@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>A Lâmina do Vale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Pixelify+Sans:wght@400;600&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+</head>
+<body>
+<main class="wrap">
+  <div class="stage" id="stage" tabindex="0" aria-label="Tela do jogo">
+    <canvas id="screen"></canvas>
+    <div class="roomname" id="roomname"></div>
+    <div class="hud" id="hud" hidden>
+      <div class="bar hp" role="meter" aria-label="Vida" aria-valuemin="0"><span></span></div>
+      <div class="bar mp" role="meter" aria-label="Mana" aria-valuemin="0"><span></span></div>
+      <span class="badge" id="pvpBadge" hidden></span>
+    </div>
+    <div class="death" id="death" role="alert" hidden><strong>Você caiu</strong><span id="deathTimer"></span></div>
+    <div class="status" id="status" role="status" hidden></div>
+    <div class="dialog" id="dialog" aria-live="polite" hidden><p id="dlgText"></p><span class="more" id="dlgMore">▼</span></div>
+    <div class="names" id="names" aria-hidden="true"></div>
+    <div class="start" id="start">
+      <div class="startcard">
+        <strong>A Lâmina do Vale</strong>
+        <span>Clique ou aperte uma tecla para jogar</span>
+        <em id="startHint">Comece lendo a placa à sua frente</em>
+        <em>Enter abre o chat · Esc abre o menu</em>
+      </div>
+    </div>
+    <div class="chatlog" id="chatlog" aria-live="polite" aria-label="Chat"></div>
+    <form class="chatbar" id="chatbar" hidden autocomplete="off">
+      <button type="button" class="chatch" id="chatCh"></button>
+      <input id="chatInput" type="text" enterkeyhint="send" spellcheck="false" aria-label="Mensagem">
+    </form>
+    <button class="chatbtn" id="chatBtn" type="button" aria-label="Chat (Enter)">💬</button>
+    <button class="menubtn" id="menuBtn" type="button" aria-label="Menu (Esc)" aria-controls="menu">☰</button>
+    <div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Menu" hidden>
+      <div class="menucard">
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-tab="char" aria-selected="true">Personagem</button>
+          <button type="button" role="tab" data-tab="opts" aria-selected="false" tabindex="-1">Opções</button>
+          <button type="button" role="tab" data-tab="keys" aria-selected="false" tabindex="-1">Controles</button>
+        </div>
+
+        <section role="tabpanel" data-panel="char">
+          <div class="charrow">
+            <canvas id="preview" width="18" height="18" aria-hidden="true"></canvas>
+            <label class="field">Nome<input id="nameInput" type="text" autocomplete="off" spellcheck="false"></label>
+          </div>
+          <div class="group"><span>Capa</span><div class="swatches" id="cloaks" role="radiogroup" aria-label="Cor da capa"></div></div>
+          <div class="group"><span>Cabelo</span><div class="swatches" id="hairs" role="radiogroup" aria-label="Cor do cabelo"></div></div>
+          <div class="saverow"><button type="button" class="primary" id="saveChar">Salvar</button><span id="charSaved" role="status"></span></div>
+        </section>
+
+        <section role="tabpanel" data-panel="opts" hidden>
+          <fieldset class="group">
+            <legend>Nomes sobre a cabeça</legend>
+            <div class="seg">
+              <label><input type="radio" name="names" value="all"><span>Todos</span></label>
+              <label><input type="radio" name="names" value="others"><span>Só dos outros</span></label>
+              <label><input type="radio" name="names" value="none"><span>Nenhum</span></label>
+            </div>
+          </fieldset>
+          <fieldset class="group">
+            <legend>PvP</legend>
+            <label class="toggle"><input type="checkbox" id="optPvp"><span>Lutar contra outros jogadores</span><kbd>V</kbd></label>
+            <p class="hint" id="pvpHint"></p>
+          </fieldset>
+          <label class="toggle"><input type="checkbox" id="optBubbles"><span>Balões de fala</span></label>
+          <label class="toggle"><input type="checkbox" id="optSound"><span>Som</span><kbd>M</kbd></label>
+          <label class="toggle"><input type="checkbox" id="optPaths"><span>Caminhos dos monstros</span><kbd>P</kbd></label>
+        </section>
+
+        <section role="tabpanel" data-panel="keys" hidden>
+          <dl class="keys">
+            <dt>Andar</dt><dd><kbd>←↑↓→</kbd> ou <kbd>WASD</kbd>. Na beira de um barranco, ande para baixo para pular.</dd>
+            <dt>Espada</dt><dd><kbd>J</kbd> <kbd>Z</kbd> <kbd>Espaço</kbd> ou clique esquerdo. Segure até brilhar e solte para girar.</dd>
+            <dt>Arco</dt><dd><kbd>L</kbd> <kbd>C</kbd> ou clique direito.</dd>
+            <dt>Dash</dt><dd>Segure <kbd>Shift</kbd> ou <kbd>Q</kbd>. Corre até bater em algo ou virar para trás.</dd>
+            <dt>Levantar e ler</dt><dd><kbd>E</kbd> <kbd>K</kbd> ou <kbd>X</kbd>. Aperte de novo para arremessar.</dd>
+            <dt>Mira</dt><dd>Com o mouse sobre a tela, espada, flechas e arremessos seguem o cursor.</dd>
+            <dt>Chat</dt><dd><kbd>Enter</kbd> abre e envia, <kbd>Tab</kbd> troca entre Perto e Todos, <kbd>Esc</kbd> cancela. <kbd>/t</kbd> antes da mensagem manda para todos.</dd>
+            <dt>PvP</dt><dd><kbd>V</kbd> liga e desliga (quando o servidor permite escolher). Nome vermelho = pode lutar.</dd>
+            <dt>Menu</dt><dd><kbd>Esc</kbd></dd>
+          </dl>
+        </section>
+
+        <button type="button" class="close" id="closeMenu">Voltar ao jogo</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="pad" id="pad">
+    <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
+    <div class="btns">
+      <button class="btn c" id="btnC" type="button">C<span>Arco</span></button>
+      <button class="btn d" id="btnD" type="button">D<span>Dash</span></button>
+      <button class="btn b" id="btnB" type="button">B<span>Levantar</span></button>
+      <button class="btn a" id="btnA" type="button">A<span>Espada</span></button>
+    </div>
+  </div>
+</main>
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>

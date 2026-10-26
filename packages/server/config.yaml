@@ -1,0 +1,67 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  A Lâmina do Vale — configuração do servidor                 ║
+# ║  Salve o arquivo e o servidor aplica na hora, sem reiniciar. ║
+# ║  Se algo estiver errado, ele avisa a linha e mantém o antigo.║
+# ╚══════════════════════════════════════════════════════════════╝
+# Tempos aceitam 500ms, 30s, 5m, 1h ou um número em segundos.
+
+server:
+  port: 2567
+  maxPlayers: 100
+  motd: "Bem-vindos ao Vale!"
+
+network:
+  sendRate: 20              # atualizações enviadas a cada jogador por segundo
+
+# ── Chat ──────────────────────────────────────────────
+chat:
+  maxLength: 120            # caracteres por mensagem
+  localRange: 320           # pixels: até onde chega o canal "Perto" (a tela tem 256 de largura)
+  burst: 5                  # contra spam: no máximo 5 mensagens...
+  per: 5s                   # ...a cada 5 segundos
+  announceJoins: true       # avisar quando alguém entra ou sai
+
+# ── Regeneração do mundo ──────────────────────────────
+regrow:
+  bush: 3m                  # arbusto cortado ou levantado volta em 3 minutos
+  tallGrass: 1m
+  rock: 5m
+
+# ── Inimigos ──────────────────────────────────────────
+# hp: golpes de espada para derrubar · damage: vida que tiram do jogador ao encostar
+enemies:
+  slime:  { hp: 2, respawn: 2m, damage: 10 }
+  beetle: { hp: 3, respawn: 4m, damage: 20 }
+
+# ── Jogadores ─────────────────────────────────────────
+player:
+  maxHp: 100
+  maxMana: 50               # ainda sem magias: a barra já existe para magos, curandeiros e bruxos
+  hpRegen: 2                # vida por segundo, depois de regenDelay sem levar dano
+  manaRegen: 3              # mana por segundo
+  regenDelay: 5s
+  respawnPoint: clareira    # id da região onde se renasce
+  respawnDelay: 5s
+  invulnerableAfterRespawn: 3s
+
+# ── PvP ───────────────────────────────────────────────
+pvp:
+  mode: optional            # off: ninguém luta · optional: só quem ligou o PvP · open: todos
+  toggleCooldown: 5m        # depois de ligar o PvP, só pode desligar após esse tempo
+  combatLock: 30s           # depois de uma briga com jogador, não desliga por esse tempo
+  safeZones: [clareira]     # regiões sem PvP e sem monstros
+  damage:                   # vida que cada golpe tira de outro jogador
+    sword: 15
+    spin: 25
+    dash: 20
+    arrow: 10
+    thrown: 20
+  announceKills: true       # "Fulano derrubou Beltrano" no chat de todos
+
+# ── Ainda não aplicado ────────────────────────────────
+# Já validado aqui, mas só passa a valer quando o jogo ganhar XP e itens.
+
+rates:
+  xp: 1.0                   # 2.0 = XP em dobro
+  drop: 1.0
+  gold: 1.0

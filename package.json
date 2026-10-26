@@ -1,0 +1,26 @@
+{
+  "name": "lamina-do-vale",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently -k -n servidor,cliente -c magenta,cyan \"npm run dev -w @vale/server\" \"npm run dev -w @vale/client\"",
+    "server": "npm run dev -w @vale/server",
+    "build": "npm run build -w @vale/client",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/server && tsc -p packages/client",
+    "test": "vitest run",
+    "check": "npm run typecheck && npm test",
+    "client": "npm run dev -w @vale/client",
+    "start": "npm run build && npm run start -w @vale/server"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "concurrently": "^10.0.6",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.5",
+    "vitest": "^5.0.5"
+  }
+}

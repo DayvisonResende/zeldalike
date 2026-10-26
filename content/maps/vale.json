@@ -1,0 +1,189 @@
+{
+  "name": "O Vale",
+  "cols": 48,
+  "rows": 28,
+  "spawn": {
+    "x": 152,
+    "y": 74
+  },
+  "regions": [
+    {
+      "id": "clareira",
+      "name": "Clareira",
+      "x": 0,
+      "y": 0,
+      "w": 16,
+      "h": 14
+    },
+    {
+      "id": "margem-do-rio",
+      "name": "Margem do Rio",
+      "x": 16,
+      "y": 0,
+      "w": 16,
+      "h": 14
+    },
+    {
+      "id": "rochedo",
+      "name": "Rochedo",
+      "x": 32,
+      "y": 0,
+      "w": 16,
+      "h": 14
+    },
+    {
+      "id": "bosque-fechado",
+      "name": "Bosque Fechado",
+      "x": 0,
+      "y": 14,
+      "w": 16,
+      "h": 14
+    },
+    {
+      "id": "ruinas-de-aurel",
+      "name": "Ruínas de Aurel",
+      "x": 16,
+      "y": 14,
+      "w": 16,
+      "h": 14
+    },
+    {
+      "id": "lago-das-garcas",
+      "name": "Lago das Garças",
+      "x": 32,
+      "y": 14,
+      "w": 16,
+      "h": 14
+    }
+  ],
+  "tiles": [
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTcccccccccccccccc",
+    "T,..f....,...f.TT..,..TT...,...Tcccccccccccccccc",
+    "T.bb..gg.....b.TT.gg..TT..bb...Tc..r..r....r...c",
+    "T.bb..gg.s...bbTT.ggg.....bb.r.Tc.r....rr..s...c",
+    "T......pp......TT....,...f.....Tc.....r...r....c",
+    "T..r...pp...r..TT..b.......gg..Tc..r........r..c",
+    "T......ppppppppppppppppppppppppppppppp....r....c",
+    "T..f...ppppppppppppppppppppppppppppppp.........c",
+    "T......pp.s...bTT...gg.pp..g...TT.....rr...ccccc",
+    "T.gg...ppccccccTwwwwwwwkkwwwwwwwT.r...rr...ccccc",
+    "T.ggg..pp.....,TwwwwwwwkkwwwwwwwT......pp..ccccc",
+    "T,.....pp..bb..TT..r...pp..b...TT..r...pp......T",
+    "T.r....pp...r..TT,.....pp....,.TT......pp......T",
+    "TTTTTTTppTTTTTTTTTTTTTTppTTTTTTTTTTTTTTppTTTTTTT",
+    "TTTTTTTppTTTTTTTTTTTTTTxxTTTTTTTcccccccppccccccc",
+    "TT.....pp.....TTT..s..xxxx.....Tc......pp......c",
+    "T..bb..pp..bb..TT.o..xxxxxx..o.Tc..r...pp..ww..c",
+    "T.bbbb.bb.bbbb.TT...xxxxxxxx...Tc.....pp..wwww.c",
+    "T..bb.bbbb.bb..TT..xxoxxxxoxx..Tc.f..pp..wwwwwwc",
+    "T......bb......TT.xxxxxxxxxxxx.Tc...pp..wwwwwwwc",
+    "T.TT..bbbbb.....xxxxxxxxxxxxxxxxpppppp.wwwwwwwwc",
+    "T.TT..bbbbb.....xxxxxxxxxxxxxxxxpppp..wwwwwwwwwc",
+    "T......bb...gg.TT.xxxxxxxxxxxx.TT....wwwwwwwwwwc",
+    "T.gg...pp..ggg.TT..xxoxxxxoxx..TT.r..wwwwwwww..c",
+    "T.ggg..pp.TT...TT...xxxxxxxx.b.TT.....wwwww..s.c",
+    "TT.....pp.TT..TTT.o..xxxxxx..o.TT.bb.....ww....c",
+    "TTT.f.........TTT.b..........b.TT.bb.f.........c",
+    "TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT"
+  ],
+  "enemies": [
+    {
+      "type": "slime",
+      "x": 13,
+      "y": 11
+    },
+    {
+      "type": "slime",
+      "x": 19,
+      "y": 4
+    },
+    {
+      "type": "slime",
+      "x": 28,
+      "y": 4
+    },
+    {
+      "type": "slime",
+      "x": 28,
+      "y": 12
+    },
+    {
+      "type": "beetle",
+      "x": 40,
+      "y": 5
+    },
+    {
+      "type": "beetle",
+      "x": 36,
+      "y": 10
+    },
+    {
+      "type": "slime",
+      "x": 3,
+      "y": 23
+    },
+    {
+      "type": "slime",
+      "x": 12,
+      "y": 23
+    },
+    {
+      "type": "slime",
+      "x": 4,
+      "y": 19
+    },
+    {
+      "type": "beetle",
+      "x": 20,
+      "y": 22
+    },
+    {
+      "type": "beetle",
+      "x": 27,
+      "y": 19
+    },
+    {
+      "type": "slime",
+      "x": 24,
+      "y": 24
+    },
+    {
+      "type": "beetle",
+      "x": 35,
+      "y": 24
+    },
+    {
+      "type": "slime",
+      "x": 39,
+      "y": 26
+    }
+  ],
+  "signs": {
+    "9,3": [
+      "Boas-vindas ao Vale! Use as setas ou WASD para andar.",
+      "J ou Z brande a espada. Corte os arbustos e o mato alto.",
+      "E levanta arbustos e pedras. Aperte de novo para arremessar. Também serve para ler placas.",
+      "Segure a espada até a ponta brilhar e solte para um golpe giratório.",
+      "L ou C dispara o arco. As flechas cruzam o rio, mas fincam nas árvores.",
+      "Com o mouse, tudo segue a mira: clique esquerdo usa a espada e o direito dispara o arco.",
+      "Segure Shift ou Q para correr com a espada em riste. Só não dê de cara na parede."
+    ],
+    "10,8": [
+      "Daqui dá para pular. Ande para baixo na beira do barranco.",
+      "Para voltar, suba pela trilha."
+    ],
+    "43,3": [
+      "Pedras pesadas também saem do chão.",
+      "Arremesse uma num besouro: derruba mais rápido que a espada."
+    ],
+    "19,15": [
+      "Ruínas de Aurel. Os besouros-guarda ainda patrulham a praça.",
+      "Eles perseguem quem conseguem ver. Arbustos e pilares bloqueiam a visão deles.",
+      "Se um besouro perder você de vista, ele vai até o último lugar onde te viu."
+    ],
+    "45,24": [
+      "Fim da trilha, por enquanto.",
+      "Jogue uma pedra no lago, só para ver o respingo."
+    ]
+  }
+}

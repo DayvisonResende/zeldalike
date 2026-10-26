@@ -1,0 +1,138 @@
+import { Client, type Room } from '@colyseus/sdk';
+import {
+  MSG, World, applyOwnState, bfs, cleanLook, cleanName, encodeInput, tileOf,
+  type ChatMsg, type ChatRequest, type GameEvent, type PvpInfo, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
+} from '@vale/shared';
+import { Interpolator, toFrame } from './interpolate';
+import type { Scene, Session, Status } from './types';
+
+const OVERLAY_TICKS = 90;   // quanto tempo um corte previsto espera a confirmação do servidor
+
+/* Online: o servidor manda no mundo. O cliente
+   - prevê o próprio movimento na hora (um World só com você, sem monstros) e corrige quando o servidor discorda;
+   - desenha os outros e os monstros interpolados, ~130 ms no passado;
+   - mostra os efeitos do servidor no mesmo instante em que desenha a cena a que eles pertencem. */
+export class NetSession implements Session {
+  status: Status = 'connecting';
+  private room: Room | null = null;
+  private pred: World;
+  private meId = '';
+  private auth: string[][];                                   // mapa como o servidor diz que está
+  private overlay = new Map<string, number>();                // cortes previstos ainda sem confirmação → validade
+  private pending: { seq: number; input: InputState }[] = [];
+  private seq = 0;
+  private local = 0; private offset = NaN; private sendEvery = 3;
+  private interp = new Interpolator();
+  private queued: { t: number; ev: GameEvent[] }[] = [];
+  private smooth = { x: 0, y: 0 };
+  private profiles = new Map<string, Profile>();
+  private pvpInfo: PvpInfo | null = null;
+  onWelcome?: (motd: string) => void;
+  onChat?: (m: ChatMsg) => void;
+
+  constructor(data: MapData) {
+    this.pred = new World({ ...data, enemies: [] });
+    this.auth = this.pred.map.tiles.map(r => r.slice());
+  }
+  get map() { return this.pred.map; }
+  private get player(): Player | undefined { return this.pred.players.get(this.meId); }
+
+  async connect(url: string, profile: ProfileRequest) {
+    const room = await new Client(url).join('world', profile);
+    this.room = room;
+    room.onMessage(MSG.welcome, (m: WelcomeMsg) => this.welcome(m));
+    room.onMessage(MSG.snapshot, (m: SnapshotMsg) => this.snapshot(m));
+    room.onMessage(MSG.chat, (m: ChatMsg) => this.onChat?.(m));
+    room.onMessage(MSG.profile, (m: ProfileMsg) => { if ('gone' in m) this.profiles.delete(m.id); else this.profiles.set(m.id, m); });
+    room.onDrop(() => { this.status = 'reconnecting'; });
+    room.onReconnect(() => { this.status = 'online'; });
+    room.onLeave(() => { this.status = 'offline'; });
+    room.send(MSG.hello);
+  }
+
+  private welcome(m: WelcomeMsg) {
+    this.meId = m.id; this.sendEvery = m.sendEvery;
+    m.tiles.forEach((row, ty) => [...row].forEach((c, tx) => { this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); }));
+    this.overlay.clear(); this.pending = []; this.queued = []; this.interp.clear(); this.offset = NaN;
+    if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, ''); }
+    this.profiles = new Map(m.profiles.map(p => [p.id, p]));
+    this.status = 'online';
+    this.onWelcome?.(m.motd);
+  }
+
+  private snapshot(s: SnapshotMsg) {
+    // relógio: estima o passo do servidor a partir do local, sem saltos pequenos
+    const est = s.t - this.local;
+    if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
+    this.interp.push(toFrame(s));
+    this.pvpInfo = s.pvp;
+    if (s.ev.length) this.queued.push({ t: s.t, ev: s.ev });
+    this.reconcile(s);
+  }
+
+  // Volta ao estado que o servidor confirmou e reaplica os inputs que ele ainda não viu.
+  private reconcile(s: SnapshotMsg) {
+    const p = this.player; if (!p || !s.me) return;
+    const bx = p.x, by = p.y;
+    applyOwnState(p, s.me);
+    this.pending = this.pending.filter(i => i.seq > s.ack);
+    for (const i of this.pending) this.predict(i.input);
+    // a diferença vira um deslize suave, a não ser que seja grande demais (aí teleporta)
+    this.smooth.x += bx - p.x; this.smooth.y += by - p.y;
+    if (Math.hypot(this.smooth.x, this.smooth.y) > 24) this.smooth = { x: 0, y: 0 };
+  }
+  private predict(input: InputState) {
+    this.pred.setInput(this.meId, input);
+    const evs = this.pred.step({ life: false });
+    for (const ev of evs) if (ev.t === 'tile') this.overlay.set(ev.tx + ',' + ev.ty, this.local + OVERLAY_TICKS);
+    this.pred.thrown = []; this.pred.arrows = []; this.pred.regrow.clear();   // objetos voando e regeneração vêm do servidor
+    return evs;
+  }
+  private applyTile(tx: number, ty: number, c: string) {
+    this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); this.overlay.delete(tx + ',' + ty);
+  }
+
+  // Mostra na hora para você; o servidor confirma e avisa os outros.
+  setProfile(p: ProfileRequest) {
+    const clean = { name: cleanName(p.name), look: cleanLook(p.look) };
+    if (this.meId) this.profiles.set(this.meId, { id: this.meId, ...clean });
+    if (this.status === 'online') this.room?.send(MSG.profile, clean);
+  }
+
+  pvp() { return this.pvpInfo; }
+  setPvp(on: boolean) { if (this.status === 'online') this.room?.send(MSG.pvp, { on }); }
+  chat(req: ChatRequest) { if (this.status === 'online') this.room?.send(MSG.chat, req); }
+
+  me(): PlayerView | undefined {
+    const p = this.player; if (!p) return;
+    return { ...p, x: p.x + this.smooth.x, y: p.y + this.smooth.y };
+  }
+  private get renderTick() { return this.local + this.offset - (this.sendEvery * 2 + 2); }
+
+  step(input: InputState): GameEvent[] {
+    this.local++;
+    this.smooth.x *= 0.85; this.smooth.y *= 0.85;
+    const out: GameEvent[] = [];
+    if (this.status === 'online' && this.player && this.room) {
+      const seq = ++this.seq;
+      this.pending.push({ seq, input });
+      this.room.send(MSG.input, encodeInput(seq, input));
+      // da previsão só saem os efeitos que você mesmo causou; o resto vem do servidor
+      for (const ev of this.predict(input)) if ((ev.t === 'sfx' || ev.t === 'burst' || ev.t === 'shake') && ev.by === this.meId) out.push(ev);
+    }
+    for (const [k, until] of this.overlay) if (this.local > until) { const [tx, ty] = k.split(',').map(Number); this.pred.map.set(tx, ty, this.auth[ty][tx]); this.overlay.delete(k); }
+    // eventos do servidor saem quando a cena interpolada chega ao momento deles
+    const rt = this.renderTick;
+    while (this.queued.length && this.queued[0].t <= rt + this.sendEvery) {
+      for (const ev of this.queued.shift()!.ev) { if (ev.t === 'tile') this.applyTile(ev.tx, ev.ty, ev.c); else out.push(ev); }
+    }
+    return out;
+  }
+
+  scene(withFlow: boolean): Scene {
+    const v = this.interp.at(this.renderTick), me = this.me();
+    const players = me ? [me, ...v.players] : v.players;
+    const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;
+    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, profiles: this.profiles, flow };
+  }
+}
