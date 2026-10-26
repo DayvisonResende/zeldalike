@@ -9,7 +9,8 @@ export const inView = (view: Rect, o: { x: number; y: number }) => inRect(view, 
 export function eventFor(ev: GameEvent, id: string, view: Rect) {
   switch (ev.t) {
     case 'tile': return true;                          // o mapa é de todos
-    case 'dialog': case 'region': case 'zone': return ev.to === id;
+    case 'dialog': case 'region': case 'zone': case 'gain': case 'notice': return ev.to === id;
+    case 'levelup': return inRect(view, ev.x, ev.y, EVENT_MARGIN);
     case 'kill': return false;                         // vira aviso no chat, não evento
     case 'shake': return ev.to === id && ev.by !== id; // o próprio cliente já tremeu a tela na previsão
     case 'poof': return inRect(view, ev.x, ev.y, EVENT_MARGIN);

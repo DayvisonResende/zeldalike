@@ -67,6 +67,7 @@ export function dashHits(w: World, p: Player) {
 export function damage(w: World, e: Enemy, n: number, sx: number, sy: number, by?: Player) {
   if (e.hurtT > 0) return;
   e.hp -= n; e.hurtT = 16;
+  if (by) e.lastHitBy = by.id;
   const a = Math.atan2(e.y - sy, e.x - sx);
   e.kx = Math.cos(a) * 3.2; e.ky = Math.sin(a) * 3.2;
   if (e.type === 'slime') { e.mode = 'idle'; e.z = 0; e.timer = 30; }

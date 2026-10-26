@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { parseDocument } from 'yaml';
 import { z } from 'zod';
-import type { MapData, Rules } from '@vale/shared';
+import type { LootId, MapData, Rules } from '@vale/shared';
 import { configSchema, type Config } from './schema';
 
 z.config(z.locales.ptBR());   // mensagens de validação em português
@@ -33,7 +33,13 @@ export function loadConfig(file: string, map?: MapData) { return parseConfig(fs.
 
 export function toRules(cfg: Config): Rules {
   const { mode, safeZones, toggleCooldown, combatLock, damage } = cfg.pvp;
-  return { regrow: cfg.regrow, enemies: cfg.enemies, player: cfg.player, pvp: { mode, safeZones, toggleCooldown, combatLock, damage } };
+  const enemy = (e: Config['enemies']['slime']) => ({
+    ...e, drops: Object.entries(e.drops).map(([item, d]) => typeof d === 'number' ? { item: item as LootId, chance: d, min: 1, max: 1 } : { item: item as LootId, ...d })
+  });
+  return {
+    regrow: cfg.regrow, enemies: { slime: enemy(cfg.enemies.slime), beetle: enemy(cfg.enemies.beetle) }, player: cfg.player,
+    pvp: { mode, safeZones, toggleCooldown, combatLock, damage }, rates: cfg.rates, leveling: cfg.leveling, inventory: cfg.inventory, loot: cfg.loot
+  };
 }
 
 // Recarrega quando o arquivo é salvo. Vigia a pasta porque muitos editores salvam trocando o arquivo.

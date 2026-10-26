@@ -3,7 +3,7 @@
 // `by` marca o jogador que causou o efeito: o cliente dele já o mostrou na hora (previsão),
 // então o servidor não manda de novo para ele.
 export type Sfx = 'swing' | 'cut' | 'hit' | 'lift' | 'throw' | 'break' | 'splash' | 'charge' | 'spin' | 'bump' | 'poof'
-  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down';
+  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use';
 export type Palette = 'leaf' | 'grass' | 'rock' | 'water' | 'dust' | 'spark' | 'splinter';
 export interface BurstOpts { s?: number; z?: number; up?: number }
 
@@ -16,4 +16,7 @@ export type GameEvent =
   | { t: 'dialog'; to: string; pages: string[] }
   | { t: 'region'; to: string; name: string }
   | { t: 'zone'; to: string; safe: boolean }            // entrou/saiu de zona segura
-  | { t: 'kill'; by: string; victim: string };         // um jogador derrubou outro
+  | { t: 'kill'; by: string; victim: string }          // um jogador derrubou outro
+  | { t: 'gain'; to: string; x: number; y: number; text: string }   // texto que sobe da cabeça: +5 XP, +1 Coração…
+  | { t: 'levelup'; id: string; x: number; y: number; level: number }
+  | { t: 'notice'; to: string; text: string };         // aviso curto só para você (inventário cheio…)

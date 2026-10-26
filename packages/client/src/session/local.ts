@@ -1,5 +1,5 @@
-import { World, pvpLock, setPvp, cleanChat, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
-import type { Scene, Session, Status } from './types';
+import { World, dropItem, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
+import type { Inventory, Scene, Session, Status } from './types';
 
 // Sem servidor: o mundo inteiro roda no navegador. Útil para desenvolver e quando o servidor está fora.
 export class LocalSession implements Session {
@@ -15,6 +15,13 @@ export class LocalSession implements Session {
   me() { return this.player; }
   // Sozinho no mundo: a mensagem só volta para você.
   chat(req: ChatRequest) { const text = cleanChat(req.text, 120); if (text) this.onChat?.({ ch: req.ch, text, from: this.player.id, name: this.player.name }); }
+  inventory(): Inventory {
+    const p = this.player, next = xpToNext(this.world, p.level);
+    return { bag: p.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: isFinite(next) ? next : -1 };
+  }
+  private itemResult(r: ItemResult) { if (!r.ok) this.onChat?.({ ch: 'system', text: r.reason }); }
+  useItem(slot: number) { this.itemResult(useItem(this.world, this.player, slot)); }
+  dropItem(slot: number) { this.itemResult(dropItem(this.world, this.player, slot)); }
   pvp() { return { mode: this.world.rules.pvp.mode, lock: pvpLock(this.world, this.player) }; }
   setPvp(on: boolean) {
     const r = setPvp(this.world, this.player, on);
@@ -28,6 +35,7 @@ export class LocalSession implements Session {
   scene(): Scene {
     const w = this.world;
     const profiles = new Map<string, Profile>([...w.players.values()].map(p => [p.id, { id: p.id, name: p.name, look: p.look }]));
-    return { map: w.map, meId: this.player.id, players: [...w.players.values()], enemies: w.enemies, thrown: w.thrown, arrows: w.arrows, profiles, flow: w.flow };
+    const drops = w.drops.map(d => ({ ...d, reserved: !!d.owner && d.owner !== this.player.id && w.tick < d.ownerUntil, fading: d.expires - w.tick < 600 }));
+    return { map: w.map, meId: this.player.id, players: [...w.players.values()], enemies: w.enemies, thrown: w.thrown, arrows: w.arrows, drops, profiles, flow: w.flow };
   }
 }

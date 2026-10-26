@@ -1,10 +1,10 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG, World, applyOwnState, bfs, cleanLook, cleanName, encodeInput, tileOf,
-  type ChatMsg, type ChatRequest, type GameEvent, type PvpInfo, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
+  type ChatMsg, type ChatRequest, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
-import type { Scene, Session, Status } from './types';
+import type { Inventory, Scene, Session, Status } from './types';
 
 const OVERLAY_TICKS = 90;   // quanto tempo um corte previsto espera a confirmação do servidor
 
@@ -27,8 +27,11 @@ export class NetSession implements Session {
   private smooth = { x: 0, y: 0 };
   private profiles = new Map<string, Profile>();
   private pvpInfo: PvpInfo | null = null;
+  private bag: Slot[] = []; private xpNext = 50;
   onWelcome?: (motd: string) => void;
   onChat?: (m: ChatMsg) => void;
+  onLeave?: (code: number) => void;
+  leave() { return this.room?.leave(); }
 
   constructor(data: MapData) {
     this.pred = new World({ ...data, enemies: [] });
@@ -37,8 +40,8 @@ export class NetSession implements Session {
   get map() { return this.pred.map; }
   private get player(): Player | undefined { return this.pred.players.get(this.meId); }
 
-  async connect(url: string, profile: ProfileRequest) {
-    const room = await new Client(url).join('world', profile);
+  async connect(url: string, join: JoinOptions) {
+    const room = await new Client(url).join('world', join);
     this.room = room;
     room.onMessage(MSG.welcome, (m: WelcomeMsg) => this.welcome(m));
     room.onMessage(MSG.snapshot, (m: SnapshotMsg) => this.snapshot(m));
@@ -46,7 +49,7 @@ export class NetSession implements Session {
     room.onMessage(MSG.profile, (m: ProfileMsg) => { if ('gone' in m) this.profiles.delete(m.id); else this.profiles.set(m.id, m); });
     room.onDrop(() => { this.status = 'reconnecting'; });
     room.onReconnect(() => { this.status = 'online'; });
-    room.onLeave(() => { this.status = 'offline'; });
+    room.onLeave(code => { this.status = 'offline'; this.onLeave?.(code); });
     room.send(MSG.hello);
   }
 
@@ -65,7 +68,8 @@ export class NetSession implements Session {
     const est = s.t - this.local;
     if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
     this.interp.push(toFrame(s));
-    this.pvpInfo = s.pvp;
+    this.pvpInfo = s.pvp; this.xpNext = s.xpNext;
+    if (s.bag) this.bag = s.bag;
     if (s.ev.length) this.queued.push({ t: s.t, ev: s.ev });
     this.reconcile(s);
   }
@@ -100,6 +104,12 @@ export class NetSession implements Session {
   }
 
   pvp() { return this.pvpInfo; }
+  inventory(): Inventory | null {
+    const p = this.player; if (!p) return null;
+    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext };
+  }
+  useItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'use', slot }); }
+  dropItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'drop', slot }); }
   setPvp(on: boolean) { if (this.status === 'online') this.room?.send(MSG.pvp, { on }); }
   chat(req: ChatRequest) { if (this.status === 'online') this.room?.send(MSG.chat, req); }
 
@@ -133,6 +143,6 @@ export class NetSession implements Session {
     const v = this.interp.at(this.renderTick), me = this.me();
     const players = me ? [me, ...v.players] : v.players;
     const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;
-    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, profiles: this.profiles, flow };
+    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, profiles: this.profiles, flow };
   }
 }

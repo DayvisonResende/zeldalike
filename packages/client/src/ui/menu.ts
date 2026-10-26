@@ -1,5 +1,5 @@
-import { CLOAKS, HAIRS, NAME_MAX, cleanName, type Look, type ProfileRequest, type PvpInfo } from '@vale/shared';
-import { heroSprite } from '../render/sprites';
+import { NAME_MAX, cleanName, type ProfileRequest, type PvpInfo } from '@vale/shared';
+import { buildSwatches, drawPreview, markSwatches } from './swatches';
 import type { NameMode, Settings } from './settings';
 
 export interface MenuHooks {
@@ -10,6 +10,9 @@ export interface MenuHooks {
   pvp(): (PvpInfo & { on: boolean }) | null;
   setPvp(on: boolean): void;
   closed(): void;
+  online: boolean;                 // online o nome é o do personagem (fixo)
+  switchCharacter(): void;
+  signOut(): void;
 }
 type Tab = 'char' | 'opts' | 'keys';
 
@@ -27,8 +30,8 @@ export class Menu {
 
   constructor(private hooks: MenuHooks) {
     this.nameInput.maxLength = NAME_MAX;
-    this.swatches('cloaks', CLOAKS.map(c => c.base), CLOAKS.map(c => c.name), 'cloak');
-    this.swatches('hairs', HAIRS.map(h => h.base), HAIRS.map(h => h.name), 'hair');
+    for (const [id, key] of [['cloaks', 'cloak'], ['hairs', 'hair']] as const)
+      buildSwatches(document.getElementById(id)!, key, i => { this.draft.look[key] = i; this.marks(); this.dirty(); });
     this.el.querySelectorAll<HTMLButtonElement>('[role=tab]').forEach(b => b.addEventListener('click', () => this.tab(b.dataset.tab as Tab)));
     this.el.querySelector('.tabs')!.addEventListener('keydown', e => {   // setas trocam de aba
       const k = (e as KeyboardEvent).key; if (k !== 'ArrowLeft' && k !== 'ArrowRight') return;
@@ -39,6 +42,8 @@ export class Menu {
     this.nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') this.save(); });
     document.getElementById('saveChar')!.addEventListener('click', () => this.save());
     document.getElementById('closeMenu')!.addEventListener('click', () => this.close());
+    document.getElementById('switchChar')!.addEventListener('click', () => this.hooks.switchCharacter());
+    document.getElementById('signOut')!.addEventListener('click', () => this.hooks.signOut());
     this.el.querySelectorAll<HTMLInputElement>('input[name=names]').forEach(r => r.addEventListener('change', () => this.set({ names: r.value as NameMode })));
     this.pvpBox.addEventListener('change', () => this.hooks.setPvp(this.pvpBox.checked));
     (document.getElementById('optBubbles') as HTMLInputElement).addEventListener('change', e => this.set({ bubbles: (e.target as HTMLInputElement).checked }));
@@ -54,6 +59,9 @@ export class Menu {
     const p = this.hooks.profile();
     this.draft = { name: p.name, look: { ...p.look } };
     this.nameInput.value = p.name;
+    this.nameInput.readOnly = this.hooks.online;
+    this.nameInput.title = this.hooks.online ? 'O nome é escolhido ao criar o personagem.' : '';
+    this.el.querySelectorAll<HTMLElement>('.online-only').forEach(e => { e.hidden = !this.hooks.online; });
     this.saved.textContent = '';
     this.refresh();
     this.el.hidden = false;
@@ -75,11 +83,8 @@ export class Menu {
     if (!this.open) return;
     this.pvpStatus();
     if (++this.spin % 50 === 0) this.dir = (this.dir + 1) % 4;
-    const ctx = this.preview.getContext('2d')!;
-    ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, this.preview.width, this.preview.height);
     const order = [0, 3, 1, 2] as const;   // de frente, direita, de costas, esquerda
-    ctx.drawImage(heroSprite(order[this.dir], (this.spin >> 3) % 3, 'n', this.draft.look.cloak, this.draft.look.hair), 0, 0);
+    drawPreview(this.preview, this.draft.look, order[this.dir], (this.spin >> 3) % 3);
   }
 
   // Estado do PvP: muda com o tempo (trava) e com as respostas do servidor.
@@ -101,21 +106,9 @@ export class Menu {
     this.current = t;
     this.el.querySelectorAll<HTMLButtonElement>('[role=tab]').forEach(b => { const on = b.dataset.tab === t; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
     this.el.querySelectorAll<HTMLElement>('[role=tabpanel]').forEach(p => { p.hidden = p.dataset.panel !== t; });
-    if (focus) (t === 'char' ? this.nameInput : this.el.querySelector<HTMLElement>('[aria-selected=true]'))?.focus();
+    if (focus) (t === 'char' && !this.nameInput.readOnly ? this.nameInput : this.el.querySelector<HTMLElement>('[aria-selected=true]'))?.focus();
   }
-  private swatches(id: string, colors: readonly string[], names: readonly string[], key: keyof Look) {
-    const box = document.getElementById(id)!;
-    colors.forEach((c, i) => {
-      const b = document.createElement('button');
-      b.type = 'button'; b.className = 'swatch'; b.style.setProperty('--c', c); b.title = names[i];
-      b.setAttribute('role', 'radio'); b.setAttribute('aria-label', names[i]); b.dataset.key = key; b.dataset.i = String(i);
-      b.addEventListener('click', () => { this.draft.look[key] = i; this.marks(); this.dirty(); });
-      box.append(b);
-    });
-  }
-  private marks() {
-    this.el.querySelectorAll<HTMLButtonElement>('.swatch').forEach(b => b.setAttribute('aria-checked', String(this.draft.look[b.dataset.key as keyof Look] === Number(b.dataset.i))));
-  }
+  private marks() { markSwatches(this.el, this.draft.look); }
   private dirty() { this.saved.textContent = ''; }
   private save() {
     const p = { name: cleanName(this.draft.name), look: { ...this.draft.look } };

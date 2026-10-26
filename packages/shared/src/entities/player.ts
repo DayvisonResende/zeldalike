@@ -1,6 +1,7 @@
 import { FACE, type Dir } from '../constants';
 import { emptyInput, type InputState } from '../input';
 import { DEFAULT_LOOK, type Look } from '../looks';
+import { emptyInventory, type Slot } from '../items';
 import type { Body } from '../world/collision';
 
 export type Carryable = 'b' | 'r';
@@ -20,6 +21,9 @@ export interface Player extends Body {
   killer: string | null;     // nome de quem derrubou (enquanto caído)
   pvp: boolean; pvpOnAt: number; combatAt: number;   // PvP ligado, quando ligou, última briga com jogador
   pvpActive: boolean; safe: boolean;                  // calculados a cada passo
+  level: number; xp: number; gold: number;
+  bag: Slot[]; bagVersion: number;                    // inventário; a versão muda a cada alteração (o servidor só reenvia quando muda)
+  useAt: number;                                      // passo do último item usado
   input: InputState;
   region: string | null;
 }
@@ -28,5 +32,6 @@ export function createPlayer(id: string, name: string, x: number, y: number, loo
   return { id, name, look: { ...look }, x, y, hw: 5, hh: 4, z: 0, push: 0, dvx: 0, dvy: 0, hop: null, dir: 1, aim: FACE[1], state: 'walk', t: 0, step: 0, walkT: 0,
     inv: 0, kx: 0, ky: 0, carry: null, liftFrom: null, charge: 0, charged: false, hit: new Set(),
     hp: maxHp, maxHp, mp: maxMp, maxMp, hurtAt: -Infinity, killer: null, pvp: false, pvpOnAt: -Infinity, combatAt: -Infinity, pvpActive: false, safe: false,
+    level: 1, xp: 0, gold: 0, bag: emptyInventory(20), bagVersion: 0, useAt: -Infinity,
     input: emptyInput(), region: null };
 }

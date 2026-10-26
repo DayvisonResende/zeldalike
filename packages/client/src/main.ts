@@ -8,7 +8,11 @@ import { render } from './render/renderer';
 import { LocalSession } from './session/local';
 import { NetSession } from './session/net';
 import type { Session, Status } from './session/types';
+import { Api, loadSession, saveSession } from './net/api';
+import { AccountScreen } from './ui/account';
+import { BagPanel } from './ui/bag';
 import { ChatBox } from './ui/chat';
+import { Floaters } from './ui/floaters';
 import { Dialog } from './ui/dialog';
 import { showRegion, updateHud } from './ui/hud';
 import { Menu } from './ui/menu';
@@ -37,22 +41,35 @@ const params = new URLSearchParams(location.search);
 // Em desenvolvimento a página vem do Vite (5173) e o servidor fica na 2567; compilada, ela vem do próprio servidor.
 const WS = location.protocol === 'https:' ? 'wss' : 'ws';
 const SERVER = params.get('server') || import.meta.env.VITE_SERVER_URL || (import.meta.env.DEV ? `${WS}://${location.hostname}:2567` : `${WS}://${location.host}`);
-let session: Session;
-if (params.has('offline')) session = new LocalSession(MAP, profile);
-else {
-  const net = new NetSession(MAP);
-  session = net;
-  net.onWelcome = motd => { if (motd) startHint.textContent = motd; };
-  net.connect(SERVER, profile).catch(err => {
-    console.warn('[vale] servidor indisponível, jogando offline:', err);
-    session = new LocalSession(MAP, profile);
-    bindChat(session);
-    startHint.textContent = 'Servidor fora do ar — jogando offline';
-  });
+const OFFLINE = params.has('offline');
+// Online, o mundo só conecta depois de entrar na conta e escolher o personagem; até lá a sessão é um mundo vazio.
+let session: Session = OFFLINE ? new LocalSession(MAP, profile) : new NetSession(MAP);
+let ready = OFFLINE;   // já dá para começar a jogar?
+const api = new Api(SERVER.replace(/^ws/, 'http') + '/api');
+api.token = loadSession()?.token ?? null;
+const account = new AccountScreen(api, {
+  async play(c) {
+    const net = new NetSession(MAP);
+    net.onWelcome = motd => { if (motd) startHint.textContent = motd; };
+    try { await net.connect(SERVER, { token: api.token!, characterId: c.id }); }
+    catch (e) { throw new Error(e instanceof Error && e.message ? e.message : 'Não foi possível entrar no mundo.'); }
+    session = net; bindChat(net);
+    profile = { name: c.name, look: { ...c.look } };
+    ready = true; account.hide(); begin();
+  },
+  offline: () => goOffline()
+});
+function goOffline() {
+  session = new LocalSession(MAP, profile); bindChat(session);
+  ready = true; account.hide(); startEl.hidden = false; startHint.textContent = 'Jogando offline: só você neste mundo.';
 }
+if (!OFFLINE) { startEl.hidden = true; account.start(); }
+async function switchCharacter() { await (session as NetSession).leave?.(); location.reload(); }
+async function signOut() { try { await api.logout(); } catch { } saveSession(null); await (session as NetSession).leave?.(); location.reload(); }
 const STATUS: Record<Status, string> = { connecting: 'Conectando…', online: 'Online', reconnecting: 'Reconectando…', offline: 'Desconectado', local: 'Offline' };
 let shownStatus: Status | null = null;
 function updateStatus() {
+  if (account.open) { statusEl.hidden = true; shownStatus = null; return; }
   if (session.status === shownStatus) return;
   shownStatus = session.status;
   statusEl.textContent = STATUS[shownStatus]; statusEl.dataset.state = shownStatus;
@@ -61,18 +78,25 @@ function updateStatus() {
 
 function begin() {
   ensureAudio();
-  if (started) return;
+  if (started || !ready) return;
   started = true; startEl.hidden = true;
   try { stage.focus({ preventScroll: true }); } catch { }
 }
 /* ---------- Menu (Esc), perfil e opções ---------- */
 function setSettings(s: Settings) { settings = s; saveSettings(s); setMuted(!s.sound); menu.refresh(); }
-function setProfile(p: ProfileRequest) { profile = p; saveProfile(p); session.setProfile(p); }
+// Online o nome é o do personagem; só a aparência muda (e fica salva no servidor). Offline tudo fica no navegador.
+function setProfile(p: ProfileRequest) {
+  profile = OFFLINE ? p : { name: profile.name, look: p.look };
+  if (OFFLINE) saveProfile(p);
+  session.setProfile(profile);
+}
 const menu = new Menu({
   profile: () => profile, saveProfile: setProfile, settings: () => settings, setSettings,
   pvp: () => { const i = session.pvp(), me = session.me(); return i && me ? { ...i, on: me.pvp } : null; },
   setPvp: on => session.setPvp(on),
-  closed: () => refocus()
+  closed: () => refocus(),
+  get online() { return !OFFLINE; },
+  switchCharacter, signOut
 });
 const nameTags = new NameTags(document.getElementById('names')!);
 // M liga/desliga o som, P mostra o mapa de caminhos dos monstros
@@ -83,21 +107,32 @@ const chat = new ChatBox({ send: req => session.chat(req), closed: refocus });
 const bindChat = (s: Session) => { s.onChat = m => { const mine = m.from !== undefined && m.from === session.me()?.id; chat.add(m, mine); if (m.ch === 'local' && m.from) nameTags.say(m.from, m.text); }; };
 bindChat(session);
 // Esc fecha o chat se ele estiver aberto; senão abre/fecha o menu. Enter numa placa avança o texto.
-function toggleMenu() { if (chat.open) chat.hide(); else menu.toggle(); }
-function openChat() { if (menu.open) return; if (dialog.open) { dialog.update(BUTTON.b); return; } chat.show(); }
+function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (bag.open) bag.close(); else menu.toggle(); }
+function openChat() { if (!started || menu.open) return; if (dialog.open) { dialog.update(BUTTON.b); return; } chat.show(); }
 function togglePvp() {
   const info = session.pvp(), me = session.me();
   if (!info || !me) return;
   if (info.mode !== 'optional') { chat.add({ ch: 'system', text: info.mode === 'open' ? 'Neste servidor o PvP é sempre ligado.' : 'Neste servidor não há PvP.' }, false); return; }
   session.setPvp(!me.pvp);
 }
-const hooks = { started: () => started, start: begin, toggleMute, togglePaths, toggleMenu, openChat, togglePvp };
+/* ---------- Inventário (I), atalhos 1 e 2 ---------- */
+const floaters = new Floaters(document.getElementById('floaters')!);
+const bag = new BagPanel({ inventory: () => session.inventory(), use: s => session.useItem(s), drop: s => session.dropItem(s), closed: refocus });
+function toggleBag() { if (!started || menu.open || chat.open) return; bag.toggle(); }
+function quickUse(n: 1 | 2) {
+  const inv = session.inventory(); if (!inv) return;
+  const id = n === 1 ? 'heart' : 'mana', slot = inv.bag.findIndex(s => s?.id === id);
+  if (slot < 0) { const me = session.me(); if (me) floaters.add(me.x, me.y, n === 1 ? 'Sem corações' : 'Sem poções', 'notice'); return; }
+  session.useItem(slot);
+}
+const hooks = { started: () => started, start: begin, toggleMute, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
 const input = new Input(stage, cv, hooks);
 bindTouch(input, hooks);
 startEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); begin(); });
 stage.addEventListener('pointerdown', e => { ensureAudio(); if (!(e.target as Element).closest(UI_SELECTOR)) refocus(); });
 document.getElementById('chatBtn')!.addEventListener('click', () => { begin(); openChat(); });
-document.getElementById('menuBtn')!.addEventListener('click', () => menu.toggle());
+document.getElementById('bagBtn')!.addEventListener('click', () => { begin(); toggleBag(); });
+document.getElementById('menuBtn')!.addEventListener('click', () => { if (!account.open) menu.toggle(); });
 
 // Som e efeitos só do que acontece perto da câmera.
 const HEAR = 48;
@@ -110,6 +145,14 @@ function handle(ev: GameEvent) {
     case 'shake': shake = Math.max(shake, ev.n); break;
     case 'dialog': dialog.show(ev.pages); break;
     case 'region': showRegion(ev.name); break;
+    case 'gain': floaters.add(ev.x, ev.y, ev.text, ev.text.endsWith('XP') ? 'xp' : 'item'); break;
+    case 'notice': { const me = session.me(); if (me) floaters.add(me.x, me.y, ev.text, 'notice'); break; }
+    case 'levelup': {
+      const mine = ev.id === session.me()?.id;
+      floaters.add(ev.x, ev.y, mine ? `Nível ${ev.level}!` : `Nv ${ev.level}!`, 'level');
+      if (mine) chat.add({ ch: 'system', text: `Você chegou ao nível ${ev.level}! Vida e mana máximas aumentaram.` }, false);
+      break;
+    }
     case 'zone': chat.add({ ch: 'system', text: ev.safe ? 'Você entrou numa zona segura: sem PvP e sem monstros.' : 'Você saiu da zona segura.' + (session.pvp()?.mode === 'open' || session.me()?.pvp ? ' Cuidado: PvP ativo.' : '') }, false); break;
   }
 }
@@ -122,7 +165,7 @@ function update() {
   tick++;
   if (shake > 0) shake--;
   let inp = emptyInput();
-  if (!started || menu.open || chat.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
+  if (!started || menu.open || chat.open || bag.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
   else if (dialog.open) dialog.update(input.sample(null).tap);   // lendo: o personagem fica parado, mas o mundo continua
   else inp = input.sample(aim());
   for (const ev of session.step(inp)) handle(ev);
@@ -144,7 +187,9 @@ function frame(now: number) {
   const scene = session.scene(settings.paths);
   render(ctx, scene, { me: session.me(), cam, particles, showPaths: settings.paths, reticle, shake, tick });
   nameTags.update(scene, cam, settings.names, settings.bubbles);
-  updateHud(session.status === 'connecting' ? undefined : session.me());
+  floaters.update(cam);
+  bag.render();
+  updateHud(session.status === 'connecting' ? undefined : session.me(), session.inventory());
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

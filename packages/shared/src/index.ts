@@ -18,3 +18,7 @@ export * from './protocol';
 export * from './looks';
 export * from './chat';
 export * from './view';
+export * from './accounts';
+export * from './items';
+export { dropItem, useItem, type Drop, type ItemResult } from './systems/loot';
+export { gainXp, maxStats, xpToNext } from './systems/progress';

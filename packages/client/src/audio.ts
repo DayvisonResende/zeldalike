@@ -44,6 +44,9 @@ const SFX: Record<Sfx, () => void> = {
   hop: () => tone('triangle', 260, 560, 0.14, 0.12),
   land: () => noise(0.12, 0.26, 420, 'lowpass'),
   thunk: () => tone('square', 220, 110, 0.07, 0.08),
-  down: () => { tone('triangle', 440, 70, 0.6, 0.14); noise(0.3, 0.2, 400, 'lowpass'); }
+  down: () => { tone('triangle', 440, 70, 0.6, 0.14); noise(0.3, 0.2, 400, 'lowpass'); },
+  pickup: () => { tone('square', 880, 880, 0.05, 0.06); setTimeout(() => tone('square', 1320, 1320, 0.07, 0.06), 55); },
+  use: () => { tone('sine', 300, 600, 0.12, 0.12); setTimeout(() => tone('sine', 450, 900, 0.12, 0.1), 90); },
+  levelup: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone('square', f, f, 0.12, 0.07), i * 90)); }
 };
 export function sfx(n: Sfx) { if (muted || !AC) return; try { if (AC.state === 'suspended') AC.resume(); SFX[n](); } catch { } }

@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { ConfigError, loadConfig, watchConfig } from './config/load';
 import { getConfig, setConfig } from './config/store';
 import { startServer } from './app';
+import { openDatabase, setDb } from './persistence/db';
+import { purgeSessions } from './persistence/accounts';
 import { WORLD_MAP } from './map';
 
 // CONFIG=arquivo.yaml troca a configuração (por exemplo, uma de produção ou de teste).
@@ -14,6 +16,13 @@ catch (e) { console.error(e instanceof ConfigError ? e.message : e); process.exi
 watchConfig(CONFIG_FILE, WORLD_MAP,
   c => { setConfig(c); console.log('[config] recarregada'); },
   e => console.error('[config] mudança ignorada, mantendo a anterior.\n' + e.message));
+
+// Banco: caminho relativo ao arquivo de config.
+const dbFile = path.resolve(path.dirname(CONFIG_FILE), getConfig().database.file);
+const db = await openDatabase(dbFile);
+setDb(db);
+console.log(`[banco] ${dbFile}`);
+setInterval(() => { purgeSessions(db).catch(e => console.error('[banco]', e)); }, 3_600_000).unref();
 
 // PORT no ambiente vence o config: é como as hospedagens (Fly, Railway, Render) dizem a porta.
 const port = Number(process.env.PORT) || getConfig().server.port;

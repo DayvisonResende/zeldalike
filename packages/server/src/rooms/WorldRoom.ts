@@ -1,19 +1,24 @@
-import { Room, type Client } from 'colyseus';
+import { Room, ServerError, type Client } from 'colyseus';
 import {
-  MSG, TICK_RATE, World, pvpLock, setPvp, viewRect, cleanLook, cleanName, decodeChatRequest, decodeInput, decodeProfileRequest, emptyInput, ownState, packArrow, packEnemy, packPlayer, packThrown,
-  type ChatMsg, type GameEvent, type InputState, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
+  MSG, TICK_RATE, World, blockedAt, dropItem, maxStats, packDrop, parseInventory, pvpLock, respawnPos, setPvp, useItem, viewRect, xpToNext, decodeChatRequest, decodeInput, decodeProfileRequest, emptyInput, ownState, packArrow, packEnemy, packPlayer, packThrown,
+  type ChatMsg, type GameEvent, type InputState, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { toRules } from '../config/load';
 import { getConfig, onConfig } from '../config/store';
 import type { Config } from '../config/schema';
 import { WORLD_MAP } from '../map';
 import { eventFor, inView } from './interest';
+import { onlineCharacters } from '../auth/routes';
+import { accountForToken } from '../auth/sessions';
+import { getCharacter, saveCharacters, type CharacterRow, type CharacterState } from '../persistence/characters';
+import { getDb } from '../persistence/db';
 
 const MAX_QUEUE = 12;  // inputs guardados por jogador; acima disso descarta os mais velhos
 const CATCH_UP = 3;    // fila maior que isso: aplica dois inputs por passo
 const PROFILE_EVERY = 1000;   // ms entre trocas de nome/aparência
 
-interface Seat { client: Client; queue: { seq: number; input: InputState }[]; ack: number; profileAt: number; chatTokens: number; chatAt: number }
+interface Seat { client: Client; charId: number; bagSent: number; queue: { seq: number; input: InputState }[]; ack: number; profileAt: number; chatTokens: number; chatAt: number; kicked?: boolean }
+interface Auth { accountId: number; character: CharacterRow }
 const profileOf = (p: Player): Profile => ({ id: p.id, name: p.name, look: { ...p.look } });
 const fmtWait = (s: number) => s >= 60 ? `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
 
@@ -26,6 +31,7 @@ export class WorldRoom extends Room {
   private seats = new Map<string, Seat>();
   private events: GameEvent[] = [];
   private sendEvery = 3;
+  private saveTimer?: NodeJS.Timeout;
   private unsub?: () => void;
 
   onCreate() {
@@ -37,17 +43,43 @@ export class WorldRoom extends Room {
     this.onMessage(MSG.profile, (client, msg) => this.onProfile(client, msg));
     this.onMessage(MSG.chat, (client, msg) => this.onChat(client, msg));
     this.onMessage(MSG.pvp, (client, msg) => this.onPvp(client, msg));
+    this.onMessage(MSG.item, (client, msg) => this.onItem(client, msg));
     this.setFixedTimestep(() => this.step(), TICK_RATE);
+    this.scheduleSave();
   }
   private apply(c: Config) {
     this.world.rules = toRules(c);
+    if (this.saveTimer) this.scheduleSave();
     this.maxClients = c.server.maxPlayers;
     this.sendEvery = Math.max(1, Math.round(TICK_RATE / c.network.sendRate));
   }
 
-  onJoin(client: Client, options?: { name?: unknown; look?: unknown }) {
-    const p = this.world.addPlayer(client.sessionId, cleanName(options?.name), undefined, undefined, cleanLook(options?.look));
-    this.seats.set(client.sessionId, { client, queue: [], ack: 0, profileAt: 0, chatTokens: getConfig().chat.burst, chatAt: Date.now() });
+  // Só entra quem tem sessão válida e escolheu um personagem da própria conta.
+  async onAuth(_client: Client, options: Partial<JoinOptions>): Promise<Auth> {
+    const acc = await accountForToken(getDb(), options?.token);
+    if (!acc) throw new ServerError(401, 'Sessão expirada. Entre de novo.');
+    const character = Number.isInteger(options?.characterId) ? await getCharacter(getDb(), acc.id, options!.characterId!) : undefined;
+    if (!character) throw new ServerError(404, 'Personagem não encontrado.');
+    return { accountId: acc.id, character };
+  }
+
+  onJoin(client: Client, _options: unknown, auth: Auth) {
+    const c = auth.character;
+    // O mesmo personagem entrou de outro lugar: a sessão antiga sai, e o estado dela (mais novo que o do banco) continua.
+    let resume: CharacterState | null = null;
+    for (const [id, seat] of this.seats) if (seat.charId === c.id) {
+      resume = this.stateOf(this.world.players.get(id)!);
+      seat.kicked = true; this.world.removePlayer(id); this.seats.delete(id);
+      seat.client.send(MSG.chat, { ch: 'system', text: 'Seu personagem entrou em outro lugar.' } satisfies ChatMsg);
+      seat.client.leave(4002);
+    }
+    const s = resume ?? this.loadState(c);
+    const p = this.world.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
+    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag;
+    const m = maxStats(this.world, p.level); p.maxHp = m.hp; p.maxMp = m.mp;
+    p.hp = Math.min(s.hp, m.hp); p.mp = Math.min(s.mp, m.mp);
+    onlineCharacters.add(c.id);
+    this.seats.set(client.sessionId, { client, charId: c.id, bagSent: -1, queue: [], ack: 0, profileAt: 0, chatTokens: getConfig().chat.burst, chatAt: Date.now() });
     this.broadcastProfile(profileOf(p), client);
     if (getConfig().chat.announceJoins) this.sendChat({ ch: 'system', text: `${p.name} entrou no Vale` }, client);
   }
@@ -61,17 +93,48 @@ export class WorldRoom extends Room {
   }
   onReconnect(client: Client) {
     const seat = this.seats.get(client.sessionId);
-    if (seat) seat.client = client;
+    if (seat) { seat.client = client; seat.bagSent = -1; }   // reenvia o inventário
     this.welcome(client);
   }
-  onLeave(client: Client) {
-    const p = this.world.players.get(client.sessionId);
+  async onLeave(client: Client) {
+    const seat = this.seats.get(client.sessionId), p = this.world.players.get(client.sessionId);
+    if (!seat || seat.kicked) return;   // expulso por ter entrado de outro lugar: já foi salvo e trocado
+    onlineCharacters.delete(seat.charId);
+    if (p) await this.save([[seat, p]]);
     if (p && getConfig().chat.announceJoins) this.sendChat({ ch: 'system', text: `${p.name} saiu` }, client);
     this.world.removePlayer(client.sessionId);
     this.seats.delete(client.sessionId);
     this.broadcastProfile({ id: client.sessionId, gone: true });
   }
-  onDispose() { this.unsub?.(); }
+  async onDispose() { this.unsub?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
+
+  /* ---------- Salvar e carregar personagens ---------- */
+  private loadState(c: CharacterRow): CharacterState {
+    const w = this.world, r = w.rules.player, m = maxStats(w, c.level);
+    const ok = c.x !== null && c.y !== null && w.map.inBounds(Math.floor(c.x / 16), Math.floor(c.y / 16)) && !blockedAt(w.map, c.x, c.y, 5, 4);
+    const at = ok ? { x: c.x!, y: c.y! } : respawnPos(w, r.respawnPoint);
+    const hp = c.hp === null || c.hp <= 0 ? m.hp : Math.min(c.hp, m.hp);
+    let bag; try { bag = JSON.parse(c.items); } catch { bag = []; }
+    return { ...at, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
+      level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack) };
+  }
+  // Quem sai caído volta no ponto de renascimento, com a vida cheia.
+  private stateOf(p: Player): CharacterState {
+    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }) };
+    if (p.state === 'dead') { const at = respawnPos(this.world, this.world.rules.player.respawnPoint); return { ...at, hp: p.maxHp, mp: p.maxMp, ...keep }; }
+    return { x: p.x, y: p.y, hp: p.hp, mp: p.mp, ...keep };
+  }
+  private async save(list: [Seat, Player][]) {
+    try { await saveCharacters(getDb(), list.map(([s, p]) => ({ id: s.charId, state: this.stateOf(p) }))); }
+    catch (e) { console.error('[banco] falha ao salvar personagens:', e); }
+  }
+  private saveAll() {
+    return this.save([...this.seats].flatMap(([id, s]) => { const p = this.world.players.get(id); return p ? [[s, p] as [Seat, Player]] : []; }));
+  }
+  private scheduleSave() {
+    clearTimeout(this.saveTimer);
+    this.saveTimer = setTimeout(async () => { await this.saveAll(); this.scheduleSave(); }, getConfig().accounts.saveEvery * 1000);
+  }
 
   private welcome(client: Client) {
     const msg: WelcomeMsg = {
@@ -88,7 +151,7 @@ export class WorldRoom extends Room {
     const seat = this.seats.get(client.sessionId), p = this.world.players.get(client.sessionId), req = decodeProfileRequest(raw);
     if (!seat || !p || !req || Date.now() - seat.profileAt < PROFILE_EVERY) return;
     seat.profileAt = Date.now();
-    p.name = req.name; p.look = req.look;
+    p.look = req.look;   // o nome é o do personagem, escolhido na criação
     this.broadcastProfile(profileOf(p));
   }
   // Chat: limpo, limitado contra spam (burst mensagens a cada `per`) e entregue por canal.
@@ -117,6 +180,13 @@ export class WorldRoom extends Room {
       ? (this.world.rules.pvp.mode === 'open' ? 'Neste servidor o PvP é sempre ligado.' : 'Neste servidor não há PvP.')
       : `Você só pode desligar o PvP em ${fmtWait(r.wait ?? 0)}.`;
     client.send(MSG.chat, { ch: 'system', text } satisfies ChatMsg);
+  }
+  // Usar ou largar um item do inventário; recusa vira aviso só para quem pediu.
+  private onItem(client: Client, raw: unknown) {
+    const p = this.world.players.get(client.sessionId), m = raw as { action?: unknown; slot?: unknown } | null;
+    if (!p || !m || !Number.isInteger(m.slot) || (m.slot as number) < 0 || (m.slot as number) >= p.bag.length) return;
+    const r = m.action === 'use' ? useItem(this.world, p, m.slot as number) : m.action === 'drop' ? dropItem(this.world, p, m.slot as number) : null;
+    if (r && !r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg);
   }
   private announceKill(by: string, victim: string) {
     const a = this.world.players.get(by), v = this.world.players.get(victim);
@@ -161,8 +231,11 @@ export class WorldRoom extends Room {
         o: w.thrown.filter(near).map(packThrown),
         a: w.arrows.filter(near).map(packArrow),
         ev: this.events.filter(ev => eventFor(ev, id, view)),
-        pvp: { mode: w.rules.pvp.mode, lock: pvpLock(w, me) }
+        pvp: { mode: w.rules.pvp.mode, lock: pvpLock(w, me) },
+        d: w.drops.filter(near).map(d => packDrop({ ...d, reserved: !!d.owner && d.owner !== id && w.tick < d.ownerUntil, fading: d.expires - w.tick < 600 })),
+        xpNext: me.level >= w.rules.leveling.maxLevel ? -1 : xpToNext(w, me.level)
       };
+      if (seat.bagSent !== me.bagVersion) { msg.bag = me.bag; seat.bagSent = me.bagVersion; }
       seat.client.send(MSG.snapshot, msg);
     }
   }

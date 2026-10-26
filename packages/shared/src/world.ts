@@ -5,6 +5,7 @@ import { createPlayer, type Player } from './entities/player';
 import type { Enemy } from './entities/enemy';
 import type { InputState } from './input';
 import type { Look } from './looks';
+import { emptyInventory } from './items';
 import { WorldMap, type MapData } from './world/map';
 import type { DistMap } from './world/pathfinding';
 import { refreshFlow, separate, updateEnemy } from './systems/ai';
@@ -12,6 +13,7 @@ import { contact } from './systems/carry';
 import { updatePlayer } from './systems/control';
 import { updateLife } from './systems/life';
 import { inSafeZone, updatePvp } from './systems/pvp';
+import { updateLoot, type Drop } from './systems/loot';
 import { updateArrows, updateThrown, type Arrow, type Thrown } from './systems/projectiles';
 import { updateRegrowth, type Regrow } from './systems/regrowth';
 import { createEnemy, updateSpawns, type Spawn } from './systems/spawner';
@@ -27,6 +29,7 @@ export class World {
   enemies: Enemy[] = [];
   thrown: Thrown[] = [];
   arrows: Arrow[] = [];
+  drops: Drop[] = [];
   spawns: Spawn[];
   regrow = new Map<string, Regrow>();
   flow: DistMap | null = null;
@@ -44,6 +47,7 @@ export class World {
 
   addPlayer(id: string, name: string, x = this.map.data.spawn.x, y = this.map.data.spawn.y, look?: Look) {
     const p = createPlayer(id, name, x, y, look, this.rules.player.maxHp, this.rules.player.maxMana);
+    p.bag = emptyInventory(this.rules.inventory.slots);
     this.players.set(id, p);
     return p;
   }
@@ -72,7 +76,7 @@ export class World {
     separate(this);
     this.enemies = this.enemies.filter(e => !e.dead);
     updateThrown(this); updateArrows(this); contact(this);
-    if (opts.life !== false) { updateLife(this); updatePvp(this); }
+    if (opts.life !== false) { updateLife(this); updatePvp(this); updateLoot(this); }
     updateRegrowth(this); updateSpawns(this);
     for (const p of this.players.values()) {
       const r = this.map.regionAt(p.x, p.y);

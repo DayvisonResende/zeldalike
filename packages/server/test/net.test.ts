@@ -2,10 +2,11 @@ import fs from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, type Room } from '@colyseus/sdk';
 import { matchMaker } from 'colyseus';
-import { MSG, World, encodeInput, emptyInput, unpackPlayer, type ChatMsg, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
+import { MSG, World, encodeInput, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
 import { parseConfig } from '../src/config/load';
 import { setConfig } from '../src/config/store';
 import { startServer } from '../src/app';
+import { getDb, openDatabase, setDb } from '../src/persistence/db';
 import { WORLD_MAP } from '../src/map';
 
 // Sobe o servidor de verdade numa porta livre e conecta clientes reais pelo WebSocket.
@@ -14,8 +15,28 @@ let server: Awaited<ReturnType<typeof startServer>>['server'];
 let roomId = '';
 
 interface Bot { room: Room; welcome: WelcomeMsg; last: SnapshotMsg | null; seq: number; tiles: Map<string, string>; profiles: Map<string, Profile>; chat: ChatMsg[] }
+const API = () => `http://127.0.0.1:${PORT}/api`;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function api(path: string, body?: unknown, token?: string, method = body === undefined ? 'GET' : 'POST'): Promise<{ status: number; body: any }> {
+  const res = await fetch(API() + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) });
+  return { status: res.status, body: res.status === 204 ? null : await res.json() };
+}
+// Uma conta e um personagem por nome, criados na primeira vez; a cada bot o personagem volta ao ponto de partida.
+const accounts = new Map<string, { token: string; charId: number }>();
+async function account(name: string, look?: unknown) {
+  let a = accounts.get(name);
+  if (!a) {
+    const user = 'u' + name.toLowerCase().replace(/[^a-z0-9]/g, '') + Math.floor(Math.random() * 1e6);
+    const { body: auth } = await api('/register', { username: user, password: 'senha123' });
+    const { body: ch } = await api('/characters', { name, look }, auth.token);
+    accounts.set(name, a = { token: auth.token, charId: ch.id });
+  }
+  await getDb().updateTable('characters').set({ x: null, y: null, hp: null, mp: null }).where('id', '=', a.charId).execute();
+  return a;
+}
 async function bot(name: string, look?: unknown): Promise<Bot> {
-  const room = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { name, look });
+  const a = await account(name, look);
+  const room = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: a.token, characterId: a.charId });
   const b = { room, last: null, seq: 0, tiles: new Map(), profiles: new Map(), chat: [] } as unknown as Bot;
   room.onMessage(MSG.chat, (m: ChatMsg) => b.chat.push(m));
   room.onMessage(MSG.profile, (m: ProfileMsg) => { if ('gone' in m) b.profiles.delete(m.id); else b.profiles.set(m.id, m); });
@@ -35,8 +56,9 @@ async function hold(b: Bot, patch: Partial<InputState>, ms: number) {
 }
 
 beforeAll(async () => {
-  const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8').replace(/port: \d+/, `port: ${PORT}`);
+  const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8').replace(/port: \d+/, `port: ${PORT}`).replace(/registerPerHour: \d+/, 'registerPerHour: 1000');
   setConfig(parseConfig(text, WORLD_MAP));
+  setDb(await openDatabase(':memory:'));
   ({ server, roomId } = await startServer(PORT));
 });
 afterAll(async () => { await server.gracefullyShutdown(false); });
@@ -101,16 +123,15 @@ describe('rede', () => {
     await a.room.leave();
   });
 
-  it('nome e aparência: validados, avisados a todos, e quem sai some da lista', async () => {
-    const a = await bot('Ana', { cloak: 3, hair: 99 });
-    const b = await bot('  <Beto>!! ', { cloak: -1 });
+  it('aparência: avisada a todos, nome fixo do personagem, e quem sai some da lista', async () => {
+    const a = await bot('Aline', { cloak: 3, hair: 99 });
+    const b = await bot('Bruno');
     await sleep(100);
-    expect(b.profiles.get(a.room.sessionId)).toMatchObject({ name: 'Ana', look: { cloak: 3, hair: 0 } });   // cabelo inválido → padrão
-    expect(a.profiles.get(b.room.sessionId)?.name).toBe('Beto');
-    b.room.send(MSG.profile, { name: 'Beto Bravo', look: { cloak: 5, hair: 2 } });
+    expect(b.profiles.get(a.room.sessionId)).toMatchObject({ name: 'Aline', look: { cloak: 3, hair: 0 } });   // cabelo inválido → padrão
+    b.room.send(MSG.profile, { name: 'Outro Nome', look: { cloak: 5, hair: 2 } });
     b.room.send(MSG.profile, { name: 'Spam', look: { cloak: 1, hair: 1 } });   // cedo demais: ignorado
     await sleep(150);
-    expect(a.profiles.get(b.room.sessionId)).toMatchObject({ name: 'Beto Bravo', look: { cloak: 5, hair: 2 } });
+    expect(a.profiles.get(b.room.sessionId)).toMatchObject({ name: 'Bruno', look: { cloak: 5, hair: 2 } });   // o nome não muda
     const bid = b.room.sessionId;
     await b.room.leave(); await sleep(150);
     expect(a.profiles.has(bid)).toBe(false);
@@ -196,5 +217,116 @@ describe('rede', () => {
     await sleep(100);
     expect(a.last!.ack).toBe(a.seq);
     await a.room.leave();
+  });
+});
+
+describe('contas e personagens', () => {
+  it('cria conta, recusa usuário repetido (sem diferenciar maiúsculas) e senha curta', async () => {
+    const user = 'Ze' + Math.floor(Math.random() * 1e6);
+    expect((await api('/register', { username: user, password: 'senha123' })).status).toBe(201);
+    expect(await api('/register', { username: user.toLowerCase(), password: 'senha123' })).toMatchObject({ status: 409, body: { error: 'Esse usuário já existe.' } });
+    expect((await api('/register', { username: 'outro' + user, password: '123' })).body.error).toMatch(/pelo menos 6/);
+    expect((await api('/register', { username: 'com espaço', password: 'senha123' })).status).toBe(400);
+  });
+  it('login certo devolve token; errado não diz se a conta existe', async () => {
+    const user = 'Lu' + Math.floor(Math.random() * 1e6);
+    await api('/register', { username: user, password: 'senha123' });
+    const ok = await api('/login', { username: user, password: 'senha123' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.token).toMatch(/^[\w-]{40,}$/);
+    const wrong = await api('/login', { username: user, password: 'errada!' }), none = await api('/login', { username: 'ninguem' + user, password: 'senha123' });
+    expect([wrong.status, none.status]).toEqual([401, 401]);
+    expect(wrong.body.error).toBe(none.body.error);
+    expect((await api('/me', undefined, 'token-falso-mas-comprido-o-bastante')).status).toBe(401);
+  });
+  it('senha guardada só como hash', async () => {
+    const user = 'Hx' + Math.floor(Math.random() * 1e6);
+    await api('/register', { username: user, password: 'minha-senha' });
+    const row = await getDb().selectFrom('accounts').select('pass_hash').where('username', '=', user).executeTakeFirstOrThrow();
+    expect(row.pass_hash).toMatch(/^scrypt\$/);
+    expect(row.pass_hash).not.toContain('minha-senha');
+  });
+  it('personagens: até o máximo da config, nome único e válido, apagar só os seus', async () => {
+    const { body: a } = await api('/register', { username: 'Pa' + Math.floor(Math.random() * 1e6), password: 'senha123' });
+    const { body: b } = await api('/register', { username: 'Pb' + Math.floor(Math.random() * 1e6), password: 'senha123' });
+    const base = 'Heroi' + Math.floor(Math.random() * 1e5);
+    const c1 = await api('/characters', { name: base + 'a', look: { cloak: 2, hair: 3 } }, a.token);
+    expect(c1).toMatchObject({ status: 201, body: { name: base + 'a', look: { cloak: 2, hair: 3 } } });
+    expect((await api('/characters', { name: (base + 'A').toUpperCase() }, b.token)).status).toBe(409);   // nome já usado, mesmo com outras maiúsculas
+    expect((await api('/characters', { name: '<script>' }, a.token)).status).toBe(400);
+    const accent = 'Íris' + base.slice(5);
+    expect((await api('/characters', { name: accent }, a.token)).status).toBe(201);
+    expect((await api('/characters', { name: accent.toLowerCase().replace('í', 'i') }, b.token)).body.error).toBe('Esse nome já está em uso.');
+    await api('/characters/' + (await api('/me', undefined, a.token)).body.characters.find((c: { name: string }) => c.name === accent).id, undefined, a.token, 'DELETE');
+    await api('/characters', { name: base + 'b' }, a.token); await api('/characters', { name: base + 'c' }, a.token);
+    expect((await api('/characters', { name: base + 'd' }, a.token)).body.error).toMatch(/já tem 3/);
+    expect((await api('/me', undefined, a.token)).body.characters).toHaveLength(3);
+    expect((await api('/characters/' + c1.body.id, undefined, b.token, 'DELETE')).status).toBe(404);   // não é dele
+    expect((await api('/characters/' + c1.body.id, undefined, a.token, 'DELETE')).status).toBe(204);
+    expect((await api('/me', undefined, a.token)).body.characters).toHaveLength(2);
+  });
+  it('sem token válido ou com personagem de outra conta, não entra no mundo', async () => {
+    const c = new Client(`ws://127.0.0.1:${PORT}`);
+    await expect(c.join('world', { token: 'x'.repeat(43), characterId: 1 })).rejects.toThrow(/Sessão expirada/);
+    const mine = await account('Dono'), { body: other } = await api('/register', { username: 'In' + Math.floor(Math.random() * 1e6), password: 'senha123' });
+    await expect(c.join('world', { token: other.token, characterId: mine.charId })).rejects.toThrow(/não encontrado/);
+  });
+  it('posição, vida e aparência ficam salvas ao sair e voltam ao entrar', async () => {
+    const a = await bot('Salva');
+    const world = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    const p = world.players.get(a.room.sessionId)!; p.x = 20 * 16; p.y = 7 * 16; p.hp = 42;
+    a.room.send(MSG.profile, { name: 'x', look: { cloak: 4, hair: 6 } });
+    await sleep(150); await a.room.leave(); await sleep(150);
+    const acc = accounts.get('Salva')!;
+    const room = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: acc.token, characterId: acc.charId });
+    await sleep(150);
+    const again = world.players.get(room.sessionId)!;
+    expect([again.x, again.y, Math.floor(again.hp), again.look]).toEqual([320, 112, 42, { cloak: 4, hair: 6 }]);
+    await room.leave();
+  });
+  it('o mesmo personagem entrando de outro lugar derruba a sessão antiga', async () => {
+    const a = await bot('Duplo');
+    const kicked = new Promise<number>(r => a.room.onLeave(code => r(code)));
+    const acc = accounts.get('Duplo')!;
+    const room2 = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: acc.token, characterId: acc.charId });
+    expect(await kicked).toBe(4002);
+    await sleep(100);
+    const world = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    expect([...world.players.values()].filter(p => p.name === 'Duplo')).toHaveLength(1);
+    await room2.leave();
+  });
+});
+
+describe('progresso e itens', () => {
+  it('derrubar monstro dá XP, o loot vai para o inventário, usar item cura, e tudo fica salvo', async () => {
+    const a = await bot('Lootadora');
+    const world = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    const p = world.players.get(a.room.sessionId)!;
+    p.x = 20 * 16; p.y = 7 * 16;
+    // geleca morrendo com golpe da Ana, e a tabela de drop forçada para ter certeza do loot
+    const saved = world.rules.enemies.slime.drops;
+    world.rules.enemies.slime.drops = [{ item: 'gold', chance: 1, min: 3, max: 3 }, { item: 'heart', chance: 1, min: 1, max: 1 }];
+    const e = world.enemies.find(e => e.type === 'slime')!;
+    e.x = p.x + 4; e.y = p.y; e.lastHitBy = p.id; e.hp = 0; e.dying = true; e.hurtT = 1;
+    const gains: string[] = [];
+    a.room.onMessage(MSG.snapshot, (s: SnapshotMsg) => { for (const ev of s.ev as GameEvent[]) if (ev.t === 'gain') gains.push(ev.text); });
+    await sleep(600);
+    world.rules.enemies.slime.drops = saved;
+    expect(a.last!.me).toMatchObject({ xp: 5, gold: 3, level: 1 });
+    expect(a.last!.xpNext).toBe(50);
+    expect(gains).toEqual(expect.arrayContaining(['+5 XP', '+3 de ouro', '+Coração']));
+    const slot = p.bag.findIndex(s => s?.id === 'heart');
+    p.hp = 40;
+    a.room.send(MSG.item, { action: 'use', slot });
+    await sleep(150);
+    expect(Math.round(a.last!.me!.hp)).toBe(65);
+    a.room.send(MSG.item, { action: 'use', slot: 99 });     // espaço inexistente: ignorado
+    p.bag[5] = { id: 'shell', n: 7 }; p.bagVersion++;
+    await sleep(150);
+    expect(a.last!.bag).toBeUndefined();                    // o inventário só vem no snapshot em que mudou, não se repete
+    await a.room.leave(); await sleep(150);
+    const row = await getDb().selectFrom('characters').select(['level', 'xp', 'gold', 'items']).where('id', '=', accounts.get('Lootadora')!.charId).executeTakeFirstOrThrow();
+    expect(row).toMatchObject({ level: 1, xp: 5, gold: 3 });
+    expect(JSON.parse(row.items)[5]).toEqual({ id: 'shell', n: 7 });
   });
 });

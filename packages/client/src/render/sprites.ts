@@ -179,3 +179,17 @@ export const SHADOW = (() => { const c = mk(14, 6), x = c.getContext('2d')!; x.f
 function glyph(rows: string[], col: string) { const g = G(rows[0].length, rows.length); rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch === '1') g[j][i] = col; })); return bake(g); }
 export const BANG = glyph(['11', '11', '11', '00', '11'], '#ffe66b');
 export const QUES = glyph(['111', '001', '011', '000', '010'], '#ffffff');
+
+/* ---------- Itens (8x8): no chão e no inventário ---------- */
+function icon(rows: string[], pal: Record<string, string>) {
+  const g = G(rows[0].length, rows.length);
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (pal[ch]) g[j][i] = pal[ch]; }));
+  return bake(g);
+}
+export const ITEM_ICON: Record<string, HTMLCanvasElement> = {
+  heart: icon(['.rr..rr.', 'rwrrrrrr', 'rwrrrrrr', 'rrrrrrrd', '.rrrrrd.', '..rrrd..', '...rd...'], { r: '#e2574c', w: '#ffd2c8', d: '#a8342c' }),
+  mana: icon(['...cc...', '...gg...', '..gbbg..', '.gbwbbg.', '.gbbbbg.', '.gbbbdg.', '..gddg..'], { c: '#8a5a36', g: '#cfe8ff', b: '#4b7fd9', w: '#bcd6ff', d: '#2f55a8' }),
+  jelly: icon(['........', '...pp...', '..pwpp..', '.pwpppp.', '.pppppd.', 'pppppddd'], { p: '#b65cd8', w: '#e4a6f3', d: '#7a3496' }),
+  shell: icon(['..bbbb..', '.bwbbbb.', 'bwbbbbbd', 'bbbbbbbd', '.bbbbdd.', '..bddd..'], { b: '#4d62b2', w: '#a2b4f0', d: '#2b3577' }),
+  gold: icon(['..yyyy..', '.yywwyy.', 'yywyyyyo', 'yyyyyyyo', 'yyyyyyoo', '.yyyyoo.', '..oooo..'], { y: '#f5c542', w: '#fff3b0', o: '#b8862a' })
+};

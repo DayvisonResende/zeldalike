@@ -4,6 +4,7 @@ import { blockedAt } from '../world/collision';
 import type { World } from '../world';
 import { sfx } from './fx';
 import { shatter } from './projectiles';
+import { maxStats } from './progress';
 
 /* ---------- Vida, mana, morte e renascimento ---------- */
 
@@ -42,7 +43,8 @@ export function respawn(w: World, p: Player) {
 export function updateLife(w: World) {
   const r = w.rules.player;
   for (const p of w.players.values()) {
-    p.maxHp = r.maxHp; p.maxMp = r.maxMana;
+    const m = maxStats(w, p.level);
+    p.maxHp = m.hp; p.maxMp = m.mp;
     if (p.state === 'dead') { if (--p.t <= 0) respawn(w, p); continue; }
     if (w.tick - p.hurtAt >= ticks(r.regenDelay)) p.hp = Math.min(p.maxHp, p.hp + r.hpRegen / TICK_RATE);
     p.mp = Math.min(p.maxMp, p.mp + r.manaRegen / TICK_RATE);

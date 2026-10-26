@@ -16,12 +16,15 @@
     <div class="hud" id="hud" hidden>
       <div class="bar hp" role="meter" aria-label="Vida" aria-valuemin="0"><span></span></div>
       <div class="bar mp" role="meter" aria-label="Mana" aria-valuemin="0"><span></span></div>
+      <div class="xprow"><span class="lvl" id="lvl">Nv 1</span><div class="xpbar" id="xpbar" role="meter" aria-label="Experiência" aria-valuemin="0"><i></i></div></div>
+      <span class="gold" id="gold"><canvas width="10" height="9" aria-hidden="true"></canvas><b>0</b></span>
       <span class="badge" id="pvpBadge" hidden></span>
     </div>
     <div class="death" id="death" role="alert" hidden><strong>Você caiu</strong><span id="deathTimer"></span></div>
     <div class="status" id="status" role="status" hidden></div>
     <div class="dialog" id="dialog" aria-live="polite" hidden><p id="dlgText"></p><span class="more" id="dlgMore">▼</span></div>
     <div class="names" id="names" aria-hidden="true"></div>
+    <div class="floaters" id="floaters" aria-hidden="true"></div>
     <div class="start" id="start">
       <div class="startcard">
         <strong>A Lâmina do Vale</strong>
@@ -35,6 +38,71 @@
       <button type="button" class="chatch" id="chatCh"></button>
       <input id="chatInput" type="text" enterkeyhint="send" spellcheck="false" aria-label="Mensagem">
     </form>
+    <div class="account" id="account" hidden>
+      <div class="menucard accountcard">
+        <strong class="logo">A Lâmina do Vale</strong>
+
+        <form data-view="login" id="loginForm" class="stack" autocomplete="on">
+          <label class="field">Usuário<input id="loginUser" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+          <label class="field">Senha<input id="loginPass" type="password" autocomplete="current-password" required></label>
+          <p class="err" role="alert"></p>
+          <button type="submit" class="primary">Entrar</button>
+          <button type="button" class="link" data-go="register">Não tem conta? Criar conta</button>
+          <button type="button" class="link" id="offlineBtn" hidden>Jogar offline</button>
+        </form>
+
+        <form data-view="register" id="regForm" class="stack" hidden autocomplete="on">
+          <label class="field">Usuário<input id="regUser" type="text" autocomplete="username" autocapitalize="off" spellcheck="false" required></label>
+          <p class="hint">3 a 20 caracteres: letras sem acento, números, ponto, hífen e _. É só para entrar; no jogo aparece o nome do personagem.</p>
+          <label class="field">Senha<input id="regPass" type="password" autocomplete="new-password" required></label>
+          <label class="field">Repita a senha<input id="regPass2" type="password" autocomplete="new-password" required></label>
+          <p class="err" role="alert"></p>
+          <button type="submit" class="primary">Criar conta</button>
+          <button type="button" class="link" data-go="login">Já tenho conta</button>
+        </form>
+
+        <section data-view="select" class="stack" hidden>
+          <div class="row"><span id="hello"></span><span class="hint" id="slots"></span></div>
+          <ul class="chars" id="charList"></ul>
+          <button type="button" class="newchar" id="newCharBtn" data-go="create">+ Criar personagem</button>
+          <p class="err" role="alert"></p>
+          <button type="button" class="link" id="logoutBtn">Sair da conta</button>
+        </section>
+
+        <form data-view="create" id="createForm" class="stack" hidden autocomplete="off">
+          <div class="charrow">
+            <canvas id="newPreview" class="preview" width="18" height="18" aria-hidden="true"></canvas>
+            <label class="field">Nome do personagem<input id="newName" type="text" spellcheck="false" required></label>
+          </div>
+          <p class="hint">3 a 16 caracteres: letras, números, espaço, hífen e _. Não dá para trocar depois.</p>
+          <div class="group"><span>Capa</span><div class="swatches" id="newCloaks" role="radiogroup" aria-label="Cor da capa"></div></div>
+          <div class="group"><span>Cabelo</span><div class="swatches" id="newHairs" role="radiogroup" aria-label="Cor do cabelo"></div></div>
+          <p class="err" role="alert"></p>
+          <div class="row"><button type="button" class="link" data-go="select">Voltar</button><button type="submit" class="primary">Criar</button></div>
+        </form>
+
+        <form data-view="delete" id="deleteForm" class="stack" hidden autocomplete="off">
+          <p>Apagar <b id="delName"></b> para sempre? Isso não tem volta.</p>
+          <label class="field">Digite o nome para confirmar<input id="delConfirm" type="text" spellcheck="false"></label>
+          <p class="err" role="alert"></p>
+          <div class="row"><button type="button" class="link" data-go="select">Cancelar</button><button type="submit" class="danger">Apagar</button></div>
+        </form>
+
+        <p data-view="busy" class="hint" hidden>Carregando…</p>
+      </div>
+    </div>
+    <div class="bag" id="bag" role="dialog" aria-label="Inventário" hidden>
+      <div class="menucard bagcard">
+        <div class="row"><strong>Inventário</strong><span class="hint" id="bagGold"></span></div>
+        <div class="bagrid" id="bagGrid" role="listbox" aria-label="Itens"></div>
+        <div class="bagdetail" id="bagDetail">
+          <p id="bagInfo" class="hint">Escolha um item.</p>
+          <div class="row"><button type="button" class="primary" id="bagUse" disabled>Usar</button><button type="button" class="link" id="bagDrop" disabled>Largar no chão</button></div>
+        </div>
+        <p class="hint">Atalhos: <kbd>1</kbd> usa um coração, <kbd>2</kbd> uma poção de mana. <kbd>I</kbd> ou <kbd>Esc</kbd> fecha.</p>
+      </div>
+    </div>
+    <button class="bagbtn" id="bagBtn" type="button" aria-label="Inventário (I)">🎒</button>
     <button class="chatbtn" id="chatBtn" type="button" aria-label="Chat (Enter)">💬</button>
     <button class="menubtn" id="menuBtn" type="button" aria-label="Menu (Esc)" aria-controls="menu">☰</button>
     <div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Menu" hidden>
@@ -53,6 +121,7 @@
           <div class="group"><span>Capa</span><div class="swatches" id="cloaks" role="radiogroup" aria-label="Cor da capa"></div></div>
           <div class="group"><span>Cabelo</span><div class="swatches" id="hairs" role="radiogroup" aria-label="Cor do cabelo"></div></div>
           <div class="saverow"><button type="button" class="primary" id="saveChar">Salvar</button><span id="charSaved" role="status"></span></div>
+          <div class="row online-only"><button type="button" class="link" id="switchChar">Trocar de personagem</button><button type="button" class="link" id="signOut">Sair da conta</button></div>
         </section>
 
         <section role="tabpanel" data-panel="opts" hidden>
@@ -84,6 +153,7 @@
             <dt>Mira</dt><dd>Com o mouse sobre a tela, espada, flechas e arremessos seguem o cursor.</dd>
             <dt>Chat</dt><dd><kbd>Enter</kbd> abre e envia, <kbd>Tab</kbd> troca entre Perto e Todos, <kbd>Esc</kbd> cancela. <kbd>/t</kbd> antes da mensagem manda para todos.</dd>
             <dt>PvP</dt><dd><kbd>V</kbd> liga e desliga (quando o servidor permite escolher). Nome vermelho = pode lutar.</dd>
+            <dt>Inventário</dt><dd><kbd>I</kbd> abre. <kbd>1</kbd> usa um coração, <kbd>2</kbd> uma poção de mana. Itens no chão: é só passar por cima.</dd>
             <dt>Menu</dt><dd><kbd>Esc</kbd></dd>
           </dl>
         </section>

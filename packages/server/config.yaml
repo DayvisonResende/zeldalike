@@ -13,6 +13,17 @@ server:
 network:
   sendRate: 20              # atualizações enviadas a cada jogador por segundo
 
+# ── Contas e banco ────────────────────────────────────
+database:
+  file: data/vale.db        # SQLite; caminho relativo a este arquivo. Backup = copiar o arquivo (com o servidor parado)
+
+accounts:
+  maxCharacters: 3          # personagens por conta
+  sessionDays: 30           # quanto tempo o login fica lembrado
+  saveEvery: 30s            # de quanto em quanto tempo o servidor salva quem está online
+  registerPerHour: 20       # contas novas por IP por hora (amigos na mesma casa dividem o IP)
+  loginPer5Min: 30          # tentativas de login por IP a cada 5 min, contra quem tenta adivinhar senhas
+
 # ── Chat ──────────────────────────────────────────────
 chat:
   maxLength: 120            # caracteres por mensagem
@@ -28,10 +39,29 @@ regrow:
   rock: 5m
 
 # ── Inimigos ──────────────────────────────────────────
-# hp: golpes de espada para derrubar · damage: vida que tiram do jogador ao encostar
+# hp: golpes de espada para derrubar · damage: vida que tiram do jogador ao encostar · xp: ganho de quem derruba
+# drops: chance de 0 a 1 de cada item (1 unidade), ou { chance, min, max } para sortear a quantidade
 enemies:
-  slime:  { hp: 2, respawn: 2m, damage: 10 }
-  beetle: { hp: 3, respawn: 4m, damage: 20 }
+  slime:
+    hp: 2
+    respawn: 2m
+    damage: 10
+    xp: 5
+    drops:
+      gold: { chance: 0.8, min: 1, max: 3 }
+      jelly: 0.5
+      heart: 0.2
+      mana: 0.1
+  beetle:
+    hp: 3
+    respawn: 4m
+    damage: 20
+    xp: 12
+    drops:
+      gold: { chance: 0.9, min: 2, max: 6 }
+      shell: 0.4
+      heart: 0.25
+      mana: 0.15
 
 # ── Jogadores ─────────────────────────────────────────
 player:
@@ -58,10 +88,23 @@ pvp:
     thrown: 20
   announceKills: true       # "Fulano derrubou Beltrano" no chat de todos
 
-# ── Ainda não aplicado ────────────────────────────────
-# Já validado aqui, mas só passa a valer quando o jogo ganhar XP e itens.
-
+# ── Progressão e itens ────────────────────────────────
 rates:
   xp: 1.0                   # 2.0 = XP em dobro
-  drop: 1.0
-  gold: 1.0
+  drop: 1.0                 # multiplica a chance de todos os drops
+  gold: 1.0                 # multiplica o ouro que cai
+
+leveling:
+  maxLevel: 50
+  base: 50                  # XP para o próximo nível = base × nível^exponent (50, 141, 260, 400, 559…)
+  exponent: 1.5
+  hpPerLevel: 10            # vida máxima a mais por nível
+  manaPerLevel: 5
+
+inventory:
+  slots: 20
+  stack: 99                 # itens iguais por espaço
+
+loot:
+  ownerTime: 10s            # só quem derrubou pega, até esse tempo
+  lifetime: 1m              # depois disso o drop some do chão

@@ -58,7 +58,7 @@ describe('inimigos', () => {
     expect(distAt(m, 5, 1)).toBe(Infinity);   // pedra é sólida
   });
   it('renasce no ponto de origem depois de morto', () => {
-    const w = new World(tiny([{ type: 'slime', x: 6, y: 1 }]), { ...rules, enemies: { ...rules.enemies, slime: { hp: 1, respawn: 1, damage: 10 } } });
+    const w = new World(tiny([{ type: 'slime', x: 6, y: 1 }]), { ...rules, enemies: { ...rules.enemies, slime: { ...rules.enemies.slime, hp: 1, respawn: 1 } } });
     const e = w.enemies[0]; e.hp = 0; e.dying = true; e.hurtT = 1;
     w.step();
     expect(w.enemies.length).toBe(0);

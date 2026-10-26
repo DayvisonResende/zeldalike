@@ -1,8 +1,8 @@
-import { unpackArrow, unpackEnemy, unpackPlayer, unpackThrown, type ArrowView, type EnemyView, type PlayerView, type SnapshotMsg, type ThrownView } from '@vale/shared';
+import { unpackArrow, unpackDrop, unpackEnemy, unpackPlayer, unpackThrown, type ArrowView, type DropView, type EnemyView, type PlayerView, type SnapshotMsg, type ThrownView } from '@vale/shared';
 
 // Os outros jogadores e os monstros são desenhados um pouco no passado, entre dois snapshots,
 // para o movimento sair liso mesmo recebendo só 20 atualizações por segundo.
-export interface Frame { t: number; players: Map<string, PlayerView>; enemies: Map<number, EnemyView>; thrown: Map<number, ThrownView>; arrows: Map<number, ArrowView> }
+export interface Frame { t: number; players: Map<string, PlayerView>; enemies: Map<number, EnemyView>; thrown: Map<number, ThrownView>; arrows: Map<number, ArrowView>; drops: DropView[] }
 
 export function toFrame(s: SnapshotMsg): Frame {
   return {
@@ -10,7 +10,8 @@ export function toFrame(s: SnapshotMsg): Frame {
     players: new Map(s.p.map(t => { const v = unpackPlayer(t); return [v.id, v]; })),
     enemies: new Map(s.e.map(t => { const v = unpackEnemy(t); return [v.id, v]; })),
     thrown: new Map(s.o.map(t => { const v = unpackThrown(t); return [v.id, v]; })),
-    arrows: new Map(s.a.map(t => { const v = unpackArrow(t); return [v.id, v]; }))
+    arrows: new Map(s.a.map(t => { const v = unpackArrow(t); return [v.id, v]; })),
+    drops: s.d.map(unpackDrop)   // drops ficam parados: não precisam de interpolação
   };
 }
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
@@ -43,7 +44,7 @@ export class Interpolator {
   clear() { this.frames = []; }
   at(t: number) {
     const fs = this.frames;
-    if (!fs.length) return { players: [], enemies: [], thrown: [], arrows: [] };
+    if (!fs.length) return { players: [], enemies: [], thrown: [], arrows: [], drops: [] };
     let i = fs.length - 1;
     while (i > 0 && fs[i].t > t) i--;
     while (i > 1 && fs.length > 3 && fs[0].t < fs[i - 1].t) fs.shift(), i--;   // descarta o que já passou
@@ -51,7 +52,7 @@ export class Interpolator {
     const k = b.t > a.t ? Math.max(0, Math.min(1, (t - a.t) / (b.t - a.t))) : 1;
     return {
       players: mix(a.players, b.players, k, mixPlayer), enemies: mix(a.enemies, b.enemies, k, mixEnemy),
-      thrown: mix(a.thrown, b.thrown, k, mixThrown), arrows: mix(a.arrows, b.arrows, k, mixArrow)
+      thrown: mix(a.thrown, b.thrown, k, mixThrown), arrows: mix(a.arrows, b.arrows, k, mixArrow), drops: b.drops
     };
   }
 }

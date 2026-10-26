@@ -6,9 +6,9 @@ const MAP: Record<string, Key> = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
 };
-export interface InputHooks { started(): boolean; start(): void; toggleMute(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void }
+export interface InputHooks { started(): boolean; start(): void; toggleMute(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2): void }
 // Cliques e teclas dentro do menu são do menu, não do jogo.
-export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog';
+export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn';
 const inMenu = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(UI_SELECTOR);
 const typing = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('input, textarea, select');
 
@@ -30,6 +30,8 @@ export class Input {
       if (e.code === 'KeyM') { if (!e.repeat) hooks.toggleMute(); return; }
       if (e.code === 'KeyP') { if (!e.repeat) hooks.togglePaths(); return; }
       if (e.code === 'KeyV') { if (!e.repeat && hooks.started()) hooks.togglePvp(); return; }
+      if (e.code === 'KeyI') { if (!e.repeat && hooks.started()) hooks.toggleBag(); return; }
+      if (e.code === 'Digit1' || e.code === 'Digit2') { if (!e.repeat && hooks.started()) hooks.quickUse(e.code === 'Digit1' ? 1 : 2); return; }
       const k = MAP[e.code]; if (!k) return;
       e.preventDefault();
       if (!hooks.started()) { hooks.start(); return; }

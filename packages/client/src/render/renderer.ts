@@ -2,7 +2,7 @@ import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, angDir, distAt, nextLower, swordPose,
 import type { Camera } from '../camera';
 import type { Scene } from '../session/types';
 import type { Particles } from './particles';
-import { BANG, OBJ, QUES, SHADOW, beetleSprite, heroSprite, slimeSprite } from './sprites';
+import { BANG, ITEM_ICON, OBJ, QUES, SHADOW, beetleSprite, heroSprite, slimeSprite } from './sprites';
 import { drawTiles } from './tiles';
 
 type Ctx = CanvasRenderingContext2D;
@@ -177,6 +177,17 @@ export function render(ctx: Ctx, w: Scene, v: View) {
     list.push({ y: p.y, d: () => drawHero(ctx, w.map, p, w.profiles.get(p.id)?.look ?? DEFAULT_LOOK, v.tick, p.id === w.meId) });
   }
   for (const e of w.enemies) if (near(e.x, e.y)) { drawShadow(ctx, e.x, e.y + 2); list.push({ y: e.y, d: () => drawEnemy(ctx, e, v.tick) }); }
+  // Drops: flutuam de leve; os reservados a outro jogador ficam meio apagados; piscam antes de sumir.
+  for (const d of w.drops) {
+    if (!near(d.x, d.y) || (d.fading && (v.tick >> 3) & 1)) continue;
+    const bob = Math.round(Math.sin((v.tick + d.id * 13) / 14) * 1.5);
+    list.push({ y: d.y - 1, d: () => {
+      ctx.globalAlpha = d.reserved ? 0.45 : 1;
+      ctx.drawImage(SHADOW, Math.round(d.x - 7), Math.round(d.y - 2), 14, 4);
+      ctx.drawImage(ITEM_ICON[d.item], Math.round(d.x - 5), Math.round(d.y - 12 + bob));
+      ctx.globalAlpha = 1;
+    } });
+  }
   for (const o of w.thrown) if (near(o.x, o.y)) { drawShadow(ctx, o.x, o.y); list.push({ y: o.y, d: () => ctx.drawImage(OBJ[o.type], Math.round(o.x - 8), Math.round(o.y - 8 - o.z)) }); }
   for (const a of w.arrows) {
     if (!near(a.x, a.y) || (a.stuck && a.stuck < 10 && (a.stuck & 2))) continue;

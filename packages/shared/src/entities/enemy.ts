@@ -8,6 +8,7 @@ export interface Enemy extends Body {
   hp: number; hurtT: number; kx: number; ky: number; z: number;
   anim: number; mode: 'idle' | 'hop' | 'patrol' | 'chase' | 'search'; timer: number; dir: Dir; vx: number; vy: number;
   dying: boolean; dead: boolean;
+  lastHitBy: string | null;   // jogador que deu o último golpe
   next: { x: number; y: number } | null;
   alert: number; lost: number; lastSeen: [number, number] | null; searchMap: DistMap | null; search: number;
 }

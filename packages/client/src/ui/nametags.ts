@@ -26,7 +26,8 @@ export class NameTags {
       if (b) { b.el.hidden = !visible; b.el.style.left = (x / VIEW_W * 100) + '%'; b.el.style.top = (y / VIEW_H * 100) + '%'; b.el.classList.toggle('noname', mode === 'none' || (mode === 'others' && p.id === scene.meId)); }
       const mine = p.id === scene.meId;
       if (mode === 'none' || (mode === 'others' && mine) || !visible) continue;
-      const name = scene.profiles.get(p.id)?.name; if (!name) continue;
+      const base = scene.profiles.get(p.id)?.name; if (!base) continue;
+      const name = `${base} · Nv ${p.level}`;
       let el = this.tags.get(p.id);
       if (!el) { el = document.createElement('span'); el.className = 'nametag'; this.layer.append(el); this.tags.set(p.id, el); }
       if (el.textContent !== name) el.textContent = name;

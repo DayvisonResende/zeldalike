@@ -63,9 +63,22 @@ Regras para manter o projeto saudável:
 depois de ligar só desliga após o cooldown, e não desliga logo depois de uma briga. Nome vermelho = pode lutar.
 Zonas seguras (a Clareira, por padrão) não têm PvP nem monstros.
 
+**Progresso:** monstros dão XP e soltam loot no chão (só quem derrubou pega nos primeiros segundos).
+`I` (ou 🎒) abre o inventário; `1` usa um coração e `2` uma poção de mana. Largar um item no chão é o jeito
+de passar para um amigo. XP, curva de nível, tabelas de drop e taxas ficam no `config.yaml`.
+
 `Esc` (ou o botão ☰ na tela) abre o menu: personagem (nome, capa, cabelo), opções
 (nomes sobre a cabeça: todos, só dos outros ou nenhum; som; caminhos dos monstros) e controles.
 Tudo fica salvo no navegador.
+
+## Contas e banco de dados
+
+- **SQLite** num arquivo só: `packages/server/data/vale.db` (fora do git). Backup = copiar o arquivo com o servidor parado.
+- O acesso ao banco fica todo em `server/src/persistence/` (Kysely). Trocar por PostgreSQL mexe só ali.
+- Mudança no banco = migração nova em `persistence/migrations.ts`, nunca editar uma antiga.
+- Senhas guardadas só como hash scrypt; tokens de sessão guardados só como sha256.
+- Nome de personagem único sem diferenciar maiúsculas nem acentos ("Íris" = "iris").
+- O servidor salva quem está online a cada `accounts.saveEvery`, ao sair e ao desligar.
 
 ## Configuração do servidor
 
@@ -83,5 +96,6 @@ mostra o campo e a linha e continua com a configuração anterior.
 5. **Chat** ✅ — canais Perto e Todos, balões de fala, avisos de entrada e saída, anti-spam.
 6. Colocar no ar para os amigos.
 7. **PvP** ✅ — modos off, optional e open, zonas seguras, travas para desligar, anúncio de quedas.
-8. Persistência — login, banco, XP.
-9. Teste de carga com bots.
+8. **Contas** ✅ — criar conta, login, até 3 personagens por conta, tudo salvo no banco.
+9. **XP, níveis, drops e inventário** ✅ — XP por monstro, níveis com vida e mana maiores, loot no chão com dono temporário, inventário de 20 espaços.
+10. Teste de carga com bots.

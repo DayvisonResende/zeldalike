@@ -64,6 +64,37 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .death strong{font-family:var(--f-display);font-size:clamp(18px,6cqw,40px);color:#e2574c;text-shadow:2px 2px 0 #000}
 .death span{font-family:var(--f-pixel);font-size:clamp(11px,3cqw,19px);color:#f6f2fc;text-shadow:1px 1px 0 #000}
 
+.xprow{display:flex;align-items:center;gap:.4em;width:clamp(96px,28cqw,200px)}
+.lvl{font-family:var(--f-display);font-size:clamp(8px,2.2cqw,13px);color:#ffe66b;text-shadow:1px 1px 0 #000;white-space:nowrap}
+.xpbar{--pct:0%;flex:1;height:clamp(5px,1.3cqw,8px);background:#120c1e;border:2px solid rgba(236,230,245,.8);position:relative}
+.xpbar i{position:absolute;inset:0 auto 0 0;width:var(--pct);background:#e8c34a}
+.gold{display:flex;align-items:center;gap:.35em;font-family:var(--f-display);font-size:clamp(8px,2.2cqw,13px);color:#ffe66b;text-shadow:1px 1px 0 #000}
+.gold canvas{width:clamp(10px,2.6cqw,16px);height:auto;image-rendering:pixelated}
+
+/* Textos que sobem da cabeça: +5 XP, +1 Coração, Nível 3! */
+.floaters{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.floater{position:absolute;transform:translate(-50%,-100%);font-family:var(--f-display);font-size:clamp(8px,2.2cqw,14px);color:#fff;text-shadow:1px 1px 0 #000,-1px 0 0 #000,0 -1px 0 #000;white-space:nowrap;animation:floatup 1.4s ease-out forwards}
+.floater.xp{color:#ffe66b}
+.floater.item{color:#9fd7a8}
+.floater.level{font-size:clamp(11px,3.4cqw,22px);color:#ffd75a;animation-duration:2.4s}
+.floater.notice{color:#ff8a7a}
+@keyframes floatup{0%{opacity:0;margin-top:0}12%{opacity:1}75%{opacity:1}100%{opacity:0;margin-top:-6cqw}}
+
+/* Inventário (I) */
+.bag{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,8,18,.5);cursor:auto;font-family:var(--f-pixel);font-size:clamp(12px,2.9cqw,18px);color:#f6f2fc;z-index:4}
+.bagcard{width:min(88%,420px)}
+.bagrid{display:grid;grid-template-columns:repeat(5,1fr);gap:.35em}
+.slot{position:relative;aspect-ratio:1;background:#0c0a1c;border:2px solid #4d4380;display:grid;place-items:center;cursor:pointer;padding:0;font:inherit;color:inherit}
+.slot canvas{width:62%;height:auto;image-rendering:pixelated}
+.slot b{position:absolute;right:.2em;bottom:.05em;font-family:var(--f-display);font-size:.62em;font-weight:400;text-shadow:1px 1px 0 #000}
+.slot[aria-selected=true]{border-color:var(--amber);background:#1e1838}
+.slot:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.bagdetail{display:flex;flex-direction:column;gap:.5em;min-height:4.2em}
+.bagdetail p{margin:0}
+.bag button:disabled{opacity:.45;cursor:not-allowed}
+.bagbtn{position:absolute;right:calc(2.5% + 2 * (clamp(28px,6.5cqw,40px) + .6em));bottom:3%;width:clamp(28px,6.5cqw,40px);height:clamp(28px,6.5cqw,40px);display:grid;place-items:center;font-size:clamp(12px,3cqw,18px);line-height:1;background:var(--box);border:2px solid rgba(236,230,245,.7);cursor:pointer;opacity:.75;padding:0}
+.bagbtn:hover,.bagbtn:focus-visible{opacity:1}
+
 /* Nomes sobre a cabeça */
 .names{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .nametag{position:absolute;transform:translate(-50%,-100%);font-family:var(--f-pixel);font-size:clamp(9px,2.3cqw,15px);line-height:1;white-space:nowrap;color:#f6f2fc;padding:.15em .4em;background:rgba(14,12,34,.62);border-radius:2px;text-shadow:0 1px 0 #000}
@@ -83,13 +114,39 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .chatlog .line.system{color:#ffe66b;font-style:italic}
 .chatlog.open{justify-content:flex-start;overflow-y:auto;pointer-events:auto;background:rgba(14,12,34,.7);padding:.4em .6em}
 .chatlog.open .line.old{opacity:1}
-.chatbar{position:absolute;left:2.5%;right:calc(2.5% + 2 * clamp(28px,6.5cqw,40px) + 1.2em);bottom:3%;display:flex;height:clamp(28px,6.5cqw,40px);font-family:var(--f-pixel);font-size:clamp(11px,2.6cqw,16px)}
+.chatbar{position:absolute;left:2.5%;right:calc(2.5% + 3 * clamp(28px,6.5cqw,40px) + 1.8em);bottom:3%;display:flex;height:clamp(28px,6.5cqw,40px);font-family:var(--f-pixel);font-size:clamp(11px,2.6cqw,16px)}
 .chatch{font:inherit;flex:none;padding:0 .7em;color:#1a1226;background:#9fd7a8;border:2px solid #ece6f5;border-right:0;cursor:pointer}
 .chatch[data-ch=local]{background:#cfe8ff}
 .chatbar input{font:inherit;flex:1;min-width:0;color:#f6f2fc;background:var(--box);border:2px solid #ece6f5;padding:0 .6em}
 .chatbar input:focus-visible,.chatch:focus-visible,.chatbtn:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
 .chatbtn{position:absolute;right:calc(2.5% + clamp(28px,6.5cqw,40px) + .6em);bottom:3%;width:clamp(28px,6.5cqw,40px);height:clamp(28px,6.5cqw,40px);display:grid;place-items:center;font-size:clamp(12px,3cqw,18px);line-height:1;background:var(--box);border:2px solid rgba(236,230,245,.7);cursor:pointer;opacity:.75;padding:0}
 .chatbtn:hover{opacity:1}
+
+/* Conta: entrar, criar conta, escolher personagem */
+.account{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,8,18,.6);cursor:auto;font-family:var(--f-pixel);font-size:clamp(12px,2.9cqw,18px);color:#f6f2fc;z-index:5}
+.accountcard{width:min(88%,460px)}
+.logo{font-family:var(--f-display);font-size:clamp(16px,4.6cqw,30px);line-height:1.1;color:var(--amber);text-align:center}
+.stack{display:flex;flex-direction:column;gap:.7em;margin:0}
+.stack p{margin:0}
+.row{display:flex;align-items:center;justify-content:space-between;gap:.8em;flex-wrap:wrap}
+.err{color:#ff8a7a;min-height:1em}
+.err:empty{display:none}
+.link{font:inherit;color:#cfe8ff;background:none;border:0;padding:.2em 0;cursor:pointer;text-decoration:underline;text-underline-offset:3px;align-self:flex-start}
+.danger{font:inherit;cursor:pointer;padding:.4em 1em;color:#fff;background:#b8343a;border:2px solid #ff8a7a}
+.account button:disabled{opacity:.6;cursor:wait}
+.chars{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:.5em}
+.char{display:flex;align-items:center;gap:.7em;padding:.4em .6em;border:2px solid #4d4380;background:#0c0a1c}
+.char canvas,.preview{width:clamp(36px,8cqw,54px);height:auto;aspect-ratio:1;image-rendering:pixelated;background:#2a3b26;flex:none}
+.preview{width:clamp(54px,13cqw,90px);border:2px solid #4d4380}
+.cname{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.char .play{padding:.3em .9em}
+.del{font:inherit;color:#ff8a7a;background:none;border:2px solid transparent;cursor:pointer;padding:.2em .5em}
+.del:hover,.del:focus-visible{border-color:#ff8a7a}
+.newchar{font:inherit;color:#f6f2fc;background:none;border:2px dashed #4d4380;padding:.6em;cursor:pointer}
+.newchar:hover{border-color:var(--amber)}
+.account button:focus-visible,.account input:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.account input{font:inherit;color:#f6f2fc;background:#0c0a1c;border:2px solid #4d4380;padding:.35em .5em;width:100%;min-width:0}
+.field input[readonly]{color:var(--muted);border-style:dashed}
 
 /* Menu (Esc) */
 .menubtn{position:absolute;right:2.5%;bottom:3%;width:clamp(28px,6.5cqw,40px);height:clamp(28px,6.5cqw,40px);display:grid;place-items:center;font-size:clamp(14px,3.4cqw,20px);line-height:1;color:#f4f0fb;background:var(--box);border:2px solid rgba(236,230,245,.7);cursor:pointer;opacity:.75}
@@ -134,6 +191,6 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 @media (hover:none) and (pointer:coarse){
   .pad{display:flex}
   .stage{width:min(100vw,calc((100dvh - 170px) * 256 / 224))}
-  .menu{position:fixed;z-index:10}   /* no celular a tela do jogo é pequena: o menu usa a tela toda */
+  .menu,.account,.bag{position:fixed;z-index:10}   /* no celular a tela do jogo é pequena: o menu usa a tela toda */
 }
 @media (prefers-reduced-motion:reduce){.more{animation:none}.roomname{transition:none}.bar::before{transition:none}.bar.hp.low{animation:none}}

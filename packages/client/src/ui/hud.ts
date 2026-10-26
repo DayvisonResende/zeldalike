@@ -1,4 +1,6 @@
 import type { PlayerView } from '@vale/shared';
+import { ITEM_ICON } from '../render/sprites';
+import type { Inventory } from '../session/types';
 
 const nameEl = document.getElementById('roomname')!;
 let nameTimer = 0;
@@ -11,6 +13,9 @@ export function showRegion(name: string) {
 /* ---------- Barras de vida e mana, e o aviso de queda ---------- */
 const hud = document.getElementById('hud')!, death = document.getElementById('death')!, deathTimer = document.getElementById('deathTimer')!;
 const deathTitle = death.querySelector('strong')!, badge = document.getElementById('pvpBadge')!;
+const lvlEl = document.getElementById('lvl')!, xpEl = document.getElementById('xpbar')!, goldEl = document.getElementById('gold')!.querySelector('b')!;
+document.getElementById('gold')!.querySelector('canvas')!.getContext('2d')!.drawImage(ITEM_ICON.gold, 0, 0);
+let progKey = '';
 const bars = {
   hp: { el: hud.querySelector<HTMLElement>('.hp')!, last: '' },
   mp: { el: hud.querySelector<HTMLElement>('.mp')!, last: '' }
@@ -25,7 +30,21 @@ function setBar(b: typeof bars.hp, v: number, max: number) {
   b.el.setAttribute('aria-valuenow', String(cur)); b.el.setAttribute('aria-valuemax', String(max));
   b.el.classList.toggle('low', pct <= 25);
 }
-export function updateHud(me: PlayerView | undefined) {
+// Nível, barra de XP e ouro: só mexe no DOM quando algo muda.
+function updateProgress(inv: Inventory | null) {
+  if (!inv) return;
+  const key = `${inv.level}|${inv.xp}|${inv.xpNext}|${inv.gold}`;
+  if (key === progKey) return;
+  progKey = key;
+  lvlEl.textContent = `Nv ${inv.level}`;
+  const pct = inv.xpNext > 0 ? Math.min(100, inv.xp / inv.xpNext * 100) : 100;
+  xpEl.style.setProperty('--pct', pct + '%');
+  xpEl.setAttribute('aria-valuenow', String(inv.xp)); xpEl.setAttribute('aria-valuemax', String(Math.max(inv.xpNext, inv.xp)));
+  xpEl.title = inv.xpNext > 0 ? `${inv.xp} / ${inv.xpNext} XP` : 'Nível máximo';
+  goldEl.textContent = String(inv.gold);
+}
+export function updateHud(me: PlayerView | undefined, inv: Inventory | null = null) {
+  updateProgress(inv);
   hud.hidden = !me;
   if (!me) { death.hidden = true; return; }
   setBar(bars.hp, me.hp, me.maxHp);
