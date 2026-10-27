@@ -52,6 +52,10 @@ const SFX: Record<Sfx, () => void> = {
   swarm: () => { for (let i = 0; i < 6; i++) setTimeout(() => tone('square', 600 + i * 60, 450, 0.06, 0.06), i * 55); },
   fuse: () => noise(0.5, 0.06, 5000, 'highpass'),
   boom: () => { noise(0.7, 0.55, 300, 'lowpass'); tone('sawtooth', 110, 30, 0.6, 0.18); },
+  fire: () => { noise(0.28, 0.22, 1200, 'lowpass'); tone('sawtooth', 240, 120, 0.2, 0.06); },
+  heal: () => { [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => tone('sine', f, f, 0.18, 0.06), i * 60)); },
+  shadow: () => { tone('sine', 220, 110, 0.35, 0.12); tone('triangle', 330, 165, 0.35, 0.05); },
+  scrape: () => { noise(0.35, 0.22, 380, 'lowpass'); tone('square', 70, 55, 0.3, 0.05); },
   cast: () => { noise(0.2, 0.15, 2400, 'highpass'); setTimeout(() => noise(0.12, 0.18, 900), 220); },
   bite: () => { tone('square', 880, 660, 0.06, 0.09); setTimeout(() => tone('square', 880, 660, 0.06, 0.09), 110); },
   chest: () => { noise(0.18, 0.2, 700, 'lowpass'); [659, 784, 988].forEach((f, i) => setTimeout(() => tone('triangle', f, f, 0.14, 0.08), 120 + i * 80)); }

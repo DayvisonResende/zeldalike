@@ -967,7 +967,7 @@
     1,
     7,
     7,
-    7,
+    26,
     7,
     7,
     7,
@@ -1063,15 +1063,15 @@
     7,
     7,
     7,
+    27,
     7,
     7,
     7,
     7,
     7,
+    27,
     7,
-    7,
-    7,
-    7,
+    26,
     7,
     7,
     7,
@@ -1208,11 +1208,11 @@
     1,
     1,
     7,
-    7,
-    7,
-    7,
-    7,
-    7,
+    15,
+    15,
+    24,
+    15,
+    15,
     7,
     7,
     1,
@@ -1256,11 +1256,11 @@
     15,
     1,
     1,
+    15,
     7,
     7,
     7,
-    7,
-    7,
+    15,
     7,
     1,
     1,
@@ -1304,11 +1304,11 @@
     9,
     1,
     1,
-    1,
-    1,
-    1,
-    1,
-    1,
+    15,
+    7,
+    7,
+    7,
+    15,
     1,
     1,
     1,
@@ -1653,7 +1653,7 @@
      "height": 0,
      "point": true,
      "x": 392,
-     "y": 392
+     "y": 360
     },
     {
      "id": 19,
@@ -2064,6 +2064,30 @@
        "value": "20m"
       }
      ]
+    },
+    {
+     "id": 44,
+     "name": "",
+     "type": "bau",
+     "rotation": 0,
+     "visible": true,
+     "point": true,
+     "width": 0,
+     "height": 0,
+     "x": 376,
+     "y": 424,
+     "properties": [
+      {
+       "name": "conteudo",
+       "type": "string",
+       "value": "gold:25-50, heart:2, mana:2, bomb:3, lightstaff:1@10%"
+      },
+      {
+       "name": "renasce",
+       "type": "string",
+       "value": "20m"
+      }
+     ]
     }
    ]
   },
@@ -2144,10 +2168,49 @@
        "value": "baixo"
       }
      ]
+    },
+    {
+     "id": 43,
+     "name": "Mercadora Rosa",
+     "type": "npc",
+     "rotation": 0,
+     "visible": true,
+     "point": true,
+     "width": 0,
+     "height": 0,
+     "x": 200,
+     "y": 136,
+     "properties": [
+      {
+       "name": "texto",
+       "type": "string",
+       "value": "Bem-vindo à banca da Rosa! Corações, poções e bombas fresquinhos.\n\nE se tiver geleia, carapaça ou peixe sobrando, eu compro. Até bota velha!"
+      },
+      {
+       "name": "capa",
+       "type": "string",
+       "value": "Âmbar"
+      },
+      {
+       "name": "cabelo",
+       "type": "string",
+       "value": "Rosa"
+      },
+      {
+       "name": "olha",
+       "type": "string",
+       "value": "esquerda"
+      },
+      {
+       "name": "loja",
+       "type": "string",
+       "value": "clareira"
+      }
+     ]
     }
    ]
   }
  ],
  "nextlayerid": 9,
- "nextobjectid": 43
+ "nextobjectid": 45
 }

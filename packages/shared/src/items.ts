@@ -1,7 +1,7 @@
 // Itens do jogo. O que viaja pela rede e vai para o banco é só o id.
-export type ItemId = 'heart' | 'mana' | 'jelly' | 'shell' | 'lambari' | 'tilapia' | 'trout' | 'moonfish' | 'blindfish' | 'boot' | 'bomb';
+export type ItemId = 'heart' | 'mana' | 'jelly' | 'shell' | 'lambari' | 'tilapia' | 'trout' | 'moonfish' | 'blindfish' | 'boot' | 'bomb' | 'firestaff' | 'lightstaff' | 'darktome';
 export type LootId = ItemId | 'gold';   // ouro cai no chão, mas vai para o contador, não para o inventário
-export interface ItemDef { name: string; desc: string; heal?: number; mana?: number }
+export interface ItemDef { name: string; desc: string; heal?: number; mana?: number; gear?: boolean }   // gear: equipa no botão A ou C
 export const ITEMS: Record<ItemId, ItemDef> = {
   heart: { name: 'Coração', desc: 'Recupera 25 de vida.', heal: 25 },
   mana: { name: 'Poção de mana', desc: 'Recupera 20 de mana.', mana: 20 },
@@ -14,7 +14,10 @@ export const ITEMS: Record<ItemId, ItemDef> = {
   moonfish: { name: 'Peixe-lua', desc: 'Só aparece à noite. Comer recupera 20 de vida e 20 de mana.', heal: 20, mana: 20 },
   blindfish: { name: 'Peixe-cego', desc: 'Vive no escuro da caverna. Comer recupera 12 de vida.', heal: 12 },
   boot: { name: 'Bota velha', desc: 'Molhada e sem par. Não serve para nada… ou serve?' },
-  bomb: { name: 'Bomba', desc: 'Tecla 3 (ou Usar) põe uma acesa. E levanta para arremessar. Abre paredes rachadas.' }
+  bomb: { name: 'Bomba', desc: 'Tecla 3 (ou Usar) põe uma acesa. E levanta para arremessar. Abre paredes rachadas.' },
+  firestaff: { name: 'Cajado de Fogo', desc: 'Bola de fogo na mira. Segure e solte: explosão. Gasta mana.', gear: true },
+  lightstaff: { name: 'Cajado de Luz', desc: 'Cura você e quem estiver perto. Segure e solte: cura maior que empurra monstros. Gasta mana.', gear: true },
+  darktome: { name: 'Grimório Sombrio', desc: 'Sombra que deixa o alvo lento e rouba vida. Segure e solte: maldição. Gasta mana.', gear: true }
 };
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
 export const LOOT_IDS: LootId[] = ['gold', ...ITEM_IDS];

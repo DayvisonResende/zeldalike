@@ -4,8 +4,9 @@ import valeTsj from '../../../content/maps/vale.tsj?raw';
 import { ensureAudio, setMuted, sfx } from './audio';
 import { follow, type Camera } from './camera';
 import { Input, UI_SELECTOR, bindTouch } from './input';
+import { Gamepads } from './gamepad';
 import { Particles } from './render/particles';
-import { render } from './render/renderer';
+import { addGlow, addSlide, render } from './render/renderer';
 import { LocalSession } from './session/local';
 import { NetSession } from './session/net';
 import type { Scene, Session, Status } from './session/types';
@@ -16,6 +17,7 @@ import { ChatBox } from './ui/chat';
 import { Floaters } from './ui/floaters';
 import { updateFishBar } from './ui/fishbar';
 import { Dialog } from './ui/dialog';
+import { ShopPanel } from './ui/shop';
 import { showRegion, updateBoss, updateClock, updateHud, updateRaid } from './ui/hud';
 import { Menu } from './ui/menu';
 import { NameTags } from './ui/nametags';
@@ -115,7 +117,7 @@ const chat = new ChatBox({ send: req => session.chat(req), closed: refocus });
 const bindChat = (s: Session) => { s.onChat = m => { const mine = m.from !== undefined && m.from === session.me()?.id; chat.add(m, mine); if (m.ch === 'local' && m.from) nameTags.say(m.from, m.text); }; };
 bindChat(session);
 // Esc fecha o chat se ele estiver aberto; senão abre/fecha o menu. Enter numa placa avança o texto.
-function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (bag.open) bag.close(); else menu.toggle(); }
+function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (shop.open) shop.close(); else if (bag.open) bag.close(); else menu.toggle(); }
 function openChat() { if (!started || menu.open) return; if (dialog.open) { dialog.update(BUTTON.b); return; } chat.show(); }
 function togglePvp() {
   const info = session.pvp(), me = session.me();
@@ -125,7 +127,8 @@ function togglePvp() {
 }
 /* ---------- Inventário (I), atalhos 1 e 2 ---------- */
 const floaters = new Floaters(document.getElementById('floaters')!);
-const bag = new BagPanel({ inventory: () => session.inventory(), use: s => session.useItem(s), drop: s => session.dropItem(s), closed: refocus });
+const bag = new BagPanel({ inventory: () => session.inventory(), use: s => session.useItem(s), drop: s => session.dropItem(s), equip: (g, s) => session.equip(g, s), closed: refocus });
+const shop = new ShopPanel({ inventory: () => session.inventory(), deal: (a, s, item, n) => session.shop(a, s, item, n), closed: refocus });
 function toggleBag() { if (!started || menu.open || chat.open) return; bag.toggle(); }
 function quickUse(n: 1 | 2 | 3) {
   const inv = session.inventory(); if (!inv) return;
@@ -136,6 +139,16 @@ function quickUse(n: 1 | 2 | 3) {
 const hooks = { started: () => started, start: begin, toggleMute, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
 const input = new Input(stage, cv, hooks);
 bindTouch(input, hooks, () => settings.vibrate);
+// Controle de videogame: com um conectado, o controle de toque some e a tela do jogo cresce.
+const pads = new Gamepads(input, {
+  ...hooks,
+  panel: () => shop.open ? document.getElementById('shop') : bag.open ? document.getElementById('bag') : menu.open ? document.getElementById('menu') : null,
+  closePanel: toggleMenu,
+  connected: name => {
+    document.body.classList.toggle('gamepad', !!name);
+    chat.add({ ch: 'system', text: name ? `Controle conectado: ${name.replace(/\s*\(.*\)\s*$/, '') || 'controle'}.` : 'Controle desconectado.' }, false);
+  }
+});
 startEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); begin(); });
 stage.addEventListener('pointerdown', e => { ensureAudio(); if (!(e.target as Element).closest(UI_SELECTOR)) refocus(); });
 document.getElementById('chatBtn')!.addEventListener('click', () => { begin(); openChat(); });
@@ -151,9 +164,11 @@ function handle(ev: GameEvent) {
     case 'burst': if (nearCam(ev.x, ev.y)) particles.burst(ev.x, ev.y, ev.palette, ev.n, ev.o); break;
     case 'poof': if (nearCam(ev.x, ev.y)) particles.poof(ev.x, ev.y); break;
     case 'shake': shake = Math.max(shake, ev.n); break;
-    case 'dialog': dialog.show(ev.pages, ev.title); talking = ev.npc ?? null; break;
+    case 'dialog': { const offer = ev.shop; dialog.show(ev.pages, ev.title, offer && (() => shop.show(offer))); talking = ev.npc ?? null; break; }
     case 'region': showRegion(ev.name); break;
     case 'gain': floaters.add(ev.x, ev.y, ev.text, ev.text.endsWith('XP') ? 'xp' : 'item'); break;
+    case 'glow': addGlow(ev.x, ev.y, ev.r, ev.s); break;
+    case 'slide': addSlide(ev.fx, ev.fy, ev.tx, ev.ty); break;
     case 'notice': { const me = session.me(); if (me) floaters.add(me.x, me.y, ev.text, 'notice'); break; }
     case 'levelup': {
       const mine = ev.id === session.me()?.id;
@@ -176,6 +191,7 @@ function aim() {
   const me = session.me();
   if (!me) return null;
   if (input.mouse.active) return Math.atan2(input.mouse.y + cam.y - (me.y - 6), input.mouse.x + cam.x - me.x);
+  if (pads.aim !== null) return pads.aim;   // analógico direito do controle
   // ajuda na mira: só no passo em que ataca (assim andar continua virando o personagem normalmente)
   const attacking = input.wants('a') || input.wants('c') || (!!me.carry && input.wants('b'));
   return lock && attacking ? Math.atan2(lock.y - (me.y - 6), lock.x - me.x) : null;
@@ -184,7 +200,8 @@ function update() {
   tick++;
   if (shake > 0) shake--;
   let inp = emptyInput();
-  if (!started || menu.open || chat.open || bag.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
+  pads.poll();
+  if (!started || menu.open || chat.open || bag.open || shop.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
   else if (dialog.open) dialog.update(input.sample(null).tap);   // lendo: o personagem fica parado, mas o mundo continua
   else inp = input.sample(aim());
   for (const ev of session.step(inp)) handle(ev);
@@ -225,7 +242,7 @@ function frame(now: number) {
   render(ctx, scene, { me: session.me(), cam, particles, lock, showPaths: settings.paths, reticle, shake, tick, talking });
   nameTags.update(scene, cam, settings.names, settings.bubbles);
   floaters.update(cam);
-  bag.render();
+  bag.render(); shop.render();
   updateHud(session.status === 'connecting' ? undefined : session.me(), session.inventory());
   requestAnimationFrame(frame);
 }

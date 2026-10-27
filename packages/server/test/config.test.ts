@@ -28,6 +28,14 @@ describe('config.yaml', () => {
   it('recusa região que não existe no mapa', () => {
     expect(() => parseConfig(text.replace('respawnPoint: clareira', 'respawnPoint: atlantida'), map)).toThrow(/atlantida/);
   });
+  it('lojas: preço precisa ser inteiro positivo e item conhecido', () => {
+    expect(parseConfig(text, map).shops.clareira.buy.heart).toBe(15);
+    expect(() => parseConfig(text.replace('heart: 15', 'heart: 0'), map)).toThrow(/shops.clareira.buy.heart/);
+    expect(() => parseConfig(text.replace('heart: 15', 'espada: 15'), map)).toThrow(/shops.clareira.buy/);
+  });
+  it('recusa NPC com loja que não está no config', () => {
+    expect(() => parseConfig(text.replace('  clareira:\n    buy:', '  feira:\n    buy:'), map)).toThrow(/loja que não está em shops: .*\("clareira"\)/);
+  });
   it('recusa zona de invasão que não existe no mapa principal', () => {
     expect(() => parseConfig(text.replace('zone: clareira', 'zone: atlantida'), map)).toThrow(/events.invasion.zone "atlantida"/);
     expect(parseConfig(text.replace('every: 40m', 'every: 0').replace('zone: clareira', 'zone: atlantida'), map).events.invasion.every).toBe(0);

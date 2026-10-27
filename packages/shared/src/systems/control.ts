@@ -9,9 +9,20 @@ import { burst, sfx } from './fx';
 import { fireArrow } from './projectiles';
 import { updateFishing } from './fishing';
 import { struggle, throwPlayer } from './throwing';
+import { gearIn, type GearId, type GearSlot } from '../gear';
+import { cast, manaCost } from './magic';
+import { pushAgainst } from './blocks';
 
 export function faceAim(p: Player) { p.aim = p.input.aim ?? FACE[p.dir]; p.dir = angDir(p.aim); }
 function startSwing(w: World, p: Player) { faceAim(p); p.state = 'swing'; p.t = 0; p.hit.clear(); sfx(w, 'swing', p, p.id); }
+// Usa o que está no botão. Cajado sem mana para a magia rápida vira bastão: bate de perto como a espada (sem carregar).
+function useGear(w: World, p: Player, g: GearId, slot: GearSlot) {
+  p.using = g; p.useBtn = slot; p.big = false;
+  if (g === 'bow') { faceAim(p); p.state = 'bow'; p.t = 0; return; }
+  if (g === 'sword' || p.mp < manaCost(w, g, false)) { startSwing(w, p); return; }
+  faceAim(p); p.state = 'cast'; p.t = 0;
+}
+const CAST_AT = 6, CAST_END = 14;
 
 /* ---------- Dash (Shift/Q) e pulo do barranco ---------- */
 function startDash(w: World, p: Player, ix: number, iy: number) {
@@ -74,7 +85,7 @@ export function updatePlayer(w: World, p: Player) {
   if (p.inv > 0) p.inv--;
   const ix = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), iy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
   const tap = (b: Button) => (inp.tap & BUTTON[b]) !== 0;
-  let speed = 1.35, turn = true;
+  let speed = (p.slowUntil > w.tick ? 0.6 : 1) * 1.35, turn = true;
   switch (p.state) {
     case 'dead': case 'flying': return;   // voando: quem manda é o arremesso (ver throwing)
     case 'held': struggle(w, p); return;
@@ -82,7 +93,12 @@ export function updatePlayer(w: World, p: Player) {
     case 'hurt': p.t--; move(w.map, p, p.kx, p.ky); p.kx *= 0.86; p.ky *= 0.86; if (p.t <= 0) p.state = p.carry ? 'carry' : 'walk'; return;
     case 'lift': if (++p.t >= 12) p.state = 'carry'; return;
     case 'throw': if (--p.t <= 0) p.state = 'walk'; return;
-    case 'swing': p.t++; swordHits(w, p); if (p.t >= SWING) { if (inp.a) { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; } return;
+    case 'swing': p.t++; swordHits(w, p); if (p.t >= SWING) { if (inp[p.useBtn] && p.using === 'sword') { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; } return;
+    case 'cast':   // ergue o cajado, solta a magia; segurando o botão (e com mana) começa a carregar a forte
+      p.t++; if (p.t <= CAST_AT - 2 && inp.aim !== null) faceAim(p);
+      if (p.t === CAST_AT) cast(w, p);
+      if (p.t >= CAST_END) { if (!p.big && inp[p.useBtn] && p.mp >= manaCost(w, p.using!, true)) { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; }
+      return;
     case 'spin': p.t++; swordHits(w, p); if (p.t >= SPIN) p.state = 'walk'; return;
     case 'dashprep':
       if (!inp.d) { p.state = 'walk'; return; }
@@ -99,16 +115,22 @@ export function updatePlayer(w: World, p: Player) {
     case 'hop': updateHop(w, p); return;
     case 'bow': p.t++; if (p.t <= 7 && inp.aim !== null) faceAim(p); if (p.t === 7) fireArrow(w, p); if (p.t >= 17) p.state = 'walk'; return;
     case 'charge':
-      if (!inp.a) { if (p.charged) { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); } else p.state = 'walk'; p.charged = false; return; }
+      if (!inp[p.useBtn]) {
+        if (p.charged && p.using === 'sword') { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); }
+        else if (p.charged) { p.state = 'cast'; p.t = 0; p.big = true; }   // solta a magia forte
+        else p.state = 'walk';
+        p.charged = false; return;
+      }
       if (++p.charge === 40) { p.charged = true; sfx(w, 'charge', p, p.id); }
       if (inp.aim !== null) faceAim(p);
-      pokeTip(w, p); speed = 0.75; turn = false; break;
+      if (p.using === 'sword') pokeTip(w, p);
+      speed = 0.75; turn = false; break;
     case 'carry':
       if (tap('a') || tap('b')) { if (p.carry === 'player') throwPlayer(w, p); else throwObj(w, p); return; }
       speed = 1.1; break;
     default:
-      if (tap('a')) { startSwing(w, p); return; }
-      if (tap('c')) { faceAim(p); p.state = 'bow'; p.t = 0; return; }
+      if (tap('a')) { useGear(w, p, gearIn(p, 'a'), 'a'); return; }
+      if (tap('c')) { useGear(w, p, gearIn(p, 'c'), 'c'); return; }
       if (tap('d')) { p.state = 'dashprep'; p.t = 0; return; }
       if (tap('b') && interact(w, p)) return;
   }
@@ -118,6 +140,8 @@ export function updatePlayer(w: World, p: Player) {
     else if (ix && iy) { const hd = ix < 0 ? 2 : 3, vd = iy < 0 ? 1 : 0; if (p.dir !== hd && p.dir !== vd) p.dir = vd; }
   }
   if (ix || iy) { const k = (ix && iy) ? 0.7071 : 1; move(w.map, p, ix * speed * k, iy * speed * k, true); p.walkT++; } else p.walkT = 0;
+  // andando contra um bloco numa direção só: conta o empurrão
+  if (!(p.state === 'walk' && !ix !== !iy && blockedAt(w.map, p.x + ix, p.y + iy, p.hw, p.hh) && pushAgainst(w, p, ix, iy))) p.shove = 0;
   p.step = (ix || iy) ? ((p.walkT >> 3) % 2) + 1 : 0;
   // empurrando para baixo contra a beira de um penhasco por alguns quadros → pula
   if (iy > 0 && !ix && (p.state === 'walk' || p.state === 'carry') && blockedAt(w.map, p.x, p.y + 1, p.hw, p.hh)) {

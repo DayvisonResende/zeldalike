@@ -3,7 +3,8 @@ import type { BurstOpts, Palette } from '@vale/shared';
 // Partículas são só visuais: vivem no cliente e nunca passam pela rede.
 const PAL: Record<Palette, string[]> = {
   leaf: ['#4e9e3c', '#86cc5e', '#2f6e2a'], grass: ['#5d9f3e', '#93d464', '#3f7d2d'], rock: ['#8f929b', '#c6c9d2', '#5e6069'],
-  water: ['#d8ecff', '#9fcaf5', '#5b97dd'], dust: ['#efe6d2', '#d9c9a8', '#ffffff'], spark: ['#fff7d6', '#e8e0d0'], splinter: ['#d6e0ef', '#8a5a33']
+  water: ['#d8ecff', '#9fcaf5', '#5b97dd'], dust: ['#efe6d2', '#d9c9a8', '#ffffff'], spark: ['#fff7d6', '#e8e0d0'], splinter: ['#d6e0ef', '#8a5a33'],
+  fire: ['#ffd35a', '#f2862e', '#e0452b'], heal: ['#fffbe6', '#b8f5a0', '#9fe7ff'], shadow: ['#c79bf0', '#7f4aa8', '#2d1a44']
 };
 const POOF = ['#f4f0fb', '#cfc6e0', '#ffffff'];
 interface Part { x: number; y: number; z: number; vx: number; vy: number; vz: number; g: number; life: number; c: string; sz: number; fade?: boolean }

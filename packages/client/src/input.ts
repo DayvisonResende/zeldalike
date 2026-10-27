@@ -1,7 +1,7 @@
 import { BUTTON, VIEW_H, VIEW_W, emptyInput, type Button, type InputState } from '@vale/shared';
 
 type Key = 'up' | 'down' | 'left' | 'right' | Button;
-type Source = 'kb' | 'mouse' | 'touch';
+type Source = 'kb' | 'mouse' | 'touch' | 'pad';
 const MAP: Record<string, Key> = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyF: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
@@ -15,7 +15,7 @@ const typing = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('in
 // Junta teclado, mouse e toque num único InputState por passo.
 // Cada fonte guarda o próprio estado, para soltar uma tecla não cancelar o mesmo botão segurado em outra.
 export class Input {
-  private src: Record<Source, Set<Key>> = { kb: new Set(), mouse: new Set(), touch: new Set() };
+  private src: Record<Source, Set<Key>> = { kb: new Set(), mouse: new Set(), touch: new Set(), pad: new Set() };
   private codes = new Set<string>();
   private tap = 0;
   usingTouch = false;   // o último comando veio da tela de toque (liga a ajuda na mira)
@@ -63,13 +63,14 @@ export class Input {
     if (v) { this.src[src].add(k); this.usingTouch = src === 'touch'; } else this.src[src].delete(k);
     if (!before && v && k in BUTTON) this.tap |= BUTTON[k as Button];
   }
-  private held(k: Key) { return this.src.kb.has(k) || this.src.mouse.has(k) || this.src.touch.has(k); }
+  private held(k: Key) { return this.src.kb.has(k) || this.src.mouse.has(k) || this.src.touch.has(k) || this.src.pad.has(k); }
   private syncKeyboard() {
     const want = new Set([...this.codes].map(c => MAP[c]));
     for (const k of Object.values(MAP)) this.set('kb', k, want.has(k));
   }
   private syncMouse(buttons: number) { this.set('mouse', 'a', (buttons & 1) !== 0); this.set('mouse', 'c', (buttons & 2) !== 0); }
   touch(k: Key, v: boolean) { this.set('touch', k, v); }
+  pad(k: Key, v: boolean) { this.set('pad', k, v); }
 
   // Estado para o próximo passo. `aim` vem de fora porque depende da câmera.
   sample(aim: number | null): InputState {

@@ -1,12 +1,13 @@
 import type { ItemId } from './items';
+import type { ShopOffer } from './systems/shop';
 
 // Tudo que a simulação quer que o cliente mostre ou toque. A simulação não desenha nem faz som:
 // ela só emite eventos, e cada cliente decide o que exibir (normalmente só o que está perto).
 // `by` marca o jogador que causou o efeito: o cliente dele já o mostrou na hora (previsão),
 // então o servidor não manda de novo para ele.
 export type Sfx = 'swing' | 'cut' | 'hit' | 'lift' | 'throw' | 'break' | 'splash' | 'charge' | 'spin' | 'bump' | 'poof'
-  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use' | 'chest' | 'cast' | 'bite' | 'fuse' | 'boom' | 'cluck' | 'swarm';
-export type Palette = 'leaf' | 'grass' | 'rock' | 'water' | 'dust' | 'spark' | 'splinter';
+  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use' | 'chest' | 'cast' | 'bite' | 'fuse' | 'boom' | 'cluck' | 'swarm' | 'fire' | 'heal' | 'shadow' | 'scrape';
+export type Palette = 'leaf' | 'grass' | 'rock' | 'water' | 'dust' | 'spark' | 'splinter' | 'fire' | 'heal' | 'shadow';
 export interface BurstOpts { s?: number; z?: number; up?: number }
 
 export type GameEvent =
@@ -15,7 +16,7 @@ export type GameEvent =
   | { t: 'poof'; x: number; y: number }
   | { t: 'tile'; tx: number; ty: number; c: string }
   | { t: 'shake'; to: string; n: number; by?: string }
-  | { t: 'dialog'; to: string; pages: string[]; title?: string; npc?: string }   // npc: "x,y" de quem fala (ele se vira para você)
+  | { t: 'dialog'; to: string; pages: string[]; title?: string; npc?: string; shop?: ShopOffer }   // npc: "x,y" de quem fala (ele se vira para você); shop: abre a loja ao fechar a fala
   | { t: 'region'; to: string; name: string }
   | { t: 'zone'; to: string; safe: boolean }            // entrou/saiu de zona segura
   | { t: 'kill'; by: string; victim: string }          // um jogador derrubou outro
@@ -24,5 +25,7 @@ export type GameEvent =
   | { t: 'notice'; to: string; text: string }          // aviso curto só para você (inventário cheio…)
   | { t: 'portal'; id: string; to: string; arrive: string }   // jogador entrou num portal para outro mapa (o servidor transfere)
   | { t: 'gohome'; id: string }
-  | { t: 'announce'; text: string }                    // aviso para o servidor inteiro (vira mensagem no chat)
+  | { t: 'announce'; text: string }
+  | { t: 'slide'; fx: number; fy: number; tx: number; ty: number; by?: string }   // bloco empurrado (o cliente anima o deslize)
+  | { t: 'glow'; x: number; y: number; r: number; s: number }   // clarão do Cajado de Luz: ilumina o escuro por s segundos                    // aviso para o servidor inteiro (vira mensagem no chat)
   | { t: 'fish'; id: string; item: ItemId; size: number };   // pescou (o servidor confere recordes)                       // caído fora do mapa principal: renasce lá (o servidor transfere)

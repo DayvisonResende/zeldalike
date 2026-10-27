@@ -134,6 +134,7 @@ function paintCracks(x: Ctx) {
   x.fillStyle = '#c8956a'; x.fillRect(9, 3, 1, 1); x.fillRect(5, 6, 1, 1);
 }
 
+const WALLS = new Set(['W', 'Y', 'I']);   // parede de caverna e as que se parecem com ela (a face só aparece onde a parede acaba)
 // Vizinhos fora do mapa contam como iguais ao tile, para a borda do mundo não ganhar contorno.
 function nb(map: WorldMap, tx: number, ty: number, self: string) { return map.inBounds(tx, ty) ? map.tiles[ty][tx] : self; }
 function maskOf(map: WorldMap, tx: number, ty: number, test: (c: string) => boolean) {
@@ -141,6 +142,12 @@ function maskOf(map: WorldMap, tx: number, ty: number, test: (c: string) => bool
   if (test(nb(map, tx, ty - 1, s))) m |= 1; if (test(nb(map, tx + 1, ty, s))) m |= 2;
   if (test(nb(map, tx, ty + 1, s))) m |= 4; if (test(nb(map, tx - 1, ty, s))) m |= 8;
   return m;
+}
+// Chão debaixo de um bloco (para a animação de deslize desenhar o bloco andando por cima).
+export function floorUnder(map: WorldMap, tx: number, ty: number) {
+  const c = map.tiles[ty][tx], v = (hash(tx, ty, 11) * 4) | 0, cave = nearCave((x, y) => nb(map, x, y, c), tx, ty);
+  if (c === 'Q') return tileImg('P' + v + (cave ? 'q' : ''), x => { if (cave) paintCaveFloor(x, v); else paintStone(x, v, 0); x.fillStyle = '#4d4a44'; x.fillRect(2, 2, 12, 12); x.fillStyle = '#a39d92'; x.fillRect(3, 3, 10, 10); x.fillStyle = '#d9b45a'; x.fillRect(7, 7, 2, 2); });
+  return tileImg('fl' + v + (cave ? 'q' : ''), x => { if (cave) paintCaveFloor(x, v); else paintStone(x, v, 0); });
 }
 export function tileFor(map: WorldMap, tx: number, ty: number, wf: number) {
   const c = map.tiles[ty][tx], v = (hash(tx, ty, 11) * 4) | 0;
@@ -156,11 +163,28 @@ export function tileFor(map: WorldMap, tx: number, ty: number, wf: number) {
     case 'c': { const m = (nb(map, tx, ty - 1, 'c') !== 'c' ? 1 : 0) | (nb(map, tx, ty + 1, 'c') !== 'c' ? 4 : 0); return tileImg('c' + v + '_' + m, x => paintCliff(x, v, m)); }
     case 'o': return tileImg('o' + v, x => { paintStone(x, v, 0); x.drawImage(OBJ.o, 0, 0); });
     case 'q': return tileImg('q' + v, x => paintCaveFloor(x, v));
-    case 'W': { const face = nb(map, tx, ty + 1, 'W') !== 'W'; return tileImg('W' + v + (face ? 'f' : ''), x => paintCaveWall(x, v, face)); }
+    case 'W': { const face = !WALLS.has(nb(map, tx, ty + 1, 'W')); return tileImg('W' + v + (face ? 'f' : ''), x => paintCaveWall(x, v, face)); }
+    case 'B': {   // bloco solto em cima do piso de pedra (ou do chão da caverna)
+      const cave = nearCave((x, y) => nb(map, x, y, c), tx, ty);
+      return tileImg('B' + v + (cave ? 'q' : ''), x => { if (cave) paintCaveFloor(x, v); else paintStone(x, v, 0); x.drawImage(OBJ.B, 0, 0); });
+    }
+    case 'P': case 'Q': {   // placa de pressão no piso de pedra (afundada quando apertada); Q: com o bloco em cima
+      const cave = nearCave((x, y) => nb(map, x, y, c), tx, ty);
+      return tileImg(c + v + (cave ? 'q' : ''), x => {
+        if (cave) paintCaveFloor(x, v); else paintStone(x, v, 0);
+        x.fillStyle = '#4d4a44'; x.fillRect(2, 2, 12, 12); x.fillStyle = c === 'Q' ? '#7a756c' : '#a39d92'; x.fillRect(3, 3, 10, 10);
+        x.fillStyle = '#d9b45a'; x.fillRect(7, 7, 2, 2);
+        if (c === 'Q') x.drawImage(OBJ.B, 0, 0);
+      });
+    }
+    case 'I': {   // parede ilusória: igual à de verdade, só com um brilho quase imperceptível (a luz revela)
+      const face = !WALLS.has(nb(map, tx, ty + 1, 'W'));
+      return tileImg('I' + v + (face ? 'f' : ''), x => { paintCaveWall(x, v, face); x.fillStyle = '#3d3552'; x.fillRect(4, 5, 1, 1); x.fillRect(11, 3, 1, 1); });
+    }
     case 'h': return tileImg('h', paintCaveMouth);
     case 'u': return tileImg('u', paintStairs);
     case 'X': { const m = (nb(map, tx, ty - 1, 'c') !== 'c' ? 1 : 0) | (nb(map, tx, ty + 1, 'c') !== 'c' ? 4 : 0); return tileImg('X' + v + '_' + m, x => { paintCliff(x, v, m); paintCracks(x); }); }
-    case 'Y': { const face = nb(map, tx, ty + 1, 'W') !== 'W'; return tileImg('Y' + v + (face ? 'f' : ''), x => { paintCaveWall(x, v, face); paintCracks(x); }); }
+    case 'Y': { const face = !WALLS.has(nb(map, tx, ty + 1, 'W')); return tileImg('Y' + v + (face ? 'f' : ''), x => { paintCaveWall(x, v, face); paintCracks(x); }); }
     default: {   // objetos (árvore, arbusto, pedra, placa) em cima do chão em volta: grama ou chão de caverna
       const cave = nearCave((x, y) => nb(map, x, y, c), tx, ty);
       return tileImg(c + v + (cave ? 'q' : ''), x => { if (cave) paintCaveFloor(x, v); else paintGrass(x, v, false); x.drawImage(OBJ[c], 0, 0); });

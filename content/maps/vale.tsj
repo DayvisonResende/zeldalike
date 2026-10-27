@@ -8,10 +8,10 @@
   "spacing": 0,
   "margin": 0,
   "columns": 5,
-  "tilecount": 22,
+  "tilecount": 28,
   "image": "tileset.png",
   "imagewidth": 80,
-  "imageheight": 80,
+  "imageheight": 96,
   "tiles": [
     {
       "id": 0,
@@ -340,6 +340,96 @@
           "name": "nome",
           "type": "string",
           "value": "Parede de caverna rachada"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "j"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Tocha apagada"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "G"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Portão"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "I"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Parede ilusória"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "B"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Bloco (empurra)"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "P"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Placa de pressão"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "Q"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Bloco na placa"
         }
       ]
     }

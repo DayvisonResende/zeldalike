@@ -1,9 +1,9 @@
-import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, bobberOf, hash, sunlight, angDir, distAt, nextLower, swordPose, type EnemyView, type Look, type PlayerView, type SwordPose, type WorldMap } from '@vale/shared';
+import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, bobberOf, hash, sunlight, angDir, distAt, nextLower, swordPose, type EnemyView, type Look, type PlayerView, type SpellView, type SwordPose, type WorldMap } from '@vale/shared';
 import type { Camera } from '../camera';
 import type { Scene } from '../session/types';
 import type { Particles } from './particles';
 import { BANG, CHEST, ITEM_ICON, OBJ, bombFrame, QUES, SHADOW, batSprite, chickenSprite, kingSprite, beetleSprite, heroSprite, mk, slimeSprite } from './sprites';
-import { drawTiles } from './tiles';
+import { drawTiles, floorUnder } from './tiles';
 
 type Ctx = CanvasRenderingContext2D;
 // talking: "x,y" do NPC que está conversando com você (ele se vira para você).
@@ -32,6 +32,42 @@ function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
     const tx = X(s.len + 1), ty = Y(s.len + 1);
     ctx.fillStyle = '#fff7d6'; ctx.fillRect(tx - 2, ty, 5, 1); ctx.fillRect(tx, ty - 2, 1, 5);
     ctx.fillStyle = '#f2a24e'; ctx.fillRect(tx, ty, 1, 1);
+  }
+}
+// Cajado ou grimório na mão: erguido ao conjurar, apontado enquanto carrega, e de bastão quando bate sem mana.
+const GEM: Record<string, string> = { firestaff: '#f2862e', lightstaff: '#fffbe6', darktome: '#c79bf0' };
+const staffInHand = (p: PlayerView) => !!p.using && p.using in GEM && (p.state === 'cast' || p.state === 'charge' || p.state === 'swing');
+function drawStaff(ctx: Ctx, p: PlayerView, tick: number) {
+  const g = p.using!, sw = p.state === 'swing' ? swordPose(p) : null;
+  const ox = p.x + Math.cos(p.aim) * 3, oy = p.y - 6 + Math.sin(p.aim) * 2;
+  const ang = sw ? sw.ang : p.state === 'cast' ? p.aim - 0.9 + Math.min(1, p.t / 6) * 0.9 : p.aim - 0.35, len = sw ? Math.max(9, sw.len) : 12;
+  const ca = Math.cos(ang), sa = Math.sin(ang), X = (r: number) => Math.round(ox + ca * r), Y = (r: number) => Math.round(oy + sa * r);
+  if (g === 'darktome') {   // grimório: um livro aberto flutuando na frente da mão
+    const bx = X(len * 0.6), by = Y(len * 0.6);
+    ctx.fillStyle = '#1b1226'; ctx.fillRect(bx - 4, by - 3, 9, 7);
+    ctx.fillStyle = '#7f4aa8'; ctx.fillRect(bx - 3, by - 2, 7, 5);
+    ctx.fillStyle = '#e8dcf5'; ctx.fillRect(bx - 2, by - 2, 2, 4); ctx.fillRect(bx + 1, by - 2, 2, 4);
+  } else {
+    ctx.fillStyle = '#1b1226'; for (let r = 0; r <= len; r++) ctx.fillRect(X(r) - 1, Y(r) - 1, 3, 3);
+    ctx.fillStyle = g === 'lightstaff' ? '#c9a46a' : '#8a5a33'; for (let r = 0; r < len; r++) ctx.fillRect(X(r), Y(r), 1, 1);
+    ctx.fillStyle = '#1b1226'; ctx.fillRect(X(len) - 2, Y(len) - 2, 5, 5);
+  }
+  const tipX = g === 'darktome' ? X(len * 0.6) : X(len), tipY = g === 'darktome' ? Y(len * 0.6) - 5 : Y(len);
+  ctx.fillStyle = GEM[g]; ctx.fillRect(tipX - 1, tipY - 1, 3, 3);
+  const glow = p.state === 'cast' ? p.t >= 4 && p.t <= 9 : p.state === 'charge' && (p.charged ? (tick & 4) !== 0 : (tick & 16) !== 0);
+  if (glow) { ctx.fillStyle = '#ffffff'; ctx.fillRect(tipX - 3, tipY, 7, 1); ctx.fillRect(tipX, tipY - 3, 1, 7); ctx.fillStyle = GEM[g]; ctx.fillRect(tipX, tipY, 1, 1); }
+}
+// Magias voando: bola de fogo (laranja, maior quando carregada) e sombra (roxa, girando).
+function drawSpell(ctx: Ctx, s: SpellView, tick: number) {
+  const x = Math.round(s.x), y = Math.round(s.y), r = s.big ? 4 : 3;
+  if (s.kind === 'fire') {
+    ctx.fillStyle = '#1b1226'; ctx.beginPath(); ctx.arc(x, y, r + 1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = (tick >> 2) & 1 ? '#e0452b' : '#f2862e'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffd35a'; ctx.fillRect(x - 1, y - 1, 2 + (s.big ? 1 : 0), 2 + (s.big ? 1 : 0));
+  } else {
+    ctx.fillStyle = '#1b1226'; ctx.beginPath(); ctx.arc(x, y, r + 1, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#4a2a6a'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    for (let k = 0; k < 3; k++) { const a = tick / 5 + k * 2.1; ctx.fillStyle = '#c79bf0'; ctx.fillRect(Math.round(x + Math.cos(a) * (r - 1)), Math.round(y + Math.sin(a) * (r - 1)), 1, 1); }
   }
 }
 function drawArrow(ctx: Ctx, x: number, y: number, ang: number) {
@@ -95,12 +131,13 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
   const s = swordPose(p);
   const spinning = p.state === 'held' || p.state === 'flying';   // no colo se debate; voando, gira
   const dir = spinning ? ([0, 3, 1, 2] as const)[(tick >> (p.state === 'flying' ? 2 : 3)) & 3] : p.state === 'spin' && s ? angDir(s.ang) : p.dir;
-  const bow = p.state === 'bow';
-  const pose = (p.state === 'lift' || p.state === 'carry' || spinning) ? 'lift' : ((s || bow) ? 'atk' : 'n');
+  const bow = p.state === 'bow', staff = staffInHand(p);
+  const pose = (p.state === 'lift' || p.state === 'carry' || spinning) ? 'lift' : ((s || bow || staff) ? 'atk' : 'n');
   const step = p.state === 'hurt' ? 0 : p.step;
   const px = Math.round(p.x), py = Math.round(p.y - p.z);
-  const behind = s && Math.sin(s.ang) < -0.35;
-  if (s && behind) drawSword(ctx, p, s, tick);
+  const behind = s && Math.sin(s.ang) < -0.35, staffBehind = staff && Math.sin(p.aim) < -0.35;
+  if (s && behind && !staff) drawSword(ctx, p, s, tick);
+  if (staffBehind) drawStaff(ctx, p, tick);
   if (bow && Math.sin(p.aim) < -0.35) drawBow(ctx, p);
   if (!blink) {
     ctx.drawImage(heroSprite(dir, step, pose, look.cloak, look.hair), px - 9, py - 13);
@@ -110,7 +147,8 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
       ctx.fillStyle = '#93d464'; for (let i = -5; i <= 5; i += 3) ctx.fillRect(px + i, py - 2, 1, 1);
     }
   }
-  if (s && !behind) drawSword(ctx, p, s, tick);
+  if (s && !behind && !staff) drawSword(ctx, p, s, tick);
+  if (staff && !staffBehind) drawStaff(ctx, p, tick);
   if (bow && Math.sin(p.aim) >= -0.35) drawBow(ctx, p);
   if (p.carry && !spinning) {
     let cx = p.x, cy = p.y - p.z - 20 + (p.step ? ((p.walkT >> 3) & 1) : 0);
@@ -126,6 +164,10 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
 }
 function drawEnemy(ctx: Ctx, e: EnemyView, tick: number) {
   const fl = e.hurtT > 0 && ((e.hurtT >> 1) & 1) === 1;
+  if (e.slowed) for (let k = 0; k < 3; k++) {
+    const a = tick / 8 + k * 2.1, top = e.type === 'king' ? 30 : 16;
+    ctx.fillStyle = k ? '#7f4aa8' : '#c79bf0'; ctx.fillRect(Math.round(e.x + Math.cos(a) * 6), Math.round(e.y - top - e.z + Math.sin(a) * 2), 2, 2);
+  }
   if (e.type === 'chicken') {   // furiosa (do bando) voa e bate as asas; comum cisca
     const angry = e.mode === 'chase', dir = e.dir === 2 ? 2 : 3;
     ctx.drawImage(chickenSprite(dir, (e.anim >> (angry ? 2 : 4)) & 1, angry), Math.round(e.x - 7), Math.round(e.y - 11 - e.z));
@@ -209,6 +251,7 @@ export function render(ctx: Ctx, w: Scene, v: View) {
   const cx = Math.round(v.cam.x), cy = Math.round(v.cam.y);
   ctx.setTransform(1, 0, 0, 1, sx - cx, sy - cy);
   drawTiles(ctx, w.map, cx, cy, VIEW_W, VIEW_H, wf);
+  drawSlides(ctx, w.map);
   if (v.showPaths) drawPaths(ctx, w, v);
   // só o que está perto da câmera entra na lista de desenho
   const near = (x: number, y: number) => x > cx - 32 && x < cx + VIEW_W + 32 && y > cy - 32 && y < cy + VIEW_H + 48;
@@ -252,6 +295,7 @@ export function render(ctx: Ctx, w: Scene, v: View) {
     if (!near(a.x, a.y) || (a.stuck && a.stuck < 10 && (a.stuck & 2))) continue;
     list.push({ y: a.y, d: () => drawArrow(ctx, a.x - Math.cos(a.ang) * 5, a.y - 6 - Math.sin(a.ang) * 5, a.ang) });
   }
+  for (const s of w.spells) if (near(s.x, s.y)) { ctx.drawImage(SHADOW, Math.round(s.x - 3), Math.round(s.y + 8), 6, 3); list.push({ y: s.y + 10, d: () => drawSpell(ctx, s, v.tick) }); }
   list.sort((a, b) => a.y - b.y).forEach(i => i.d());
   v.particles.draw(ctx);
   if (v.lock) drawLock(ctx, v.lock, v.tick);
@@ -275,6 +319,23 @@ function torchFlames(ctx: Ctx, w: Scene, cx: number, cy: number, tick: number) {
     ctx.fillStyle = '#fff3b0'; ctx.fillRect(x + 7 + (k > 0.5 ? 1 : 0), y + 2, 1, 1);
   });
 }
+// Blocos deslizando: o bloco anda do tile de origem até o de destino em ~1/4 s.
+const slides: { fx: number; fy: number; tx: number; ty: number; start: number }[] = [];
+export function addSlide(fx: number, fy: number, tx: number, ty: number) { slides.push({ fx, fy, tx, ty, start: performance.now() }); }
+function drawSlides(ctx: Ctx, map: WorldMap) {
+  const now = performance.now();
+  for (let i = slides.length - 1; i >= 0; i--) {
+    const s = slides[i], k = (now - s.start) / 260;
+    if (k >= 1 || !isBlockTile(map.get(s.tx, s.ty))) { slides.splice(i, 1); continue; }
+    ctx.drawImage(floorUnder(map, s.tx, s.ty), s.tx * TS, s.ty * TS);   // esconde o bloco já parado no destino
+    const x = (s.fx + (s.tx - s.fx) * k) * TS, y = (s.fy + (s.ty - s.fy) * k) * TS;
+    ctx.drawImage(OBJ.B, Math.round(x), Math.round(y));
+  }
+}
+const isBlockTile = (c: string) => c === 'B' || c === 'Q';
+// Clarões do Cajado de Luz: buracos de luz que encolhem até sumir.
+const glows: { x: number; y: number; r: number; start: number; end: number }[] = [];
+export function addGlow(x: number, y: number, r: number, s: number) { const now = performance.now(); glows.push({ x, y, r, start: now, end: now + s * 1000 }); }
 // Escuridão da noite (ou da caverna) com buracos de luz em degraus, no estilo pixel art.
 const lightCv = mk(VIEW_W, VIEW_H), lctx = lightCv.getContext('2d')!;
 function drawLight(ctx: Ctx, w: Scene, cx: number, cy: number, tick: number) {
@@ -291,6 +352,13 @@ function drawLight(ctx: Ctx, w: Scene, cx: number, cy: number, tick: number) {
     for (const [f, a] of [[1, 0.35], [0.72, 0.35], [0.45, 0.4]] as const) { lctx.fillStyle = `rgba(0,0,0,${a})`; lctx.beginPath(); lctx.arc(Math.round(x - cx), Math.round(y - cy), r * f, 0, Math.PI * 2); lctx.fill(); }
   };
   for (const p of w.players) if (p.state !== 'dead') hole(p.x, p.y - 6, p.id === w.meId ? 42 : 32);   // cada um carrega uma luz pequena
+  for (const s of w.spells) if (s.kind === 'fire') hole(s.x, s.y, s.big ? 40 : 28);
+  const now = performance.now();
+  for (let i = glows.length - 1; i >= 0; i--) {
+    const g = glows[i], k = (now - g.start) / (g.end - g.start);
+    if (k >= 1) { glows.splice(i, 1); continue; }
+    hole(g.x, g.y, g.r * (k < 0.75 ? 1 : 1 - (k - 0.75) * 2.4));   // dura inteiro e no fim vai fechando
+  }
   visibleTiles(w, cx, cy, (tx, ty, c) => {
     if (c === 't') hole(tx * TS + 8, ty * TS + 3, 62 + Math.round(hash(tx, ty, tick >> 4) * 4));
     else if (c === 'u') hole(tx * TS + 8, ty * TS + 6, 26);

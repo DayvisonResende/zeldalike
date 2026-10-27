@@ -10,7 +10,7 @@ export interface Portal { x: number; y: number; w: number; h: number; to: string
 // Baú: posição em tiles, o que tem dentro e em quantos segundos enche de novo para quem abriu.
 export interface Chest { x: number; y: number; loot: DropRule[]; respawn: number }
 // NPC: personagem parado que conversa. Posição em tiles; `dir`: para onde olha (0 baixo, 1 cima, 2 esquerda, 3 direita).
-export interface Npc { x: number; y: number; name: string; pages: string[]; look: Look; dir: Dir }
+export interface Npc { x: number; y: number; name: string; pages: string[]; look: Look; dir: Dir; shop?: string }   // shop: id da loja (preços no config)
 export interface MapData {
   name: string; cols: number; rows: number;
   spawn: { x: number; y: number };                       // em pixels (o ponto "partida")

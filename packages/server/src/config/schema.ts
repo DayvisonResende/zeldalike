@@ -1,3 +1,4 @@
+import { ITEM_IDS, LOOT_IDS, type ItemId, type LootId } from '@vale/shared';
 import { z } from 'zod';
 
 const UNIT = { ms: 0.001, s: 1, m: 60, h: 3600 } as const;
@@ -16,9 +17,12 @@ const dropEntry = z.union([chance, z.strictObject({ chance, min: z.number().int(
   .refine(d => typeof d === 'number' || d.min <= d.max, 'min não pode ser maior que max');
 const enemy = z.strictObject({
   hp: z.number().int().positive(), respawn: duration, damage: z.number().nonnegative(), xp: z.number().int().nonnegative(),
-  drops: z.partialRecord(z.enum(['gold', 'heart', 'mana', 'jelly', 'shell', 'bomb']), dropEntry).default({})
+  drops: z.partialRecord(z.enum(LOOT_IDS as [LootId, ...LootId[]]), dropEntry).default({})
 });
 const rate = z.number().nonnegative();
+// Loja: "heart: 15" = preço em ouro. buy: o que ela vende; sell: o que ela compra de você.
+const prices = z.partialRecord(z.enum(ITEM_IDS as [ItemId, ...ItemId[]]), z.number().int().positive()).default({});
+const shop = z.strictObject({ buy: prices, sell: prices });
 
 // strictObject recusa chaves desconhecidas: um "tallgras" digitado errado vira erro, não silêncio.
 export const configSchema = z.strictObject({
@@ -47,13 +51,22 @@ export const configSchema = z.strictObject({
     per: duration,
     announceJoins: z.boolean()
   }),
-  regrow: z.strictObject({ bush: duration, tallGrass: duration, rock: duration, secret: duration }),
+  regrow: z.strictObject({ bush: duration, tallGrass: duration, rock: duration, secret: duration, torch: duration.default(90), block: duration.default(120) }),
   enemies: z.strictObject({ slime: enemy, beetle: enemy, bat: enemy, chicken: enemy, king: enemy }),
   daynight: z.strictObject({ cycle: duration, start: z.number().min(0).max(24) }),
   fun: z.strictObject({
     liftPlayers: z.boolean(), struggle: z.number().int().min(1).max(100),
     chickenAnger: z.number().int().min(1), swarmSize: z.number().int().min(0).max(40), swarmTime: duration, swarmDamage: z.number().nonnegative()
   }),
+  magic: z.strictObject({
+    fire: z.strictObject({ mana: rate, damage: z.number().int().nonnegative(), pvp: rate }),
+    blast: z.strictObject({ mana: rate, damage: z.number().int().nonnegative(), pvp: rate, radius: z.number().positive() }),
+    heal: z.strictObject({ mana: rate, amount: rate, radius: z.number().positive() }),
+    bigHeal: z.strictObject({ mana: rate, amount: rate, radius: z.number().positive() }),
+    shadow: z.strictObject({ mana: rate, damage: z.number().int().nonnegative(), pvp: rate, drain: rate, slow: duration }),
+    curse: z.strictObject({ mana: rate, damage: z.number().int().nonnegative(), pvp: rate, drain: rate, slow: duration })
+  }),
+  shops: z.record(z.string().regex(/^[a-z0-9-]+$/, 'id de loja: só letras minúsculas sem acento, números e hífen'), shop).default({}),
   events: z.strictObject({
     invasion: z.strictObject({
       every: duration, warning: duration, duration: duration.refine(d => d > 0, 'a invasão precisa durar mais que 0'),

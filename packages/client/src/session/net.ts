@@ -1,7 +1,7 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG, World, applyOwnState, bfs, cleanLook, cleanName, encodeInput, tileOf,
-  type ChatMsg, type ChatRequest, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
+  type ChatMsg, type ChatRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
 import type { Inventory, Scene, Session, Status } from './types';
@@ -102,7 +102,7 @@ export class NetSession implements Session {
     this.pred.setInput(this.meId, input);
     const evs = this.pred.step({ life: false });
     for (const ev of evs) if (ev.t === 'tile') this.overlay.set(ev.tx + ',' + ev.ty, this.local + OVERLAY_TICKS);
-    this.pred.thrown = []; this.pred.arrows = []; this.pred.drops = []; this.pred.bombs = []; this.pred.regrow.clear();   // objetos voando, drops e regeneração vêm do servidor
+    this.pred.thrown = []; this.pred.arrows = []; this.pred.drops = []; this.pred.bombs = []; this.pred.spells = []; this.pred.regrow.clear();   // objetos voando, drops e regeneração vêm do servidor
     return evs;
   }
   private applyTile(tx: number, ty: number, c: string) {
@@ -119,10 +119,12 @@ export class NetSession implements Session {
   pvp() { return this.pvpInfo; }
   inventory(): Inventory | null {
     const p = this.player; if (!p) return null;
-    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext };
+    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext, gear: p.gear };
   }
   useItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'use', slot }); }
   dropItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'drop', slot }); }
+  equip(gear: GearId, slot: GearSlot) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'equip', gear, slot }); }
+  shop(action: 'buy' | 'sell', shop: string, item: ItemId, n: number) { if (this.status === 'online') this.room?.send(MSG.shop, { action, shop, item, n }); }
   setPvp(on: boolean) { if (this.status === 'online') this.room?.send(MSG.pvp, { on }); }
   chat(req: ChatRequest) { if (this.status === 'online') this.room?.send(MSG.chat, req); }
 
@@ -157,7 +159,7 @@ export class NetSession implements Session {
     const players = me ? [me, ...v.players] : v.players;
     const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;
     const chests = (this.map.data.chests ?? []).map(c => ({ x: c.x, y: c.y, open: this.openChests.has(`${c.x},${c.y}`) }));
-    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, bombs: v.bombs, chests, npcs: this.map.data.npcs ?? [],
+    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, bombs: v.bombs, spells: v.spells, chests, npcs: this.map.data.npcs ?? [],
       day: this.day, invasion: this.invasion, dark: !!this.map.data.dark, profiles: this.profiles, flow };
   }
 }

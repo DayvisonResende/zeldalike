@@ -73,6 +73,31 @@ cair em monstro machuca o monstro). No colo de alguém, aperte as teclas rápido
 **Galinhas:** inofensivas e imortais (classe `chicken` no Tiled). Bata 5 vezes na mesma e um bando vem bicar só você
 por alguns segundos; a zona segura é o único refúgio. Números em `fun` no config.
 
+**Equipamento e magias:** os botões A e C recebem qualquer arma, e cada um monta do seu jeito, trocando quando
+quiser pelo inventário. Espada e arco todo mundo tem; Cajado de Fogo (bola de fogo / explosão), Cajado de Luz
+(cura em volta / cura maior que empurra monstros) e Grimório Sombrio (lentidão + roubo de vida / maldição) são
+itens — vendidos pela Rosa e às vezes deixados pelo Rei Geleca. Segurar e soltar solta a magia forte. Gastam mana
+(números em `magic` no config); sem mana, viram bastão. O equipado fica salvo no personagem.
+
+**Magia no mundo:** o fogo queima arbustos e mato (crescem de novo) e acende **tochas apagadas** (tile `j`); com
+todas as tochas apagadas de um grupo acesas (até 6 tiles uma da outra), os **portões** (`G`) a até 8 tiles abrem. Depois
+de `regrow.torch` as tochas apagam e o portão fecha. O Cajado de Luz deixa um clarão no escuro e revela **paredes
+ilusórias** (`I`, iguais às da caverna) por perto. Na Caverna Funda há um baú atrás de um portão e uma sala escondida.
+
+**Blocos e placas:** andar contra um **bloco** (`B`) por meio segundo o empurra um tile. Uma **placa de pressão** (`P`)
+fica apertada com um bloco em cima ou com alguém de pé nela; com todas as placas de um grupo (até 6 tiles uma da
+outra) apertadas, os portões (`G`) a até 8 tiles abrem, e fecham quando uma solta. Blocos fora do lugar voltam
+sozinhos depois de `regrow.block` sem ninguém perto. Nas Ruínas de Aurel há uma cripta com um baú.
+
+**Loja:** um NPC vira lojista com a propriedade `loja` no Tiled (o id de uma loja em `shops` no config). Falar com ele
+abre a loja depois da fala: Comprar (o que ele vende, `buy`) e Vender (o que ele compra, `sell`), com preços em ouro.
+O servidor confere ouro, espaço no inventário e se você está perto do lojista. A Mercadora Rosa fica na Clareira.
+
+**Controle de videogame:** qualquer controle que o navegador reconheça (Bluetooth ou USB, no celular ou no PC).
+Analógico/direcional anda, botão de baixo é a espada, direita a ação, esquerda o arco, cima/RB o dash, analógico
+direito mira; LT coração, RT poção, LB bomba; Start menu, Select inventário. Menus, inventário e loja se navegam
+pelo direcional. Com controle conectado no celular, os botões de toque somem.
+
 **Celular:** em telas de toque aparece um controle (joystick flutuante, botões A/B/C/D, atalhos de coração, poção e
 bomba). Deitado, a tela do jogo ocupa a altura toda e o controle vai para as laterais. Tamanho dos botões e vibração
 ficam em Menu → Opções. Dá para instalar como app (manifest em `packages/client/public`), que abre em tela cheia.

@@ -21,6 +21,8 @@ import { updateArrows, updateThrown, type Arrow, type Thrown } from './systems/p
 import { updateRegrowth, type Regrow } from './systems/regrowth';
 import { createEnemy, inPeriod, updateSpawns, type Spawn } from './systems/spawner';
 import { updateInvasion, type Invasion } from './systems/invasion';
+import { updateSpells, type Spell } from './systems/magic';
+import { updateBlocks, type BlockHome } from './systems/blocks';
 
 // O mundo inteiro: mapa, jogadores, inimigos e objetos voando. Roda igual no servidor e no navegador.
 export class World {
@@ -35,6 +37,10 @@ export class World {
   arrows: Arrow[] = [];
   drops: Drop[] = [];
   bombs: Bomb[] = [];
+  spells: Spell[] = [];
+  blockHomes = new Map<string, BlockHome>();   // bloco fora do lugar ("x,y" de agora) → de onde veio
+  plateGates = new Set<string>();             // portões que as placas abriram
+  plateGroups?: [number, number][][];
   spawns: Spawn[];
   regrow = new Map<string, Regrow>();
   flow: DistMap | null = null;
@@ -87,11 +93,11 @@ export class World {
     separate(this);
     this.enemies = this.enemies.filter(e => !e.dead);
     updateCarried(this);
-    updateThrown(this); updateArrows(this); updateBombs(this); contact(this);
+    updateThrown(this); updateArrows(this); updateSpells(this); updateBombs(this); contact(this);
     updatePortals(this);
     if (opts.life !== false) { updateLife(this); updatePvp(this); updateLoot(this); }
     updateRegrowth(this); updateSpawns(this);
-    if (opts.life !== false) updateInvasion(this);
+    if (opts.life !== false) { updateInvasion(this); updateBlocks(this); }
     for (const p of this.players.values()) {
       const r = this.map.regionAt(p.x, p.y);
       if (r && r.id !== p.region) { p.region = r.id; this.emit({ t: 'region', to: p.id, name: r.name }); }

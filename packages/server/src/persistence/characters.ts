@@ -1,10 +1,10 @@
-import type { CharacterSummary, Look, Slot } from '@vale/shared';
+import type { CharacterSummary, GearId, GearSlot, Look, Slot } from '@vale/shared';
 import type { Db } from './db';
 import type { DB } from './schema';
 import { nameKey } from './names';
 
-export type CharacterRow = Omit<DB['characters'], 'id' | 'level' | 'xp' | 'gold' | 'items' | 'map' | 'chests'> & { id: number; level: number; xp: number; gold: number; items: string; map: string; chests: string };
-export interface CharacterState { map: string; x: number; y: number; hp: number; mp: number; look: Look; level: number; xp: number; gold: number; bag: Slot[]; chests: Record<string, number> }
+export type CharacterRow = Omit<DB['characters'], 'id' | 'level' | 'xp' | 'gold' | 'items' | 'map' | 'chests' | 'gear'> & { id: number; level: number; xp: number; gold: number; items: string; map: string; chests: string; gear: string };
+export interface CharacterState { map: string; x: number; y: number; hp: number; mp: number; look: Look; level: number; xp: number; gold: number; bag: Slot[]; chests: Record<string, number>; gear: Record<GearSlot, GearId> }
 
 export async function listCharacters(db: Db, accountId: number): Promise<CharacterSummary[]> {
   const rows = await db.selectFrom('characters').selectAll().where('account_id', '=', accountId).orderBy('created_at').execute();
@@ -32,6 +32,6 @@ export async function saveCharacters(db: Db, list: { id: number; state: Characte
   await db.transaction().execute(async tx => {
     for (const { id, state: s } of list)
       await tx.updateTable('characters').set({ x: s.x, y: s.y, hp: s.hp, mp: s.mp, cloak: s.look.cloak, hair: s.look.hair, last_played: now,
-        level: s.level, xp: s.xp, gold: s.gold, items: JSON.stringify(s.bag), map: s.map, chests: JSON.stringify(s.chests) }).where('id', '=', id).execute();
+        level: s.level, xp: s.xp, gold: s.gold, items: JSON.stringify(s.bag), map: s.map, chests: JSON.stringify(s.chests), gear: JSON.stringify(s.gear) }).where('id', '=', id).execute();
   });
 }

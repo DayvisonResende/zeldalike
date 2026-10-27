@@ -82,6 +82,7 @@ export function useItem(w: World, p: Player, slot: number): ItemResult {
     if (w.tick - p.useAt < USE_COOLDOWN) return { ok: false, reason: 'Calma, um de cada vez.' };
     p.useAt = w.tick; useBomb(w, p, slot); return { ok: true };
   }
+  if (def.gear) return { ok: false, reason: `Equipe ${def.name} no A ou no C pelo inventário.` };
   if (!def.heal && !def.mana) return { ok: false, reason: `${def.name} não tem uso por enquanto.` };
   if (w.tick - p.useAt < USE_COOLDOWN) return { ok: false, reason: 'Calma, um de cada vez.' };
   if ((!def.heal || p.hp >= p.maxHp) && (!def.mana || p.mp >= p.maxMp)) return { ok: false, reason: def.heal ? 'Sua vida já está cheia.' : 'Sua mana já está cheia.' };

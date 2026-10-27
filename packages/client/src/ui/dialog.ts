@@ -3,13 +3,13 @@ import { sfx } from '../audio';
 
 // Caixa de texto das placas. É só interface: o mundo continua rodando enquanto você lê.
 export class Dialog {
-  private pages: string[] = []; private i = 0; private n = 0;
+  private pages: string[] = []; private i = 0; private n = 0; private done?: () => void;
   private el = document.getElementById('dialog')!; private text = document.getElementById('dlgText')!; private more = document.getElementById('dlgMore')!;
   private who = document.getElementById('dlgWho')!;
   get open() { return this.pages.length > 0; }
-  // title: nome de quem fala (NPC); placas não têm.
-  show(pages: string[], title?: string) {
-    this.pages = pages; this.i = 0; this.n = 0; this.el.hidden = false; this.text.textContent = ''; this.more.hidden = true;
+  // title: nome de quem fala (NPC); placas não têm. done: chamado quando a última página fecha (lojista abre a loja).
+  show(pages: string[], title?: string, done?: () => void) {
+    this.pages = pages; this.done = done; this.i = 0; this.n = 0; this.el.hidden = false; this.text.textContent = ''; this.more.hidden = true;
     this.who.hidden = !title; this.who.textContent = title ?? '';
   }
   update(tap: number) {
@@ -18,7 +18,7 @@ export class Dialog {
     if (tap & (BUTTON.a | BUTTON.b)) {
       if (this.n < full.length) this.n = full.length;
       else if (this.i < this.pages.length - 1) { this.i++; this.n = 0; sfx('sign'); }
-      else { this.pages = []; this.el.hidden = true; return; }
+      else { this.pages = []; this.el.hidden = true; const d = this.done; this.done = undefined; d?.(); return; }
     }
     const cur = this.pages[this.i];
     this.text.textContent = cur.slice(0, Math.floor(this.n));

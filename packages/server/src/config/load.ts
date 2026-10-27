@@ -28,6 +28,8 @@ export function parseConfig(text: string, map?: MapData, others: MapData[] = [])
     const main = new Set(map.regions.map(r => r.id)), all = new Set([...main, ...others.flatMap(m => m.regions.map(r => r.id))]);
     if (!main.has(cfg.player.respawnPoint)) throw new ConfigError(`config.yaml: player.respawnPoint "${cfg.player.respawnPoint}" não é uma região do mapa principal. Regiões dele: ${[...main].join(', ')}`);
     if (cfg.events.invasion.every > 0 && !main.has(cfg.events.invasion.zone)) throw new ConfigError(`config.yaml: events.invasion.zone "${cfg.events.invasion.zone}" não é uma região do mapa principal. Regiões dele: ${[...main].join(', ')}`);
+    const lost = [map, ...others].flatMap(m => (m.npcs ?? []).filter(n => n.shop && !(n.shop in cfg.shops)).map(n => `${n.name} ("${n.shop}")`));
+    if (lost.length) throw new ConfigError(`config.yaml: loja que não está em shops: ${lost.join(', ')}. Lojas do config: ${Object.keys(cfg.shops).join(', ') || 'nenhuma'}`);
     const bad = cfg.pvp.safeZones.filter(id => !all.has(id));
     if (bad.length) throw new ConfigError(`config.yaml: zona segura desconhecida ${bad.map(b => `"${b}"`).join(', ')}. Regiões dos mapas: ${[...all].join(', ')}`);
   }
@@ -42,7 +44,7 @@ export function toRules(cfg: Config): Rules {
   });
   return {
     regrow: cfg.regrow, enemies: { slime: enemy(cfg.enemies.slime), beetle: enemy(cfg.enemies.beetle), bat: enemy(cfg.enemies.bat), chicken: enemy(cfg.enemies.chicken), king: enemy(cfg.enemies.king) }, player: cfg.player,
-    daynight: { cycle: cfg.daynight.cycle, start: cfg.daynight.start / 24 }, fun: cfg.fun, events: cfg.events,
+    daynight: { cycle: cfg.daynight.cycle, start: cfg.daynight.start / 24 }, fun: cfg.fun, events: cfg.events, shops: cfg.shops, magic: cfg.magic,
     pvp: { mode, safeZones, toggleCooldown, combatLock, damage }, rates: cfg.rates, leveling: cfg.leveling, inventory: cfg.inventory, loot: cfg.loot
   };
 }

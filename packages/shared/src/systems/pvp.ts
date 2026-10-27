@@ -21,10 +21,10 @@ export function pvpActive(w: World, p: Player) {
 export const canHarm = (w: World, a: Player, v: Player) => a !== v && v.state !== 'dead' && pvpActive(w, a) && pvpActive(w, v);
 
 // Golpe de um jogador em outro. Retorna true se acertou (para o golpe não acertar o mesmo duas vezes).
-export function harmPlayer(w: World, a: Player, v: Player, attack: PvpAttack) {
+export function harmPlayer(w: World, a: Player, v: Player, attack: PvpAttack, amount = w.rules.pvp.damage[attack]) {
   if (!canHarm(w, a, v) || v.inv > 0) return false;
   a.combatAt = v.combatAt = w.tick;
-  damagePlayer(w, v, w.rules.pvp.damage[attack], a, a);
+  damagePlayer(w, v, amount, a, a);
   return true;
 }
 

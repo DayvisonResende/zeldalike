@@ -10,6 +10,7 @@ import { openChest } from './chests';
 import { cast, waterAhead } from './fishing';
 import { liftBomb } from './bombs';
 import { liftPlayer } from './throwing';
+import { shopOffer } from './shop';
 
 // Botão B: lê a placa à frente ou levanta um arbusto/pedra.
 export function interact(w: World, p: Player) {
@@ -24,7 +25,11 @@ export function interact(w: World, p: Player) {
     const chest = w.map.chest(tx, ty);
     if (chest) { openChest(w, p, chest); return true; }
     const npc = w.map.npc(tx, ty);
-    if (npc) { w.emit({ t: 'dialog', to: p.id, pages: npc.pages, title: npc.name, npc: tx + ',' + ty }); sfx(w, 'sign', p); return true; }
+    if (npc) {
+      const shop = shopOffer(w, npc);
+      w.emit({ t: 'dialog', to: p.id, pages: npc.pages, title: npc.name, npc: tx + ',' + ty, ...(shop ? { shop } : {}) });
+      sfx(w, 'sign', p); return true;
+    }
     const c = w.map.tiles[ty][tx];
     if (c === 's') { const pages = w.map.sign(tx, ty); if (pages) { w.emit({ t: 'dialog', to: p.id, pages }); sfx(w, 'sign', p); return true; } }
     if (c === 'b' || c === 'r') {

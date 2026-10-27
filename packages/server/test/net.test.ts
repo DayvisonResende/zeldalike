@@ -297,6 +297,25 @@ describe('contas e personagens', () => {
     expect([again.x, again.y, Math.floor(again.hp), again.look]).toEqual([320, 112, 42, { cloak: 4, hair: 6 }]);
     await room.leave();
   });
+  it('equipar pela mensagem de item: só o que tem, e o equipado fica salvo', async () => {
+    const a = await bot('Maga');
+    const world = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    const p = world.players.get(a.room.sessionId)!;
+    a.room.send(MSG.item, { action: 'equip', gear: 'firestaff', slot: 'a' });   // ainda não tem
+    await sleep(150);
+    expect(p.gear.a).toBe('sword');
+    expect(a.chat.at(-1)?.text).toBe('Você não tem isso.');
+    p.bag[0] = { id: 'firestaff', n: 1 }; p.bagVersion++;
+    a.room.send(MSG.item, { action: 'equip', gear: 'firestaff', slot: 'c' });
+    await sleep(150);
+    expect(p.gear).toEqual({ a: 'sword', c: 'firestaff' });
+    await a.room.leave(); await sleep(150);
+    const acc = accounts.get('Maga')!;
+    const room = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: acc.token, characterId: acc.charId });
+    await sleep(150);
+    expect(world.players.get(room.sessionId)!.gear).toEqual({ a: 'sword', c: 'firestaff' });
+    await room.leave();
+  });
   it('o mesmo personagem entrando de outro lugar derruba a sessão antiga', async () => {
     const a = await bot('Duplo');
     const kicked = new Promise<number>(r => a.room.onLeave(code => r(code)));

@@ -106,11 +106,13 @@ function updateBeetle(w: World, e: Enemy) {
 
 export function updateEnemy(w: World, e: Enemy) {
   e.anim++;
+  e.slowed = (e.slowUntil ?? 0) > w.tick;
   if (e.hurtT > 0) {
     e.hurtT--; moveEnemy(w, e, e.kx, e.ky); e.kx *= 0.82; e.ky *= 0.82;
     if (e.hurtT === 0 && e.dying) { w.emit({ t: 'poof', x: e.x, y: e.y - 4 }); sfx(w, 'poof', e); e.dead = true; onEnemyDead(w, e); }
     if (e.type !== 'king' || e.dying) return;   // o rei apanha sem parar o que estava fazendo
   }
+  if (e.slowed && w.tick % 2) return;   // lento (sombra): age em passos alternados
   if (e.type === 'king') { updateKing(w, e); return; }
   if (e.type === 'slime') updateSlime(w, e); else if (e.type === 'bat') updateBat(w, e); else if (e.type === 'chicken') updateChicken(w, e); else updateBeetle(w, e);
 }

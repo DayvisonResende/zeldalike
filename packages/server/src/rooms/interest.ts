@@ -10,10 +10,11 @@ export function eventFor(ev: GameEvent, id: string, view: Rect) {
   switch (ev.t) {
     case 'tile': return true;                          // o mapa é de todos
     case 'dialog': case 'region': case 'zone': case 'gain': case 'notice': return ev.to === id;
-    case 'levelup': return inRect(view, ev.x, ev.y, EVENT_MARGIN);
+    case 'levelup': case 'glow': return inRect(view, ev.x, ev.y, EVENT_MARGIN);
     case 'kill': case 'fish': case 'announce': return false;   // viram aviso no chat, não evento
     case 'shake': return ev.to === id && ev.by !== id; // o próprio cliente já tremeu a tela na previsão
     case 'poof': return inRect(view, ev.x, ev.y, EVENT_MARGIN);
     case 'sfx': case 'burst': return ev.by !== id && inRect(view, ev.x, ev.y, EVENT_MARGIN);
+    case 'slide': return ev.by !== id && inRect(view, ev.tx * 16 + 8, ev.ty * 16 + 8, EVENT_MARGIN);
   }
 }

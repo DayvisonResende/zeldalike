@@ -118,6 +118,12 @@
       "drawFill": true,
       "members": [
         {
+          "name": "loja",
+          "propertyType": "",
+          "type": "string",
+          "value": ""
+        },
+        {
           "name": "texto",
           "type": "string",
           "value": ""

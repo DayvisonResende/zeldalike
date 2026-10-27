@@ -209,7 +209,32 @@ function torchGrid() {
   R(g, 5, 2, 4, 3, '#ee8b3d'); R(g, 6, 1, 2, 2, '#f5c542'); P(g, 6, 0, '#fff3b0');
   return g;
 }
-export const OBJ: Record<string, HTMLCanvasElement> = { T: bake(treeGrid()), b: bake(bushGrid()), r: bake(rockGrid()), s: bake(signGrid()), o: bake(pillarGrid()), t: bake(torchGrid()) };
+// Tocha apagada: o mesmo poste, com o braseiro frio e um fio de fumaça.
+function coldTorchGrid() {
+  const g = G(14, 14);
+  R(g, 6, 6, 2, 8, '#7d4f2a'); R(g, 6, 6, 1, 8, '#9a6538');
+  R(g, 4, 5, 6, 2, '#4a4038'); R(g, 4, 5, 6, 1, '#6e6255');
+  R(g, 5, 4, 4, 1, '#2d2733'); P(g, 6, 3, '#5e5866'); P(g, 7, 1, '#8a8494');
+  return g;
+}
+// Bloco de pedra entalhado (empurra), com um losango gravado.
+function blockGrid() {
+  const g = G(14, 14);
+  R(g, 0, 0, 14, 14, '#8f897f'); R(g, 0, 0, 14, 2, '#c6c0b4'); R(g, 0, 0, 2, 14, '#b3ada3'); R(g, 0, 12, 14, 2, '#6a645b'); R(g, 12, 0, 2, 14, '#77716a');
+  for (const [x, y] of [[7, 3], [6, 4], [8, 4], [5, 5], [9, 5], [4, 6], [10, 6], [5, 7], [9, 7], [6, 8], [8, 8], [7, 9]]) P(g, x, y, '#5a554d');
+  P(g, 7, 6, '#d9b45a');
+  return g;
+}
+// Portão: grade de ferro presa em dois postes.
+function gateGrid() {
+  const g = G(14, 14);
+  R(g, 0, 0, 2, 14, '#6e6255'); R(g, 12, 0, 2, 14, '#6e6255'); R(g, 0, 0, 1, 14, '#8a7c6c');
+  for (const x of [3, 6, 9]) { R(g, x, 1, 2, 13, '#4d505a'); R(g, x, 1, 1, 13, '#8f929b'); }
+  R(g, 2, 3, 10, 2, '#3a3d46'); R(g, 2, 3, 10, 1, '#7a7d87'); R(g, 2, 10, 10, 2, '#3a3d46'); R(g, 2, 10, 10, 1, '#7a7d87');
+  for (const x of [3, 6, 9]) P(g, x, 0, '#c6c9d2');
+  return g;
+}
+export const OBJ: Record<string, HTMLCanvasElement> = { T: bake(treeGrid()), b: bake(bushGrid()), r: bake(rockGrid()), s: bake(signGrid()), o: bake(pillarGrid()), t: bake(torchGrid()), j: bake(coldTorchGrid()), G: bake(gateGrid()), B: bake(blockGrid()) };
 export const SHADOW = (() => { const c = mk(14, 6), x = c.getContext('2d')!; x.fillStyle = 'rgba(16,24,8,0.32)'; for (let j = 0; j < 6; j++) for (let i = 0; i < 14; i++) { const dx = (i + 0.5 - 7) / 7, dy = (j + 0.5 - 3) / 3; if (dx * dx + dy * dy <= 1) x.fillRect(i, j, 1, 1); } return c; })();
 
 function glyph(rows: string[], col: string) { const g = G(rows[0].length, rows.length); rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch === '1') g[j][i] = col; })); return bake(g); }
@@ -234,6 +259,9 @@ export const ITEM_ICON: Record<string, HTMLCanvasElement> = {
   blindfish: icon(['........', '.pp...p.', 'pppppppp', 'pppppp..', '.pp...p.'], { p: '#f2c6d6' }),
   boot: icon(['.bbb....', '.bbb....', '.bbb....', '.bbbbbb.', 'dddddddd'], { b: '#7a4a2a', d: '#3e2416' }),
   bomb: icon(['....oo..', '...o....', '.bbbb...', 'bwbbbb..', 'bbbbbb..', 'bbbbbb..', '.bbbb...'], { b: '#2d2a3a', w: '#7a7690', o: '#d9822b' }),
+  firestaff: icon(['......oy', '.....bo.', '....b...', '...b....', '..b.....', '.b......', 'b.......'], { b: '#8a5a33', o: '#e8642c', y: '#ffd35a' }),
+  lightstaff: icon(['......wy', '.....bw.', '....b...', '...b....', '..b.....', '.b......', 'b.......'], { b: '#c9a46a', w: '#fffbe6', y: '#9fe7ff' }),
+  darktome: icon(['.pppppp.', 'pPPPPPpd', 'pPwwPPpd', 'pPPPPPpd', 'pPPwwPpd', 'pPPPPPpd', '.dddddd.'], { p: '#4a2a6a', P: '#7f4aa8', w: '#c79bf0', d: '#24142f' }),
   gold: icon(['..yyyy..', '.yywwyy.', 'yywyyyyo', 'yyyyyyyo', 'yyyyyyoo', '.yyyyoo.', '..oooo..'], { y: '#f5c542', w: '#fff3b0', o: '#b8862a' })
 };
 

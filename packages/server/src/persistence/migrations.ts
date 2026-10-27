@@ -66,6 +66,11 @@ export const migrations: Record<string, Migration> = {
       await db.schema.alterTable('characters').addColumn('chests', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"mapa:x,y": quando abriu (ms)}
     }
   },
+  '007_equipamento': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('characters').addColumn('gear', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"a": "sword", "c": "bow"}
+    }
+  },
   '006_recordes_de_pesca': {
     async up(db: Kysely<unknown>) {
       await db.schema.createTable('fish_records')   // o maior de cada peixe no servidor

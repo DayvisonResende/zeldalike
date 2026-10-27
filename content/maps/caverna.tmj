@@ -183,18 +183,18 @@
     16,
     16,
     17,
+    16,
+    17,
+    16,
+    16,
+    16,
+    16,
     17,
     17,
     16,
     16,
     16,
     16,
-    17,
-    17,
-    16,
-    16,
-    16,
-    16,
     16,
     16,
     16,
@@ -213,7 +213,7 @@
     16,
     16,
     17,
-    17,
+    25,
     17,
     16,
     16,
@@ -286,7 +286,7 @@
     16,
     16,
     17,
-    17,
+    16,
     17,
     17,
     16,
@@ -316,7 +316,7 @@
     16,
     16,
     17,
-    17,
+    24,
     17,
     17,
     16,
@@ -344,12 +344,12 @@
     16,
     16,
     16,
+    23,
     16,
     16,
     16,
     16,
-    16,
-    16,
+    23,
     16,
     16,
     16,
@@ -944,6 +944,54 @@
        "value": "30m"
       }
      ]
+    },
+    {
+     "id": 19,
+     "name": "",
+     "type": "bau",
+     "rotation": 0,
+     "visible": true,
+     "point": true,
+     "width": 0,
+     "height": 0,
+     "x": 104,
+     "y": 136,
+     "properties": [
+      {
+       "name": "conteudo",
+       "type": "string",
+       "value": "gold:30-60, heart:2, bomb:4, firestaff:1@10%"
+      },
+      {
+       "name": "renasce",
+       "type": "string",
+       "value": "20m"
+      }
+     ]
+    },
+    {
+     "id": 20,
+     "name": "",
+     "type": "bau",
+     "rotation": 0,
+     "visible": true,
+     "point": true,
+     "width": 0,
+     "height": 0,
+     "x": 376,
+     "y": 72,
+     "properties": [
+      {
+       "name": "conteudo",
+       "type": "string",
+       "value": "gold:40-80, mana:3, lightstaff:1@10%, darktome:1@10%"
+      },
+      {
+       "name": "renasce",
+       "type": "string",
+       "value": "20m"
+      }
+     ]
     }
    ]
   },
@@ -995,5 +1043,5 @@
   }
  ],
  "nextlayerid": 8,
- "nextobjectid": 19
+ "nextobjectid": 21
 }

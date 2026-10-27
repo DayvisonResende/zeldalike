@@ -25,6 +25,7 @@
       <div class="xprow"><span class="lvl" id="lvl">Nv 1</span><div class="xpbar" id="xpbar" role="meter" aria-label="Experiência" aria-valuemin="0"><i></i></div></div>
       <span class="clock" id="clock"></span>
       <span class="raid" id="raid" role="status" hidden></span>
+      <span class="gearline" id="gearLine"></span>
       <span class="gold" id="gold"><canvas width="10" height="9" aria-hidden="true"></canvas><b>0</b></span>
       <span class="badge" id="pvpBadge" hidden></span>
     </div>
@@ -104,12 +105,27 @@
     <div class="bag" id="bag" role="dialog" aria-label="Inventário" hidden>
       <div class="menucard bagcard">
         <div class="row"><strong>Inventário</strong><span class="hint" id="bagGold"></span></div>
+        <div class="gearrow" role="group" aria-label="Equipado">
+          <button type="button" class="gearbtn" id="gearA" data-slot="a"></button>
+          <button type="button" class="gearbtn" id="gearC" data-slot="c"></button>
+        </div>
         <div class="bagrid" id="bagGrid" role="listbox" aria-label="Itens"></div>
         <div class="bagdetail" id="bagDetail">
           <p id="bagInfo" class="hint">Escolha um item.</p>
-          <div class="row"><button type="button" class="primary" id="bagUse" disabled>Usar</button><button type="button" class="link" id="bagDrop" disabled>Largar no chão</button></div>
+          <div class="row"><button type="button" class="primary" id="bagUse" disabled>Usar</button><button type="button" class="primary" id="bagEquipC" hidden>Equipar no C</button><button type="button" class="link" id="bagDrop" disabled>Largar no chão</button></div>
         </div>
         <p class="hint">Atalhos: <kbd>1</kbd> usa um coração, <kbd>2</kbd> uma poção de mana, <kbd>3</kbd> põe uma bomba. <kbd>I</kbd> ou <kbd>Esc</kbd> fecha.</p>
+      </div>
+    </div>
+    <div class="bag" id="shop" role="dialog" aria-label="Loja" hidden>
+      <div class="menucard bagcard">
+        <div class="row"><strong id="shopName">Loja</strong><span class="hint" id="shopGold"></span></div>
+        <div class="tabs" role="tablist">
+          <button type="button" role="tab" data-shoptab="buy" aria-selected="true">Comprar</button>
+          <button type="button" role="tab" data-shoptab="sell" aria-selected="false">Vender</button>
+        </div>
+        <ul class="shoplist" id="shopList"></ul>
+        <button type="button" class="close" id="shopClose">Sair da loja</button>
       </div>
     </div>
     <button class="bagbtn" id="bagBtn" type="button" aria-label="Inventário (I)">🎒</button>
@@ -168,10 +184,12 @@
         <section role="tabpanel" data-panel="keys" hidden>
           <dl class="keys">
             <dt>Andar</dt><dd><kbd>←↑↓→</kbd> ou <kbd>WASD</kbd>. Na beira de um barranco, ande para baixo para pular.</dd>
-            <dt>Espada</dt><dd><kbd>J</kbd> <kbd>Z</kbd> <kbd>Espaço</kbd> ou clique esquerdo. Segure até brilhar e solte para girar.</dd>
-            <dt>Arco</dt><dd><kbd>L</kbd> <kbd>C</kbd> ou clique direito.</dd>
+            <dt>Botão A</dt><dd><kbd>J</kbd> <kbd>Z</kbd> <kbd>Espaço</kbd> ou clique esquerdo: usa o que estiver no A (começa com a espada). Segure até brilhar e solte: giro da espada ou magia forte.</dd>
+            <dt>Botão C</dt><dd><kbd>L</kbd> <kbd>C</kbd> ou clique direito: usa o que estiver no C (começa com o arco).</dd>
+            <dt>Equipar</dt><dd>No inventário (<kbd>I</kbd>), os botões A e C no topo trocam o que vai em cada um. Cajados e grimório gastam mana; sem mana, viram bastão.</dd>
             <dt>Dash</dt><dd>Segure <kbd>Shift</kbd> ou <kbd>Q</kbd>. Corre até bater em algo ou virar para trás.</dd>
             <dt>Levantar e ler</dt><dd><kbd>E</kbd> <kbd>K</kbd> ou <kbd>X</kbd>. Aperte de novo para arremessar.</dd>
+            <dt>Controle</dt><dd>Conecte um controle (Bluetooth ou USB). Analógico ou direcional anda; botão de baixo: espada; direita: ação; esquerda: arco; cima ou RB: dash; analógico direito mira. LT: coração, RT: poção, LB: bomba. Start: menu; Select: inventário. Nos menus, o direcional escolhe, baixo confirma e direita fecha.</dd>
             <dt>Celular</dt><dd>Encoste em qualquer lugar do lado esquerdo para andar. Os botões redondos são as teclas; os de cima usam coração, poção e bomba. Jogue deitado e use ⛶ para tela cheia (no iPhone: Compartilhar → Adicionar à Tela de Início).</dd>
             <dt>Mira</dt><dd>Com o mouse sobre a tela, espada, flechas e arremessos seguem o cursor.</dd>
             <dt>Levantar amigos</dt><dd><kbd>E</kbd> de frente para outro jogador levanta; <kbd>E</kbd> de novo arremessa. No colo de alguém? Aperte as teclas rápido para se soltar.</dd>

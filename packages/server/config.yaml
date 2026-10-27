@@ -43,7 +43,9 @@ regrow:
   bush: 3m                  # arbusto cortado ou levantado volta em 3 minutos
   tallGrass: 1m
   rock: 5m
-  secret: 5m                # parede rachada aberta com bomba se fecha de novo
+  secret: 5m                # parede rachada aberta com bomba (ou ilusória revelada pela luz) se fecha de novo
+  torch: 90s                # tocha acesa com fogo apaga (e o portão que ela abriu fecha)
+  block: 2m                 # bloco empurrado volta ao lugar (quando não tem ninguém perto)
 
 # ── Inimigos ──────────────────────────────────────────
 # hp: golpes de espada para derrubar · damage: vida que tiram do jogador ao encostar · xp: ganho de quem derruba
@@ -93,6 +95,9 @@ enemies:
       jelly: { chance: 1, min: 3, max: 5 }
       heart: { chance: 1, min: 2, max: 2 }
       bomb: { chance: 0.5, min: 2, max: 4 }
+      firestaff: 0.15
+      lightstaff: 0.15
+      darktome: 0.15
 
 # ── Diversão ──────────────────────────────────────────
 fun:
@@ -102,6 +107,37 @@ fun:
   swarmSize: 8              # galinhas no bando
   swarmTime: 10s            # quanto tempo o bando persegue
   swarmDamage: 4            # vida por bicada
+
+# ── Magias (cajados e grimório) ───────────────────────
+# mana: quanto gasta; damage: golpes num monstro; pvp: vida tirada de um jogador; radius em pixels (16 = um tile)
+magic:
+  fire:    { mana: 6,  damage: 2, pvp: 12 }                 # Cajado de Fogo: bola de fogo
+  blast:   { mana: 15, damage: 3, pvp: 22, radius: 28 }     # ...segurada: explosão
+  heal:    { mana: 10, amount: 15, radius: 40 }             # Cajado de Luz: cura quem estiver perto
+  bigHeal: { mana: 20, amount: 30, radius: 56 }             # ...segurada: cura maior e empurra monstros
+  shadow:  { mana: 8,  damage: 1, pvp: 8,  drain: 5,  slow: 3s }    # Grimório Sombrio: deixa lento e rouba vida
+  curse:   { mana: 18, damage: 2, pvp: 14, drain: 10, slow: 6s }    # ...segurada: maldição
+
+# ── Lojas ─────────────────────────────────────────────
+# O NPC vira lojista com a propriedade "loja" no Tiled (o id daqui). Preços em ouro.
+shops:
+  clareira:
+    buy:                    # o que a loja vende
+      heart: 15
+      mana: 20
+      bomb: 25
+      lightstaff: 120       # cajados e grimório: um de cada por pessoa
+      firestaff: 120
+      darktome: 150
+    sell:                   # o que ela compra de você (e quanto paga)
+      jelly: 3
+      shell: 6
+      lambari: 2
+      tilapia: 5
+      blindfish: 8
+      moonfish: 15
+      trout: 25
+      boot: 1
 
 # ── Eventos do servidor ───────────────────────────────
 events:

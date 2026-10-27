@@ -1,6 +1,6 @@
 import { Room, ServerError, type Client } from 'colyseus';
 import {
-  ITEMS, MSG, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
+  ITEMS, MSG, buyItem, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
   type ChatMsg, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
@@ -60,6 +60,7 @@ export class WorldRoom extends Room {
     this.onMessage(MSG.chat, (client, msg) => this.onChat(client, msg));
     this.onMessage(MSG.pvp, (client, msg) => this.onPvp(client, msg));
     this.onMessage(MSG.item, (client, msg) => this.onItem(client, msg));
+    this.onMessage(MSG.shop, (client, msg) => this.onShop(client, msg));
     this.setFixedTimestep(() => this.step(), TICK_RATE);
     this.scheduleSave();
   }
@@ -97,7 +98,7 @@ export class WorldRoom extends Room {
     }
     const s = resume ?? this.loadState(c), w = this.worlds.get(s.map)!;
     const p = w.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
-    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests;
+    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.gear = s.gear;
     const m = maxStats(w, p.level); p.maxHp = m.hp; p.maxMp = m.mp;
     p.hp = Math.min(s.hp, m.hp); p.mp = Math.min(s.mp, m.mp);
     onlineCharacters.add(c.id);
@@ -159,16 +160,17 @@ export class WorldRoom extends Room {
     const ok = c.x !== null && c.y !== null && w.map.inBounds(Math.floor(c.x / 16), Math.floor(c.y / 16)) && !blockedAt(w.map, c.x, c.y, 5, 4);
     const at = ok ? { x: c.x!, y: c.y! } : map === startMap() ? respawnPos(w, r.respawnPoint) : w.map.data.spawn;
     const hp = c.hp === null || c.hp <= 0 ? m.hp : Math.min(c.hp, m.hp);
-    let bag, chests: Record<string, number> = {};
+    let bag, gear, chests: Record<string, number> = {};
+    try { gear = JSON.parse(c.gear ?? '{}'); } catch { gear = {}; }
     try { bag = JSON.parse(c.items); } catch { bag = []; }
     try { for (const [k, v] of Object.entries(JSON.parse(c.chests ?? '{}'))) if (typeof v === 'number') chests[k] = v; } catch { }
     return { map, ...at, chests, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
-      level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack) };
+      level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack), gear: parseGear(gear) };
   }
   // Quem sai caído volta no ponto de renascimento do mapa principal, com a vida cheia.
   private stateOf(p: Player, map: string): CharacterState {
     const w = this.worlds.get(map); if (w) pruneChests(w, p);
-    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests } };
+    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, gear: { ...p.gear } };
     if (p.state === 'dead') {
       const at = respawnPos(this.world, this.world.rules.player.respawnPoint);
       return { map: startMap(), ...at, hp: p.maxHp, mp: p.maxMp, ...keep };
@@ -238,9 +240,21 @@ export class WorldRoom extends Room {
   }
   // Usar ou largar um item do inventário; recusa vira aviso só para quem pediu.
   private onItem(client: Client, raw: unknown) {
-    const f = this.find(client.sessionId), m = raw as { action?: unknown; slot?: unknown } | null;
+    const f = this.find(client.sessionId), m = raw as { action?: unknown; slot?: unknown; gear?: unknown } | null;
+    if (f && m?.action === 'equip') {   // equipar no A ou no C: { gear, slot: 'a' | 'c' }
+      const r = isGear(m.gear) && (m.slot === 'a' || m.slot === 'c') ? equipGear(f.p, m.gear, m.slot) : null;
+      if (r && !r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg);
+      return;
+    }
     if (!f || !m || !Number.isInteger(m.slot) || (m.slot as number) < 0 || (m.slot as number) >= f.p.bag.length) return;
     const r = m.action === 'use' ? useItem(f.w, f.p, m.slot as number) : m.action === 'drop' ? dropItem(f.w, f.p, m.slot as number) : null;
+    if (r && !r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg);
+  }
+  // Comprar ou vender na loja; o mundo confere preço, ouro, espaço e se está perto do lojista.
+  private onShop(client: Client, raw: unknown) {
+    const f = this.find(client.sessionId), m = raw as { action?: unknown; shop?: unknown; item?: unknown; n?: unknown } | null;
+    if (!f || !m || typeof m.shop !== 'string' || !isItem(m.item) || !Number.isInteger(m.n)) return;
+    const r = m.action === 'buy' ? buyItem(f.w, f.p, m.shop, m.item, m.n as number) : m.action === 'sell' ? sellItem(f.w, f.p, m.shop, m.item, m.n as number) : null;
     if (r && !r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg);
   }
   // Peixe pescado: confere o recorde do servidor; recorde novo é anunciado para todos.
@@ -316,6 +330,7 @@ export class WorldRoom extends Room {
         pvp: { mode: w.rules.pvp.mode, lock: pvpLock(w, me) },
         d: w.drops.filter(near).map(d => packDrop({ ...d, reserved: !!d.owner && d.owner !== id && w.tick < d.ownerUntil, fading: d.expires - w.tick < 600 })),
         b: w.bombs.filter(near).map(packBomb),
+        m: w.spells.filter(near).map(packSpell),
         xpNext: me.level >= w.rules.leveling.maxLevel ? -1 : xpToNext(w, me.level),
         day: Math.round(dayTime(w) * 1000) / 1000
       };

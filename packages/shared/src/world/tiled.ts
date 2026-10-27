@@ -154,7 +154,9 @@ export function fromTiled(raw: unknown, rawTileset: unknown, name = 'mapa'): Til
     if (cloak === null || hair === null) { errors.push(`${where} ("${o.name}"): cor desconhecida. Capas: ${CLOAKS.map(c => c.name).join(', ')}. Cabelos: ${HAIRS.map(h => h.name).join(', ')} (ou o número, a partir de 0)`); continue; }
     const dir = ({ baixo: 0, cima: 1, esquerda: 2, direita: 3 } as Record<string, Dir>)[slug(String(prop(o, 'olha') ?? 'baixo'))];
     if (dir === undefined) { errors.push(`${where} ("${o.name}"): "olha" precisa ser baixo, cima, esquerda ou direita`); continue; }
-    npcs.push({ x: tx, y: ty, name: o.name.trim(), pages: pagesOf(text), look: { cloak, hair }, dir });
+    const shop = prop(o, 'loja');
+    if (shop !== undefined && (typeof shop !== 'string' || !/^[a-z0-9-]+$/.test(shop.trim()))) { errors.push(`${where} ("${o.name}"): "loja" precisa ser o id de uma loja do config (letras minúsculas sem acento, números e hífen)`); continue; }
+    npcs.push({ x: tx, y: ty, name: o.name.trim(), pages: pagesOf(text), look: { cloak, hair }, dir, ...(typeof shop === 'string' && shop.trim() ? { shop: shop.trim() } : {}) });
   }
 
   /* ---------- ponto de partida ---------- */
