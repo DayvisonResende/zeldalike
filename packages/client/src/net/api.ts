@@ -24,6 +24,7 @@ export class Api {
   me = () => this.call<AccountInfo>('/me');
   createCharacter = (name: string, look: Look) => this.call<CharacterSummary>('/characters', 'POST', { name, look });
   deleteCharacter = (id: number) => this.call<void>('/characters/' + id, 'DELETE');
+  records = () => this.call<{ item: string; size: number; character: string; at: number }[]>('/records');
 }
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 

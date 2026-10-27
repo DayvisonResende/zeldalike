@@ -16,6 +16,40 @@ const deathTitle = death.querySelector('strong')!, badge = document.getElementBy
 const lvlEl = document.getElementById('lvl')!, xpEl = document.getElementById('xpbar')!, goldEl = document.getElementById('gold')!.querySelector('b')!;
 document.getElementById('gold')!.querySelector('canvas')!.getContext('2d')!.drawImage(ITEM_ICON.gold, 0, 0);
 let progKey = '';
+const clockEl = document.getElementById('clock')!;
+let clockKey = '';
+// Relógio: sol de dia, lua de noite, e a hora.
+export function updateClock(day: number, dark: boolean) {
+  const h = Math.floor(day * 24), night = h < 6 || h >= 19, key = dark ? 'dark' : `${h}${night}`;
+  if (key === clockKey) return;
+  clockKey = key;
+  clockEl.textContent = dark ? '☾ Subterrâneo' : `${night ? '☾' : '☀'} ${String(h).padStart(2, '0')}h`;
+  clockEl.dataset.night = String(night || dark);
+}
+const raidEl = document.getElementById('raid')!;
+let raidKey = '';
+// Invasão: contagem regressiva do aviso, depois gelecas restantes e o tempo que falta.
+export function updateRaid(iv: [number, number] | null) {
+  const key = iv ? iv.join('|') : '';
+  if (key === raidKey) return;
+  raidKey = key; raidEl.hidden = !iv;
+  if (!iv) return;
+  const [n, s] = iv, t = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  raidEl.textContent = n < 0 ? `⚔ Invasão em ${t}` : `⚔ ${n} gelecas · ${t}`;
+  raidEl.dataset.warn = String(n < 0);
+}
+const bossEl = document.getElementById('boss')!, bossBar = bossEl.querySelector<HTMLElement>('.bar')!;
+let bossKey = '';
+// Barra do chefão no alto da tela enquanto ele está à vista. Roxa; vermelha quando ele fica furioso.
+export function updateBoss(e: { hp: number; maxHp: number } | undefined) {
+  const key = e ? `${Math.max(0, e.hp)}/${e.maxHp}` : '';
+  if (key === bossKey) return;
+  bossKey = key; bossEl.hidden = !e;
+  if (!e) return;
+  bossBar.style.setProperty('--pct', Math.max(0, e.hp / e.maxHp * 100) + '%');
+  bossBar.setAttribute('aria-valuenow', String(Math.max(0, e.hp))); bossBar.setAttribute('aria-valuemax', String(e.maxHp));
+  bossEl.dataset.angry = String(e.hp <= e.maxHp / 2);
+}
 const bars = {
   hp: { el: hud.querySelector<HTMLElement>('.hp')!, last: '' },
   mp: { el: hud.querySelector<HTMLElement>('.mp')!, last: '' }

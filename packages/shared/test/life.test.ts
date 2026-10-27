@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, TICK_RATE, World, damagePlayer, respawnPos, type MapData, type Rules } from '../src';
-import vale from '../../../content/maps/vale.json';
+import vale from './fixtures';
 
 const rules: Rules = { ...DEFAULT_RULES, player: { ...DEFAULT_RULES.player, maxHp: 50, maxMana: 20, hpRegen: 10, manaRegen: 5, regenDelay: 1, respawnDelay: 2, invulnerableAfterRespawn: 1 } };
 const run = (w: World, seconds: number) => { for (let i = 0; i < seconds * TICK_RATE; i++) w.step(); };

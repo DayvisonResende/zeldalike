@@ -5,8 +5,13 @@ import { sfx } from '../audio';
 export class Dialog {
   private pages: string[] = []; private i = 0; private n = 0;
   private el = document.getElementById('dialog')!; private text = document.getElementById('dlgText')!; private more = document.getElementById('dlgMore')!;
+  private who = document.getElementById('dlgWho')!;
   get open() { return this.pages.length > 0; }
-  show(pages: string[]) { this.pages = pages; this.i = 0; this.n = 0; this.el.hidden = false; this.text.textContent = ''; this.more.hidden = true; }
+  // title: nome de quem fala (NPC); placas não têm.
+  show(pages: string[], title?: string) {
+    this.pages = pages; this.i = 0; this.n = 0; this.el.hidden = false; this.text.textContent = ''; this.more.hidden = true;
+    this.who.hidden = !title; this.who.textContent = title ?? '';
+  }
   update(tap: number) {
     const full = this.pages[this.i];
     if (this.n < full.length) this.n = Math.min(full.length, this.n + 1.4);

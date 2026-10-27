@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUTTON, DEFAULT_RULES, TICK_RATE, World, emptyInput, pvpLock, setPvp, type GameEvent, type MapData, type Player, type PvpMode, type Rules } from '../src';
-import vale from '../../../content/maps/vale.json';
+import vale from './fixtures';
 
 const map = (enemies = false): MapData => ({ ...(vale as MapData), enemies: enemies ? (vale as MapData).enemies : [] });
 const rules = (mode: PvpMode, safeZones: string[] = []): Rules => ({ ...DEFAULT_RULES, pvp: { ...DEFAULT_RULES.pvp, mode, safeZones, toggleCooldown: 2, combatLock: 1 } });

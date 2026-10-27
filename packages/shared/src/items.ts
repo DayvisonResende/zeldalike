@@ -1,12 +1,20 @@
 // Itens do jogo. O que viaja pela rede e vai para o banco é só o id.
-export type ItemId = 'heart' | 'mana' | 'jelly' | 'shell';
+export type ItemId = 'heart' | 'mana' | 'jelly' | 'shell' | 'lambari' | 'tilapia' | 'trout' | 'moonfish' | 'blindfish' | 'boot' | 'bomb';
 export type LootId = ItemId | 'gold';   // ouro cai no chão, mas vai para o contador, não para o inventário
 export interface ItemDef { name: string; desc: string; heal?: number; mana?: number }
 export const ITEMS: Record<ItemId, ItemDef> = {
   heart: { name: 'Coração', desc: 'Recupera 25 de vida.', heal: 25 },
   mana: { name: 'Poção de mana', desc: 'Recupera 20 de mana.', mana: 20 },
   jelly: { name: 'Geleia de geleca', desc: 'Material pegajoso. Vai servir para algo um dia.' },
-  shell: { name: 'Carapaça de besouro', desc: 'Dura e brilhante. Vai servir para algo um dia.' }
+  shell: { name: 'Carapaça de besouro', desc: 'Dura e brilhante. Vai servir para algo um dia.' },
+  // peixes (os novos sempre no fim: a ordem entra no número que viaja pela rede)
+  lambari: { name: 'Lambari', desc: 'Pequeno e comum. Comer recupera 8 de vida.', heal: 8 },
+  tilapia: { name: 'Tilápia', desc: 'Um bom almoço. Comer recupera 15 de vida.', heal: 15 },
+  trout: { name: 'Truta dourada', desc: 'Rara e brilhante. Comer recupera 30 de vida.', heal: 30 },
+  moonfish: { name: 'Peixe-lua', desc: 'Só aparece à noite. Comer recupera 20 de vida e 20 de mana.', heal: 20, mana: 20 },
+  blindfish: { name: 'Peixe-cego', desc: 'Vive no escuro da caverna. Comer recupera 12 de vida.', heal: 12 },
+  boot: { name: 'Bota velha', desc: 'Molhada e sem par. Não serve para nada… ou serve?' },
+  bomb: { name: 'Bomba', desc: 'Tecla 3 (ou Usar) põe uma acesa. E levanta para arremessar. Abre paredes rachadas.' }
 };
 export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
 export const LOOT_IDS: LootId[] = ['gold', ...ITEM_IDS];

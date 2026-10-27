@@ -1,5 +1,6 @@
-import { BUTTON, VIEW_H, VIEW_W, emptyInput, type GameEvent, type MapData, type ProfileRequest } from '@vale/shared';
-import vale from '../../../content/maps/vale.json';
+import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type GameEvent, type ProfileRequest } from '@vale/shared';
+import valeTmj from '../../../content/maps/vale.tmj?raw';
+import valeTsj from '../../../content/maps/vale.tsj?raw';
 import { ensureAudio, setMuted, sfx } from './audio';
 import { follow, type Camera } from './camera';
 import { Input, UI_SELECTOR, bindTouch } from './input';
@@ -7,20 +8,24 @@ import { Particles } from './render/particles';
 import { render } from './render/renderer';
 import { LocalSession } from './session/local';
 import { NetSession } from './session/net';
-import type { Session, Status } from './session/types';
+import type { Scene, Session, Status } from './session/types';
 import { Api, loadSession, saveSession } from './net/api';
 import { AccountScreen } from './ui/account';
 import { BagPanel } from './ui/bag';
 import { ChatBox } from './ui/chat';
 import { Floaters } from './ui/floaters';
+import { updateFishBar } from './ui/fishbar';
 import { Dialog } from './ui/dialog';
-import { showRegion, updateHud } from './ui/hud';
+import { showRegion, updateBoss, updateClock, updateHud, updateRaid } from './ui/hud';
 import { Menu } from './ui/menu';
 import { NameTags } from './ui/nametags';
+import { updatePad } from './ui/pad';
+import { assistTarget } from './aimassist';
 import { loadProfile, loadSettings, saveProfile, saveSettings, type Settings } from './ui/settings';
 import './style.css';
 
-const MAP = vale as MapData;
+// Mapa que vem no pacote do jogo: usado offline e de fundo antes de entrar. Online, vale o mapa que o servidor manda.
+const MAP = fromTiled(JSON.parse(valeTmj), JSON.parse(valeTsj), 'vale.tmj').map;
 const cv = document.getElementById('screen') as HTMLCanvasElement;
 cv.width = VIEW_W; cv.height = VIEW_H;
 const ctx = cv.getContext('2d')!;
@@ -30,6 +35,7 @@ const cam: Camera = { x: 0, y: 0 };
 const particles = new Particles();
 const dialog = new Dialog();
 let started = false, shake = 0, tick = 0;
+let talking: string | null = null;   // NPC conversando com você (ele se vira enquanto a conversa dura)
 let profile = loadProfile(), settings = loadSettings();
 setMuted(!settings.sound);
 
@@ -54,6 +60,7 @@ const account = new AccountScreen(api, {
     try { await net.connect(SERVER, { token: api.token!, characterId: c.id }); }
     catch (e) { throw new Error(e instanceof Error && e.message ? e.message : 'Não foi possível entrar no mundo.'); }
     session = net; bindChat(net);
+    net.onMapChange = () => { stage.classList.remove('fade'); void stage.offsetWidth; stage.classList.add('fade'); };
     profile = { name: c.name, look: { ...c.look } };
     ready = true; account.hide(); begin();
   },
@@ -96,7 +103,8 @@ const menu = new Menu({
   setPvp: on => session.setPvp(on),
   closed: () => refocus(),
   get online() { return !OFFLINE; },
-  switchCharacter, signOut
+  switchCharacter, signOut,
+  records: async () => OFFLINE ? null : api.records()
 });
 const nameTags = new NameTags(document.getElementById('names')!);
 // M liga/desliga o som, P mostra o mapa de caminhos dos monstros
@@ -119,15 +127,15 @@ function togglePvp() {
 const floaters = new Floaters(document.getElementById('floaters')!);
 const bag = new BagPanel({ inventory: () => session.inventory(), use: s => session.useItem(s), drop: s => session.dropItem(s), closed: refocus });
 function toggleBag() { if (!started || menu.open || chat.open) return; bag.toggle(); }
-function quickUse(n: 1 | 2) {
+function quickUse(n: 1 | 2 | 3) {
   const inv = session.inventory(); if (!inv) return;
-  const id = n === 1 ? 'heart' : 'mana', slot = inv.bag.findIndex(s => s?.id === id);
-  if (slot < 0) { const me = session.me(); if (me) floaters.add(me.x, me.y, n === 1 ? 'Sem corações' : 'Sem poções', 'notice'); return; }
+  const id = n === 1 ? 'heart' : n === 2 ? 'mana' : 'bomb', slot = inv.bag.findIndex(s => s?.id === id);
+  if (slot < 0) { const me = session.me(); if (me) floaters.add(me.x, me.y, n === 1 ? 'Sem corações' : n === 2 ? 'Sem poções' : 'Sem bombas', 'notice'); return; }
   session.useItem(slot);
 }
 const hooks = { started: () => started, start: begin, toggleMute, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
 const input = new Input(stage, cv, hooks);
-bindTouch(input, hooks);
+bindTouch(input, hooks, () => settings.vibrate);
 startEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); begin(); });
 stage.addEventListener('pointerdown', e => { ensureAudio(); if (!(e.target as Element).closest(UI_SELECTOR)) refocus(); });
 document.getElementById('chatBtn')!.addEventListener('click', () => { begin(); openChat(); });
@@ -143,7 +151,7 @@ function handle(ev: GameEvent) {
     case 'burst': if (nearCam(ev.x, ev.y)) particles.burst(ev.x, ev.y, ev.palette, ev.n, ev.o); break;
     case 'poof': if (nearCam(ev.x, ev.y)) particles.poof(ev.x, ev.y); break;
     case 'shake': shake = Math.max(shake, ev.n); break;
-    case 'dialog': dialog.show(ev.pages); break;
+    case 'dialog': dialog.show(ev.pages, ev.title); talking = ev.npc ?? null; break;
     case 'region': showRegion(ev.name); break;
     case 'gain': floaters.add(ev.x, ev.y, ev.text, ev.text.endsWith('XP') ? 'xp' : 'item'); break;
     case 'notice': { const me = session.me(); if (me) floaters.add(me.x, me.y, ev.text, 'notice'); break; }
@@ -156,10 +164,21 @@ function handle(ev: GameEvent) {
     case 'zone': chat.add({ ch: 'system', text: ev.safe ? 'Você entrou numa zona segura: sem PvP e sem monstros.' : 'Você saiu da zona segura.' + (session.pvp()?.mode === 'open' || session.me()?.pvp ? ' Cuidado: PvP ativo.' : '') }, false); break;
   }
 }
+// Alvo da ajuda na mira (sem mouse, jogando pelo toque); recalculado a cada quadro para a marca na tela.
+// Só no celular: a mesma condição que mostra o controle de toque (tela de toque, sem mouse).
+const PHONE = matchMedia('(hover:none) and (pointer:coarse)');
+let lock: { x: number; y: number } | null = null;
+function updateLock(scene: Scene) {
+  const me = session.me();
+  lock = me && settings.aimAssist && PHONE.matches && input.usingTouch && !input.mouse.active && me.state !== 'dead' ? assistTarget(me, scene.enemies, scene.players, input.moving()) : null;
+}
 function aim() {
   const me = session.me();
-  if (!input.mouse.active || !me) return null;
-  return Math.atan2(input.mouse.y + cam.y - (me.y - 6), input.mouse.x + cam.x - me.x);
+  if (!me) return null;
+  if (input.mouse.active) return Math.atan2(input.mouse.y + cam.y - (me.y - 6), input.mouse.x + cam.x - me.x);
+  // ajuda na mira: só no passo em que ataca (assim andar continua virando o personagem normalmente)
+  const attacking = input.wants('a') || input.wants('c') || (!!me.carry && input.wants('b'));
+  return lock && attacking ? Math.atan2(lock.y - (me.y - 6), lock.x - me.x) : null;
 }
 function update() {
   tick++;
@@ -176,6 +195,16 @@ function update() {
   updateStatus();
 }
 
+// Quem está no colo é desenhado em cima de quem carrega, na posição que a tela mostra de quem carrega
+// (para quem carrega, a dele é a prevista; senão a pessoa ficaria um pouco atrás).
+function attachHeld(scene: ReturnType<Session['scene']>) {
+  const byId = new Map(scene.players.map(p => [p.id, p]));
+  scene.players = scene.players.map(p => {
+    const c = p.state === 'held' && p.heldBy ? byId.get(p.heldBy) : undefined;
+    return c ? { ...p, x: c.x, y: c.y + 1, z: c.z + 16 } : p;
+  });
+}
+
 /* ---------- Laço: simulação em passo fixo de 60 Hz, desenho a cada quadro ---------- */
 const STEP = 1000 / 60;
 let last = performance.now(), acc = 0;
@@ -185,7 +214,15 @@ function frame(now: number) {
   while (acc >= STEP) { update(); acc -= STEP; }
   const reticle = input.mouse.active && started && !dialog.open && !menu.open ? input.mouse : null;
   const scene = session.scene(settings.paths);
-  render(ctx, scene, { me: session.me(), cam, particles, showPaths: settings.paths, reticle, shake, tick });
+  attachHeld(scene);
+  updateLock(scene);
+  updateClock(scene.day, scene.dark); updateRaid(scene.invasion);
+  const me = session.me();
+  updatePad(me, session.inventory(), settings.padSize);
+  updateBoss(me ? scene.enemies.find(e => e.type === 'king' && Math.hypot(e.x - me.x, e.y - me.y) < 200) : undefined);
+  updateFishBar(session.me());
+  if (!dialog.open) talking = null;
+  render(ctx, scene, { me: session.me(), cam, particles, lock, showPaths: settings.paths, reticle, shake, tick, talking });
   nameTags.update(scene, cam, settings.names, settings.bubbles);
   floaters.update(cam);
   bag.render();

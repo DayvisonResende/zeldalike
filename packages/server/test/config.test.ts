@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import type { MapData } from '@vale/shared';
 import { parseConfig, toRules } from '../src/config/load';
-import vale from '../../../content/maps/vale.json';
+import vale from '../../shared/test/fixtures';
 
 const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8');
 const map = vale as MapData;
@@ -27,6 +27,10 @@ describe('config.yaml', () => {
   });
   it('recusa região que não existe no mapa', () => {
     expect(() => parseConfig(text.replace('respawnPoint: clareira', 'respawnPoint: atlantida'), map)).toThrow(/atlantida/);
+  });
+  it('recusa zona de invasão que não existe no mapa principal', () => {
+    expect(() => parseConfig(text.replace('zone: clareira', 'zone: atlantida'), map)).toThrow(/events.invasion.zone "atlantida"/);
+    expect(parseConfig(text.replace('every: 40m', 'every: 0').replace('zone: clareira', 'zone: atlantida'), map).events.invasion.every).toBe(0);
   });
   it('recusa modo de PvP desconhecido', () => {
     expect(() => parseConfig(text.replace('mode: optional', 'mode: livre'), map)).toThrow(/pvp\.mode/);

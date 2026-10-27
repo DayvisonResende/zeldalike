@@ -55,5 +55,25 @@ export const migrations: Record<string, Migration> = {
       await db.schema.alterTable('characters').addColumn('gold', 'integer', c => c.notNull().defaultTo(0)).execute();
       await db.schema.alterTable('characters').addColumn('items', 'text', c => c.notNull().defaultTo('[]')).execute();   // inventário em JSON
     }
+  },
+  '004_mapa_do_personagem': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('characters').addColumn('map', 'text', c => c.notNull().defaultTo('')).execute();   // '' = mapa principal
+    }
+  },
+  '005_baus_abertos': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.alterTable('characters').addColumn('chests', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"mapa:x,y": quando abriu (ms)}
+    }
+  },
+  '006_recordes_de_pesca': {
+    async up(db: Kysely<unknown>) {
+      await db.schema.createTable('fish_records')   // o maior de cada peixe no servidor
+        .addColumn('item', 'text', c => c.primaryKey())
+        .addColumn('size', 'integer', c => c.notNull())
+        .addColumn('character', 'text', c => c.notNull())
+        .addColumn('at', 'integer', c => c.notNull())
+        .execute();
+    }
   }
 };

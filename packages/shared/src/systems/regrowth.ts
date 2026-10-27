@@ -4,7 +4,7 @@ import { SOLID } from '../world/tiles';
 import type { World } from '../world';
 
 // Tiles que voltam ao normal: o arbusto cortado cresce de novo, a pedra levantada reaparece.
-const KIND = { b: 'bush', g: 'tallGrass', r: 'rock' } as const;
+const KIND = { b: 'bush', g: 'tallGrass', r: 'rock', X: 'secret', Y: 'secret' } as const;
 export interface Regrow { tx: number; ty: number; orig: keyof typeof KIND; at: number }
 
 export function breakTile(w: World, tx: number, ty: number, to: string) {

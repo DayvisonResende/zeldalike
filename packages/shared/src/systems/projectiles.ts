@@ -4,12 +4,14 @@ import { blocksShot } from '../world/tiles';
 import type { World } from '../world';
 import { damage } from './combat';
 import { canHarm, harmPlayer } from './pvp';
+import { explode } from './bombs';
 import { burst, sfx } from './fx';
 
-export interface Thrown { id: number; owner: string; x: number; y: number; z: number; vx: number; vy: number; vz: number; type: Carryable; dead?: boolean }
+export interface Thrown { id: number; owner: string; x: number; y: number; z: number; vx: number; vy: number; vz: number; type: Carryable; fuse?: number; dead?: boolean }
 export interface Arrow { id: number; owner: string; x: number; y: number; ang: number; vx: number; vy: number; stuck: number; life: number; dead?: boolean }
 
 export function shatter(w: World, x: number, y: number, type: Carryable, z = 0) {
+  if (type === 'bomb' || type === 'player') return;
   burst(w, x, y, type === 'b' ? 'leaf' : 'rock', type === 'b' ? 12 : 10, { s: 1.5, z: z + 2 });
   sfx(w, type === 'b' ? 'cut' : 'break', { x, y });
 }
@@ -19,6 +21,7 @@ export function updateThrown(w: World) {
     const tx = Math.floor(o.x / TS), ty = Math.floor(o.y / TS);
     if (!w.map.inBounds(tx, ty)) { o.dead = true; continue; }
     const c = w.map.tiles[ty][tx];
+    if (o.type === 'bomb') { flyBomb(w, o, c); continue; }
     if (blocksShot(c)) { shatter(w, o.x - o.vx, o.y - o.vy, o.type, o.z); o.dead = true; continue; }
     for (const e of w.enemies) {
       if (!e.dying && o.z < 24 && Math.abs(e.x - o.x) < e.hw + 6 && Math.abs(e.y - o.y) < e.hh + 7) {
@@ -40,6 +43,17 @@ export function updateThrown(w: World) {
     }
   }
   w.thrown = w.thrown.filter(o => !o.dead);
+}
+// Bomba arremessada: o pavio continua; bate e para (sem quebrar); na água, apaga.
+function flyBomb(w: World, o: Thrown, c: string) {
+  if (--o.fuse! <= 0) { explode(w, o.x, o.y, o.owner); o.dead = true; return; }
+  const hitEnemy = w.enemies.some(e => !e.dying && o.z < 20 && Math.abs(e.x - o.x) < e.hw + 4 && Math.abs(e.y - o.y) < e.hh + 5);
+  if (blocksShot(c) || hitEnemy || o.z <= 0) {
+    o.dead = true;
+    if (c === 'w' && !blocksShot(c)) { burst(w, o.x, o.y, 'water', 10, { s: 0.9, z: 0, up: 2.2 }); sfx(w, 'splash', o); return; }
+    const back = blocksShot(c) ? 1 : 0;
+    w.bombs.push({ id: w.nextId++, owner: o.owner, x: o.x - o.vx * back, y: o.y - o.vy * back, fuse: o.fuse! });
+  }
 }
 export function fireArrow(w: World, p: Player) {
   const ca = Math.cos(p.aim), sa = Math.sin(p.aim);

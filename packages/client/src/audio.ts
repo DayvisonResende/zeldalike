@@ -47,6 +47,13 @@ const SFX: Record<Sfx, () => void> = {
   down: () => { tone('triangle', 440, 70, 0.6, 0.14); noise(0.3, 0.2, 400, 'lowpass'); },
   pickup: () => { tone('square', 880, 880, 0.05, 0.06); setTimeout(() => tone('square', 1320, 1320, 0.07, 0.06), 55); },
   use: () => { tone('sine', 300, 600, 0.12, 0.12); setTimeout(() => tone('sine', 450, 900, 0.12, 0.1), 90); },
-  levelup: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone('square', f, f, 0.12, 0.07), i * 90)); }
+  levelup: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone('square', f, f, 0.12, 0.07), i * 90)); },
+  cluck: () => { tone('square', 700, 520, 0.05, 0.07); setTimeout(() => tone('square', 760, 560, 0.05, 0.07), 70); },
+  swarm: () => { for (let i = 0; i < 6; i++) setTimeout(() => tone('square', 600 + i * 60, 450, 0.06, 0.06), i * 55); },
+  fuse: () => noise(0.5, 0.06, 5000, 'highpass'),
+  boom: () => { noise(0.7, 0.55, 300, 'lowpass'); tone('sawtooth', 110, 30, 0.6, 0.18); },
+  cast: () => { noise(0.2, 0.15, 2400, 'highpass'); setTimeout(() => noise(0.12, 0.18, 900), 220); },
+  bite: () => { tone('square', 880, 660, 0.06, 0.09); setTimeout(() => tone('square', 880, 660, 0.06, 0.09), 110); },
+  chest: () => { noise(0.18, 0.2, 700, 'lowpass'); [659, 784, 988].forEach((f, i) => setTimeout(() => tone('triangle', f, f, 0.14, 0.08), 120 + i * 80)); }
 };
 export function sfx(n: Sfx) { if (muted || !AC) return; try { if (AC.state === 'suspended') AC.resume(); SFX[n](); } catch { } }

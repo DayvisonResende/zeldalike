@@ -1,0 +1,1 @@
+{ "name": "@vale/tools", "private": true, "type": "module", "scripts": { "tileset": "tsx src/tileset.ts", "check": "tsx src/check-map.ts" } }

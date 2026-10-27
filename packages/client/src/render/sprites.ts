@@ -107,6 +107,34 @@ function slimeGrid(sq: number) {
 }
 export const slimeSprite = cached((sq: number, fl: boolean) => bake(slimeGrid(sq), fl));
 
+// Rei Geleca: uma geleca enorme de coroa. sq como a geleca (0 normal, 1 achatado, 2 esticado no pulo); furioso fica vermelho.
+function kingGrid(sq: number, angry: boolean) {
+  const W = 28, H = 26, g = G(W, H), hgt = sq === 1 ? 15 : sq === 2 ? 22 : 19, rx = sq === 1 ? 13.5 : sq === 2 ? 10.5 : 12.5;
+  const [B, L, Dk] = angry ? ['#d9534f', '#f5a39a', '#8f2630'] : ['#9a4fc4', '#d99af0', '#5f2a84'];
+  for (let j = 0; j < H; j++) {
+    const yy = H - 1 - j; if (yy >= hgt) continue;
+    const base = hgt * 0.35;
+    const hw = yy > base ? rx * Math.sqrt(Math.max(0, 1 - Math.pow((yy - base) / (hgt - base), 2))) : rx * (0.86 + 0.14 * yy / base);
+    for (let i = 0; i < W; i++) {
+      const dx = i + 0.5 - W / 2; if (Math.abs(dx) > hw) continue;
+      let c = B;
+      if (dx < -hw * 0.3 && yy > hgt * 0.55) c = L;
+      if (yy < 2 || dx > hw * 0.66) c = Dk;
+      g[j][i] = c;
+    }
+  }
+  const top = H - hgt, ey = H - 1 - Math.round(hgt * 0.55);
+  [8, 17].forEach(ex => { R(g, ex, ey - 2, 3, 3, '#ffffff'); R(g, ex + 1, ey - 1, 2, 2, '#20142c'); });
+  if (angry) { R(g, 7, ey - 4, 4, 1, '#20142c'); R(g, 17, ey - 4, 4, 1, '#20142c'); }   // sobrancelhas bravas
+  R(g, 11, ey + 4, 6, 1, '#20142c');                                                    // boca
+  const GD = '#ffd94f', GS = '#c99a1e', cy = Math.max(0, top - 4);                      // coroa
+  R(g, 9, cy + 2, 10, 3, GD); R(g, 9, cy + 4, 10, 1, GS);
+  [9, 13, 17].forEach(x => { R(g, x, cy, 2, 2, GD); });
+  P(g, 14, cy + 3, '#e0457b'); P(g, 11, cy + 3, '#4fb6e0'); P(g, 17, cy + 3, '#4fb6e0');
+  return g;
+}
+export const kingSprite = cached((sq: number, angry: boolean, fl: boolean) => bake(kingGrid(sq, angry), fl));
+
 // Besouro-guarda (patrulha e persegue)
 function beetleGrid(step: number) {
   const g = G(14, 14), L = '#24203a', S = '#4d62b2', SL = '#a2b4f0', SD = '#2b3577', HD = '#262338', GD = '#e0ad48';
@@ -173,7 +201,15 @@ function pillarGrid() {
   R(g, 2, 0, 10, 2, '#d2ccc2'); R(g, 2, 0, 10, 1, '#e6e0d6'); R(g, 2, 12, 10, 2, '#8f897f');
   return g;
 }
-export const OBJ: Record<string, HTMLCanvasElement> = { T: bake(treeGrid()), b: bake(bushGrid()), r: bake(rockGrid()), s: bake(signGrid()), o: bake(pillarGrid()) };
+// Tocha: poste de madeira com braseiro; a chama ganha brilho animado no renderer.
+function torchGrid() {
+  const g = G(14, 14);
+  R(g, 6, 6, 2, 8, '#7d4f2a'); R(g, 6, 6, 1, 8, '#9a6538');
+  R(g, 4, 5, 6, 2, '#4a4038'); R(g, 4, 5, 6, 1, '#6e6255');
+  R(g, 5, 2, 4, 3, '#ee8b3d'); R(g, 6, 1, 2, 2, '#f5c542'); P(g, 6, 0, '#fff3b0');
+  return g;
+}
+export const OBJ: Record<string, HTMLCanvasElement> = { T: bake(treeGrid()), b: bake(bushGrid()), r: bake(rockGrid()), s: bake(signGrid()), o: bake(pillarGrid()), t: bake(torchGrid()) };
 export const SHADOW = (() => { const c = mk(14, 6), x = c.getContext('2d')!; x.fillStyle = 'rgba(16,24,8,0.32)'; for (let j = 0; j < 6; j++) for (let i = 0; i < 14; i++) { const dx = (i + 0.5 - 7) / 7, dy = (j + 0.5 - 3) / 3; if (dx * dx + dy * dy <= 1) x.fillRect(i, j, 1, 1); } return c; })();
 
 function glyph(rows: string[], col: string) { const g = G(rows[0].length, rows.length); rows.forEach((r, j) => [...r].forEach((ch, i) => { if (ch === '1') g[j][i] = col; })); return bake(g); }
@@ -191,5 +227,63 @@ export const ITEM_ICON: Record<string, HTMLCanvasElement> = {
   mana: icon(['...cc...', '...gg...', '..gbbg..', '.gbwbbg.', '.gbbbbg.', '.gbbbdg.', '..gddg..'], { c: '#8a5a36', g: '#cfe8ff', b: '#4b7fd9', w: '#bcd6ff', d: '#2f55a8' }),
   jelly: icon(['........', '...pp...', '..pwpp..', '.pwpppp.', '.pppppd.', 'pppppddd'], { p: '#b65cd8', w: '#e4a6f3', d: '#7a3496' }),
   shell: icon(['..bbbb..', '.bwbbbb.', 'bwbbbbbd', 'bbbbbbbd', '.bbbbdd.', '..bddd..'], { b: '#4d62b2', w: '#a2b4f0', d: '#2b3577' }),
+  lambari: icon(['........', '.ss...s.', 'swsssss.', 'sssssss.', '.ss...s.'], { s: '#b8c4d4', w: '#ffffff' }),
+  tilapia: icon(['........', '.gg....g', 'gwgggggg', 'ggggdggg', '.gg....g'], { g: '#6f8f6a', w: '#e6f0dc', d: '#3f5a3c' }),
+  trout: icon(['..yy....', '.yyyy..y', 'ywyyyyyy', 'yyyoyyyy', '.yyyy..y', '..yy....'], { y: '#f0c44a', w: '#fff3b0', o: '#d9822b' }),
+  moonfish: icon(['...bb...', '.bbbbb.b', 'bwbbbbbb', 'bbbbbbbb', '.bbbbb.b', '...bb...'], { b: '#9fb8ff', w: '#ffffff' }),
+  blindfish: icon(['........', '.pp...p.', 'pppppppp', 'pppppp..', '.pp...p.'], { p: '#f2c6d6' }),
+  boot: icon(['.bbb....', '.bbb....', '.bbb....', '.bbbbbb.', 'dddddddd'], { b: '#7a4a2a', d: '#3e2416' }),
+  bomb: icon(['....oo..', '...o....', '.bbbb...', 'bwbbbb..', 'bbbbbb..', 'bbbbbb..', '.bbbb...'], { b: '#2d2a3a', w: '#7a7690', o: '#d9822b' }),
   gold: icon(['..yyyy..', '.yywwyy.', 'yywyyyyo', 'yyyyyyyo', 'yyyyyyoo', '.yyyyoo.', '..oooo..'], { y: '#f5c542', w: '#fff3b0', o: '#b8862a' })
 };
+
+/* ---------- Baú (14x12 + contorno): fechado e aberto (vazio para você) ---------- */
+function chestGrid(open: boolean) {
+  const g = G(14, 12), W = '#9a6234', WD = '#6b4026', WL = '#c4854c', GOLD = '#e9b44c', GD = '#a8792a', IN = '#2a1a14';
+  if (open) {
+    R(g, 1, 0, 12, 3, WD); R(g, 1, 0, 12, 1, W); R(g, 2, 1, 10, 1, IN);           // tampa aberta, para trás
+    R(g, 1, 3, 12, 2, IN);                                                       // por dentro, vazio
+  } else {
+    R(g, 1, 1, 12, 4, W); R(g, 1, 1, 12, 1, WL); R(g, 1, 4, 12, 1, WD);          // tampa
+    R(g, 6, 3, 2, 3, GOLD); P(g, 6, 3, '#fff3b0');                                 // fecho
+  }
+  R(g, 0, 5, 14, 7, W); R(g, 0, 5, 14, 1, WL); R(g, 0, 11, 14, 1, WD);           // corpo
+  R(g, 0, 5, 2, 7, GOLD); R(g, 12, 5, 2, 7, GOLD); R(g, 0, 5, 1, 7, GD); R(g, 13, 5, 1, 7, GD);
+  if (!open) R(g, 6, 6, 2, 2, GOLD);
+  return g;
+}
+export const CHEST = { closed: bake(chestGrid(false)), open: bake(chestGrid(true)) };
+
+/* ---------- Morcego: dois quadros (asas abertas e fechadas) ---------- */
+function batGrid(up: boolean) {
+  const g = G(14, 8), B = '#3a2a4a', W = '#5a4570', WL = '#7a6294', E = '#ff5a5a';
+  R(g, 5, 2, 4, 4, B); P(g, 5, 1, B); P(g, 8, 1, B);          // corpo e orelhas
+  P(g, 6, 3, E); P(g, 7, 3, E);                                  // olhos
+  if (up) { R(g, 0, 0, 5, 2, W); R(g, 9, 0, 5, 2, W); R(g, 2, 2, 3, 1, WL); R(g, 9, 2, 3, 1, WL); }
+  else { R(g, 0, 3, 5, 2, W); R(g, 9, 3, 5, 2, W); R(g, 1, 5, 4, 1, WL); R(g, 9, 5, 4, 1, WL); }
+  return g;
+}
+export const batSprite = cached((up: boolean, fl: boolean) => bake(batGrid(up), fl));
+
+/* ---------- Bomba (10x10): pisca cada vez mais rápido perto de explodir ---------- */
+function bombGrid(hot: boolean) {
+  const g = G(10, 11), B = hot ? '#e2574c' : '#2d2a3a', L = hot ? '#ff9f8c' : '#5a566e';
+  for (let j = 0; j < 8; j++) for (let i = 0; i < 10; i++) { const dx = i + 0.5 - 5, dy = j + 0.5 - 6.5 + 3; if (dx * dx + dy * dy <= 16) g[j + 3][i] = B; }
+  R(g, 2, 4, 2, 2, L); R(g, 4, 1, 2, 2, '#8a6a3a'); P(g, 6, 0, '#8a6a3a');
+  return g;
+}
+export const BOMB = { cold: bake(bombGrid(false)), hot: bake(bombGrid(true)) };
+export const bombFrame = (fuse: number, tick: number) => (fuse < 60 ? (tick >> 1) & 1 : fuse < 100 ? (tick >> 3) & 1 : 0) ? BOMB.hot : BOMB.cold;
+
+/* ---------- Galinha: ciscando (2 quadros) e furiosa voando (asas batendo, olhos vermelhos) ---------- */
+function chickenGrid(dir: 2 | 3, step: number, angry: boolean) {
+  const g = G(12, 11), W = '#f4f0e8', S = '#cfc6b4', R = '#e2574c', Y = '#f5c542', E = angry ? '#ff2a2a' : '#1f142b';
+  R_(g, 3, 3, 7, 5, W); R_(g, 2, 4, 2, 3, W); R_(g, 4, 7, 5, 1, S);          // corpo e rabo
+  R_(g, 8, 0, 3, 4, W); P(g, 9, 0, R); P(g, 10, 0, R); P(g, 9, 3, R);       // cabeça, crista, barbela
+  P(g, 11, 2, Y); P(g, 9, 1, E);                                            // bico e olho
+  if (angry) { R_(g, 3, step ? 1 : 3, 4, 2, S); }                           // asa batendo
+  else { R_(g, 4, 4, 4, 2, S); R_(g, step ? 5 : 6, 8, 1, 3, Y); R_(g, step ? 7 : 6, 8, 1, 3, Y); }
+  return dir === 2 ? mirror(g) : g;
+}
+function R_(g: Grid, x: number, y: number, w: number, h: number, c: string) { R(g, x, y, w, h, c); }
+export const chickenSprite = cached((dir: 2 | 3, step: number, angry: boolean) => bake(chickenGrid(dir, step, angry)));

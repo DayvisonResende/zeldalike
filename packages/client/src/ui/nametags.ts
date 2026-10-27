@@ -1,4 +1,4 @@
-import { VIEW_H, VIEW_W } from '@vale/shared';
+import { TS, VIEW_H, VIEW_W } from '@vale/shared';
 import type { Camera } from '../camera';
 import type { Scene } from '../session/types';
 import type { NameMode } from './settings';
@@ -35,6 +35,15 @@ export class NameTags {
       el.classList.toggle('pvp', p.pvpActive);
       el.style.left = (x / VIEW_W * 100) + '%'; el.style.top = (y / VIEW_H * 100) + '%';
       seen.add(p.id);
+    }
+    // NPCs: nome em outra cor, sem nível
+    if (mode !== 'none') for (const n of scene.npcs) {
+      const x = n.x * TS + 8 - cam.x, y = n.y * TS + 12 - 19 - cam.y, key = `npc:${n.x},${n.y}`;
+      if (x < -40 || x > VIEW_W + 40 || y < -10 || y > VIEW_H + 10) continue;
+      let el = this.tags.get(key);
+      if (!el) { el = document.createElement('span'); el.className = 'nametag npc'; el.textContent = n.name; this.layer.append(el); this.tags.set(key, el); }
+      el.style.left = (x / VIEW_W * 100) + '%'; el.style.top = (y / VIEW_H * 100) + '%';
+      seen.add(key);
     }
     for (const [id, el] of this.tags) if (!seen.has(id)) { el.remove(); this.tags.delete(id); }
   }

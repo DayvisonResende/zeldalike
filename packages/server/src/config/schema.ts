@@ -16,12 +16,16 @@ const dropEntry = z.union([chance, z.strictObject({ chance, min: z.number().int(
   .refine(d => typeof d === 'number' || d.min <= d.max, 'min não pode ser maior que max');
 const enemy = z.strictObject({
   hp: z.number().int().positive(), respawn: duration, damage: z.number().nonnegative(), xp: z.number().int().nonnegative(),
-  drops: z.partialRecord(z.enum(['gold', 'heart', 'mana', 'jelly', 'shell']), dropEntry).default({})
+  drops: z.partialRecord(z.enum(['gold', 'heart', 'mana', 'jelly', 'shell', 'bomb']), dropEntry).default({})
 });
 const rate = z.number().nonnegative();
 
 // strictObject recusa chaves desconhecidas: um "tallgras" digitado errado vira erro, não silêncio.
 export const configSchema = z.strictObject({
+  world: z.strictObject({
+    maps: z.record(z.string().regex(/^[a-z0-9-]+$/, 'id de mapa: só letras minúsculas sem acento, números e hífen'), z.string().min(1)),
+    start: z.string()
+  }).refine(w => w.start in w.maps, { message: 'world.start precisa ser um dos mapas de world.maps', path: ['start'] }),
   server: z.strictObject({
     port: z.number().int().min(1).max(65535),
     maxPlayers: z.number().int().positive(),
@@ -43,8 +47,20 @@ export const configSchema = z.strictObject({
     per: duration,
     announceJoins: z.boolean()
   }),
-  regrow: z.strictObject({ bush: duration, tallGrass: duration, rock: duration }),
-  enemies: z.strictObject({ slime: enemy, beetle: enemy }),
+  regrow: z.strictObject({ bush: duration, tallGrass: duration, rock: duration, secret: duration }),
+  enemies: z.strictObject({ slime: enemy, beetle: enemy, bat: enemy, chicken: enemy, king: enemy }),
+  daynight: z.strictObject({ cycle: duration, start: z.number().min(0).max(24) }),
+  fun: z.strictObject({
+    liftPlayers: z.boolean(), struggle: z.number().int().min(1).max(100),
+    chickenAnger: z.number().int().min(1), swarmSize: z.number().int().min(0).max(40), swarmTime: duration, swarmDamage: z.number().nonnegative()
+  }),
+  events: z.strictObject({
+    invasion: z.strictObject({
+      every: duration, warning: duration, duration: duration.refine(d => d > 0, 'a invasão precisa durar mais que 0'),
+      count: z.number().int().min(1).max(200), zone: z.string(),
+      reward: z.strictObject({ xp: z.number().int().nonnegative(), gold: z.number().int().nonnegative() })
+    })
+  }),
   player: z.strictObject({
     maxHp: z.number().int().positive(),
     maxMana: z.number().int().nonnegative(),
@@ -67,7 +83,7 @@ export const configSchema = z.strictObject({
     toggleCooldown: duration,
     combatLock: duration,
     safeZones: z.array(z.string()),
-    damage: z.strictObject({ sword: rate, spin: rate, dash: rate, arrow: rate, thrown: rate }),
+    damage: z.strictObject({ sword: rate, spin: rate, dash: rate, arrow: rate, thrown: rate, bomb: rate }),
     announceKills: z.boolean()
   })
 });

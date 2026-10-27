@@ -3,7 +3,7 @@ import type { Player } from '../entities/player';
 import { blockedAt } from '../world/collision';
 import type { World } from '../world';
 import { sfx } from './fx';
-import { shatter } from './projectiles';
+import { dropCarried } from './throwing';
 import { maxStats } from './progress';
 
 /* ---------- Vida, mana, morte e renascimento ---------- */
@@ -11,8 +11,8 @@ import { maxStats } from './progress';
 // Dano em um jogador: empurra, derruba o que estiver no colo e, zerando a vida, derruba o jogador.
 export function damagePlayer(w: World, p: Player, n: number, from: { x: number; y: number }, by?: Player) {
   if (p.state === 'dead' || p.inv > 0) return;
-  p.hp = Math.max(0, p.hp - n); p.hurtAt = w.tick;
-  if (p.carry) { shatter(w, p.x, p.y, p.carry, 14); p.carry = null; }
+  p.hp = Math.max(0, p.hp - n); p.hurtAt = w.tick; p.fish = null;
+  if (p.carry) dropCarried(w, p);
   if (p.hp === 0) { die(w, p); if (by) { p.killer = by.name; w.emit({ t: 'kill', by: by.id, victim: p.id }); } return; }
   const a = Math.atan2(p.y - from.y, p.x - from.x);
   p.kx = Math.cos(a) * 3; p.ky = Math.sin(a) * 3; p.state = 'hurt'; p.t = 14; p.inv = 70; sfx(w, 'bump', p);
@@ -45,7 +45,11 @@ export function updateLife(w: World) {
   for (const p of w.players.values()) {
     const m = maxStats(w, p.level);
     p.maxHp = m.hp; p.maxMp = m.mp;
-    if (p.state === 'dead') { if (--p.t <= 0) respawn(w, p); continue; }
+    if (p.state === 'dead') {
+      if (--p.t > 0) continue;
+      if (w.home) respawn(w, p); else { p.t = 1e9; w.emit({ t: 'gohome', id: p.id }); }   // o servidor leva para o mapa principal
+      continue;
+    }
     if (w.tick - p.hurtAt >= ticks(r.regenDelay)) p.hp = Math.min(p.maxHp, p.hp + r.hpRegen / TICK_RATE);
     p.mp = Math.min(p.maxMp, p.mp + r.manaRegen / TICK_RATE);
     p.hp = Math.min(p.hp, p.maxHp);

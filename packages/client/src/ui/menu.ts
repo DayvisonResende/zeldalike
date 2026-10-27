@@ -1,6 +1,6 @@
-import { NAME_MAX, cleanName, type ProfileRequest, type PvpInfo } from '@vale/shared';
+import { ITEMS, NAME_MAX, cleanName, type ItemId, type ProfileRequest, type PvpInfo } from '@vale/shared';
 import { buildSwatches, drawPreview, markSwatches } from './swatches';
-import type { NameMode, Settings } from './settings';
+import type { NameMode, PadSize, Settings } from './settings';
 
 export interface MenuHooks {
   profile(): ProfileRequest;
@@ -13,8 +13,9 @@ export interface MenuHooks {
   online: boolean;                 // online o nome é o do personagem (fixo)
   switchCharacter(): void;
   signOut(): void;
+  records(): Promise<{ item: string; size: number; character: string }[] | null>;
 }
-type Tab = 'char' | 'opts' | 'keys';
+type Tab = 'char' | 'opts' | 'keys' | 'records';
 
 // Menu sobre a tela do jogo (Esc). O mundo continua rodando enquanto ele está aberto.
 export class Menu {
@@ -49,6 +50,9 @@ export class Menu {
     (document.getElementById('optBubbles') as HTMLInputElement).addEventListener('change', e => this.set({ bubbles: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optSound') as HTMLInputElement).addEventListener('change', e => this.set({ sound: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optPaths') as HTMLInputElement).addEventListener('change', e => this.set({ paths: (e.target as HTMLInputElement).checked }));
+    (document.getElementById('optAssist') as HTMLInputElement).addEventListener('change', e => this.set({ aimAssist: (e.target as HTMLInputElement).checked }));
+    (document.getElementById('optVibrate') as HTMLInputElement).addEventListener('change', e => this.set({ vibrate: (e.target as HTMLInputElement).checked }));
+    this.el.querySelectorAll<HTMLInputElement>('input[name=padSize]').forEach(r => r.addEventListener('change', () => this.set({ padSize: r.value as PadSize })));
     // clicar fora do cartão fecha
     this.el.addEventListener('pointerdown', e => { if (e.target === this.el) this.close(); });
   }
@@ -76,6 +80,9 @@ export class Menu {
     (document.getElementById('optBubbles') as HTMLInputElement).checked = s.bubbles;
     (document.getElementById('optSound') as HTMLInputElement).checked = s.sound;
     (document.getElementById('optPaths') as HTMLInputElement).checked = s.paths;
+    (document.getElementById('optVibrate') as HTMLInputElement).checked = s.vibrate;
+    (document.getElementById('optAssist') as HTMLInputElement).checked = s.aimAssist;
+    this.el.querySelectorAll<HTMLInputElement>('input[name=padSize]').forEach(r => { r.checked = r.value === s.padSize; });
     this.marks();
   }
   // Gira a prévia do personagem enquanto o menu está aberto.
@@ -104,9 +111,22 @@ export class Menu {
   }
   private tab(t: Tab, focus = false) {
     this.current = t;
+    if (t === 'records') this.loadRecords();
     this.el.querySelectorAll<HTMLButtonElement>('[role=tab]').forEach(b => { const on = b.dataset.tab === t; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; });
     this.el.querySelectorAll<HTMLElement>('[role=tabpanel]').forEach(p => { p.hidden = p.dataset.panel !== t; });
     if (focus) (t === 'char' && !this.nameInput.readOnly ? this.nameInput : this.el.querySelector<HTMLElement>('[aria-selected=true]'))?.focus();
+  }
+  private async loadRecords() {
+    const list = document.getElementById('recordList')!;
+    list.replaceChildren(Object.assign(document.createElement('li'), { textContent: 'Carregando…' }));
+    const recs = await this.hooks.records().catch(() => null);
+    if (!recs) { list.replaceChildren(Object.assign(document.createElement('li'), { textContent: 'Os recordes só existem jogando online.' })); return; }
+    if (!recs.length) { list.replaceChildren(Object.assign(document.createElement('li'), { textContent: 'Ninguém pescou nada ainda. Seja o primeiro!' })); return; }
+    list.replaceChildren(...recs.map(r => {
+      const li = document.createElement('li'), name = ITEMS[r.item as ItemId]?.name ?? r.item;
+      li.append(Object.assign(document.createElement('b'), { textContent: `${name}: ${r.size} cm` }), document.createTextNode(` — ${r.character}`));
+      return li;
+    }));
   }
   private marks() { markSwatches(this.el, this.draft.look); }
   private dirty() { this.saved.textContent = ''; }

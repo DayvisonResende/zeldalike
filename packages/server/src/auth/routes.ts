@@ -4,6 +4,7 @@ import { getConfig } from '../config/store';
 import { createAccount, createSession, deleteSession, findAccount, touchLogin } from '../persistence/accounts';
 import { countCharacters, createCharacter, deleteCharacter, listCharacters, nameTaken } from '../persistence/characters';
 import { getDb } from '../persistence/db';
+import { listRecords } from '../persistence/records';
 import { Limiter } from './limiter';
 import { DUMMY_HASH, hashPassword, newToken, tokenHash, verifyPassword } from './password';
 import { accountForToken } from './sessions';
@@ -33,6 +34,9 @@ export function authRoutes() {
     await touchLogin(getDb(), id);
     res.status(status).json({ token, username } satisfies AuthResult);
   }
+
+  // Recordes de pesca: públicos, sem precisar entrar.
+  r.get('/records', async (_req, res) => { res.json(await listRecords(getDb())); });
 
   r.post('/register', async (req, res) => {
     const { username, password } = req.body ?? {};

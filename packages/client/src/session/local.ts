@@ -1,4 +1,4 @@
-import { World, dropItem, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
+import { World, dayTime, remaining, dropItem, openChests, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
 import type { Inventory, Scene, Session, Status } from './types';
 
 // Sem servidor: o mundo inteiro roda no navegador. Útil para desenvolver e quando o servidor está fora.
@@ -30,12 +30,14 @@ export class LocalSession implements Session {
   setProfile(p: ProfileRequest) { this.player.name = cleanName(p.name); this.player.look = cleanLook(p.look); }
   step(input: InputState): GameEvent[] {
     this.world.setInput(this.player.id, input);
-    return this.world.step().filter(ev => !('to' in ev) || ev.to === this.player.id);
+    return this.world.step().map((ev): GameEvent => ev.t === 'portal' ? { t: 'notice', to: this.player.id, text: 'Esse portal leva a outro mapa: só funciona online.' } : ev)
+      .filter(ev => !('to' in ev) || ev.to === this.player.id);
   }
   scene(): Scene {
     const w = this.world;
     const profiles = new Map<string, Profile>([...w.players.values()].map(p => [p.id, { id: p.id, name: p.name, look: p.look }]));
     const drops = w.drops.map(d => ({ ...d, reserved: !!d.owner && d.owner !== this.player.id && w.tick < d.ownerUntil, fading: d.expires - w.tick < 600 }));
-    return { map: w.map, meId: this.player.id, players: [...w.players.values()], enemies: w.enemies, thrown: w.thrown, arrows: w.arrows, drops, profiles, flow: w.flow };
+    const open = new Set(openChests(w, this.player)), chests = (w.map.data.chests ?? []).map(c => ({ x: c.x, y: c.y, open: open.has(`${c.x},${c.y}`) }));
+    return { map: w.map, meId: this.player.id, players: [...w.players.values()], enemies: w.enemies, thrown: w.thrown, arrows: w.arrows, drops, bombs: w.bombs, chests, npcs: w.map.data.npcs ?? [], day: dayTime(w), invasion: w.invasion ? [w.invasion.phase === 'warn' ? -1 : remaining(w), Math.max(0, Math.ceil((w.invasion.until - w.tick) / 60))] : null, dark: !!w.map.data.dark, profiles, flow: w.flow };
   }
 }

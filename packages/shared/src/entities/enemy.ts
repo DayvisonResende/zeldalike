@@ -9,6 +9,13 @@ export interface Enemy extends Body {
   anim: number; mode: 'idle' | 'hop' | 'patrol' | 'chase' | 'search'; timer: number; dir: Dir; vx: number; vy: number;
   dying: boolean; dead: boolean;
   lastHitBy: string | null;   // jogador que deu o último golpe
+  anger: number; angerBy: string | null; angerAt: number;   // galinha: golpes seguidos de quem, e quando foi o último
+  maxHp: number;
+  minion?: boolean;                                         // geleca chamada pelo Rei (não volta quando morre)
+  enraged?: boolean; lands?: number;                        // Rei Geleca: furioso (metade da vida) e pulos dados
+  hitters?: Record<string, number>;                         // Rei Geleca: dano de cada jogador (todos ganham XP e loot)
+  invader?: boolean;                                        // geleca da invasão (não volta quando morre)
+  swarm: { target: string; until: number } | null;          // galinha do bando de vingança: persegue só `target`
   next: { x: number; y: number } | null;
   alert: number; lost: number; lastSeen: [number, number] | null; searchMap: DistMap | null; search: number;
 }

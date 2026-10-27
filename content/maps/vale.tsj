@@ -1,0 +1,347 @@
+{
+  "type": "tileset",
+  "version": "1.10",
+  "tiledversion": "1.11.0",
+  "name": "vale",
+  "tilewidth": 16,
+  "tileheight": 16,
+  "spacing": 0,
+  "margin": 0,
+  "columns": 5,
+  "tilecount": 22,
+  "image": "tileset.png",
+  "imagewidth": 80,
+  "imageheight": 80,
+  "tiles": [
+    {
+      "id": 0,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "."
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Grama"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": ","
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Grama densa"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "f"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Flores"
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "g"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Mato alto"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "p"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Trilha"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "d"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Terra"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "x"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Piso de pedra"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "T"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Árvore"
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "b"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Arbusto"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "r"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Pedra"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "w"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Água"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "k"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Ponte"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "c"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Penhasco"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "s"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Placa"
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "o"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Pilar"
+        }
+      ]
+    },
+    {
+      "id": 15,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "q"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Chão de caverna"
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "W"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Parede de caverna"
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "h"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Entrada de caverna"
+        }
+      ]
+    },
+    {
+      "id": 18,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "u"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Escada"
+        }
+      ]
+    },
+    {
+      "id": 19,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "t"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Tocha"
+        }
+      ]
+    },
+    {
+      "id": 20,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "X"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Paredão rachado"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "properties": [
+        {
+          "name": "codigo",
+          "type": "string",
+          "value": "Y"
+        },
+        {
+          "name": "nome",
+          "type": "string",
+          "value": "Parede de caverna rachada"
+        }
+      ]
+    }
+  ]
+}

@@ -1,9 +1,14 @@
-import type { ArrowView, ChatMsg, ChatRequest, DistMap, DropView, PvpInfo, Slot, EnemyView, GameEvent, InputState, PlayerView, Profile, ProfileRequest, ThrownView, WorldMap } from '@vale/shared';
+import type { ArrowView, BombView, ChatMsg, ChatRequest, DistMap, DropView, Npc, PvpInfo, Slot, EnemyView, GameEvent, InputState, PlayerView, Profile, ProfileRequest, ThrownView, WorldMap } from '@vale/shared';
 
 // Tudo que o renderer precisa para desenhar um quadro.
 export interface Scene {
   map: WorldMap; meId: string;
-  players: PlayerView[]; enemies: EnemyView[]; thrown: ThrownView[]; arrows: ArrowView[]; drops: DropView[];
+  players: PlayerView[]; enemies: EnemyView[]; thrown: ThrownView[]; arrows: ArrowView[]; drops: DropView[]; bombs: BombView[];
+  chests: { x: number; y: number; open: boolean }[];   // em tiles; open = vazio para você
+  npcs: Npc[];
+  day: number;     // 0 = meia-noite, 0,5 = meio-dia
+  dark: boolean;   // mapa sempre escuro (caverna)
+  invasion: [number, number] | null;   // [gelecas restantes (-1 = aviso), segundos] enquanto houver invasão
   profiles: ReadonlyMap<string, Profile>;   // nome e aparência de cada jogador
   flow: DistMap | null;
 }

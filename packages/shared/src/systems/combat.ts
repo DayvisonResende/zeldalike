@@ -3,9 +3,10 @@ import type { Enemy } from '../entities/enemy';
 import type { Player } from '../entities/player';
 import { tileOf } from '../world/pathfinding';
 import type { World } from '../world';
-import { startSearch } from './ai';
+import { chickenHit, startSearch } from './ai';
 import { burst, sfx } from './fx';
 import { breakTile } from './regrowth';
+import { nearCave } from '../world/tiles';
 import { harmPlayer } from './pvp';
 
 export interface SwordPose { ox: number; oy: number; ang: number; len: number }
@@ -30,8 +31,9 @@ export function cutAt(w: World, x: number, y: number, by?: string) {
   const tx = Math.floor(x / TS), ty = Math.floor(y / TS);
   if (!w.map.inBounds(tx, ty)) return;
   const c = w.map.tiles[ty][tx];
-  if (c === 'b') { breakTile(w, tx, ty, '.'); burst(w, tx * TS + 8, ty * TS + 9, 'leaf', 12, { s: 1.4, z: 6 }, by); sfx(w, 'cut', { x, y }, by); }
-  else if (c === 'g') { breakTile(w, tx, ty, '.'); burst(w, tx * TS + 8, ty * TS + 10, 'grass', 8, { s: 1, z: 3 }, by); sfx(w, 'cut', { x, y }, by); }
+  const floor = nearCave((x, y) => w.map.get(x, y), tx, ty) ? 'q' : '.';
+  if (c === 'b') { breakTile(w, tx, ty, floor); burst(w, tx * TS + 8, ty * TS + 9, 'leaf', 12, { s: 1.4, z: 6 }, by); sfx(w, 'cut', { x, y }, by); }
+  else if (c === 'g') { breakTile(w, tx, ty, floor); burst(w, tx * TS + 8, ty * TS + 10, 'grass', 8, { s: 1, z: 3 }, by); sfx(w, 'cut', { x, y }, by); }
 }
 export function swordHits(w: World, p: Player) {
   const s = swordPose(p); if (!s) return;
@@ -65,11 +67,13 @@ export function dashHits(w: World, p: Player) {
   }
 }
 export function damage(w: World, e: Enemy, n: number, sx: number, sy: number, by?: Player) {
+  if (e.type === 'chicken') { chickenHit(w, e, sx, sy, by); return; }
   if (e.hurtT > 0) return;
-  e.hp -= n; e.hurtT = 16;
+  e.hp -= n; e.hurtT = e.type === 'king' ? 10 : 16;
   if (by) e.lastHitBy = by.id;
-  const a = Math.atan2(e.y - sy, e.x - sx);
-  e.kx = Math.cos(a) * 3.2; e.ky = Math.sin(a) * 3.2;
+  if (by && e.type === 'king') (e.hitters ??= {})[by.id] = (e.hitters[by.id] ?? 0) + n;
+  const a = Math.atan2(e.y - sy, e.x - sx), kb = e.type === 'king' ? 0 : 3.2;
+  e.kx = Math.cos(a) * kb; e.ky = Math.sin(a) * kb;
   if (e.type === 'slime') { e.mode = 'idle'; e.z = 0; e.timer = 30; }
   // besouro atingido sem ter visto ninguém vai procurar quem bateu
   if (e.type === 'beetle' && e.hp > 0 && e.mode !== 'chase' && by) { e.lastSeen = tileOf(w.map, by.x, by.y); e.alert = 36; startSearch(w, e); }

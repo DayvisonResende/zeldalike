@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import { BUTTON, DEFAULT_RULES, TICK_RATE, World, bfs, distAt, emptyInput, type MapData } from '../src';
-import vale from '../../../content/maps/vale.json';
+import vale from './fixtures';
 
 // Mapa pequeno: corredor fechado, arbusto em (3,1), pedra em (5,1)
 function tiny(enemies: MapData['enemies'] = []): MapData {
   return { name: 'teste', cols: 8, rows: 3, spawn: { x: 24, y: 24 }, regions: [{ id: 'a', name: 'Área', x: 0, y: 0, w: 8, h: 3 }],
     tiles: ['TTTTTTTT', 'T..b.r.T', 'TTTTTTTT'], enemies, signs: {} };
 }
-const rules = { ...DEFAULT_RULES, regrow: { bush: 2, tallGrass: 1, rock: 3 } };
+const rules = { ...DEFAULT_RULES, regrow: { bush: 2, tallGrass: 1, rock: 3, secret: 3 } };
 function hold(w: World, id: string, patch: Partial<ReturnType<typeof emptyInput>>, n: number) {
   for (let i = 0; i < n; i++) { w.setInput(id, { ...emptyInput(), ...patch }); w.step(); patch = { ...patch, tap: 0 }; }
 }
@@ -18,7 +18,7 @@ describe('mapa do Vale', () => {
     expect(w.map.cols).toBe(48);
     expect(w.map.rows).toBe(28);
     expect(w.map.data.regions.map(r => r.name)).toContain('Ruínas de Aurel');
-    expect(w.enemies.length).toBe(14);
+    expect(w.enemies.length).toBe(20);   // de dia: sem os 4 morcegos noturnos
   });
   it('avisa a região ao entrar nela', () => {
     const w = new World(vale as MapData);

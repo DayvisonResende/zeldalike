@@ -6,12 +6,15 @@ import { bfs, distAt, lineOfSight, nextLower, tileOf, type DistMap } from '../wo
 import type { World } from '../world';
 import { sfx } from './fx';
 import { inSafeZone } from './pvp';
-import { onEnemyDead } from './spawner';
+import { monsterSafe } from './invasion';
+import { createEnemy, onEnemyDead } from './spawner';
+import { updateKing } from './boss';
+import { ticks } from '../constants';
 
 // Monstro anda como qualquer corpo, mas não entra em zona segura (se já estava dentro, pode sair).
 function moveEnemy(w: World, e: Enemy, dx: number, dy: number) {
   const ox = e.x, oy = e.y, hit = move(w.map, e, dx, dy);
-  if (inSafeZone(w, e.x, e.y) && !inSafeZone(w, ox, oy)) { e.x = ox; e.y = oy; return true; }
+  if (monsterSafe(w, e.x, e.y) && !monsterSafe(w, ox, oy)) { e.x = ox; e.y = oy; return true; }
   return hit;
 }
 
@@ -58,20 +61,21 @@ function updateSlime(w: World, e: Enemy) {
   if (e.mode === 'idle') {
     if (--e.timer <= 0) {
       let ang = w.rng.range(0, Math.PI * 2);
-      const p = nearest(w, e, 110);
-      if (p && w.flow) {
-        const [cx, cy] = tileOf(w.map, e.x, e.y);
-        if (distAt(w.flow, cx, cy) <= 14) {   // mira dois tiles adiante no caminho, com um pouco de ruído
-          const n = nextLower(w.flow, cx, cy), m = n && nextLower(w.flow, n[0], n[1]), t = m || n;
-          ang = Math.atan2((t ? t[1] * TS + 8 : p.y) - e.y, (t ? t[0] * TS + 8 : p.x) - e.x) + w.rng.range(-0.45, 0.45);
-        }
-      }
+      const p = nearest(w, e, 110), [cx, cy] = tileOf(w.map, e.x, e.y);
+      // mira dois tiles adiante no caminho, com um pouco de ruído
+      const along = (map: DistMap, gx: number, gy: number) => {
+        const n = nextLower(map, cx, cy), m = n && nextLower(map, n[0], n[1]), t = m || n;
+        ang = Math.atan2((t ? t[1] * TS + 8 : gy) - e.y, (t ? t[0] * TS + 8 : gx) - e.x) + w.rng.range(-0.45, 0.45);
+      };
+      const flow = e.invader ? w.invasion?.flow : null;   // geleca da invasão: marcha até a zona invadida
+      if (p && w.flow && distAt(w.flow, cx, cy) <= 14) along(w.flow, p.x, p.y);
+      else if (flow && distAt(flow, cx, cy) > 0 && isFinite(distAt(flow, cx, cy))) along(flow, e.x, e.y);
       e.vx = Math.cos(ang) * 1.05; e.vy = Math.sin(ang) * 1.05; e.mode = 'hop'; e.timer = 26;
     }
   } else {
     moveEnemy(w, e, e.vx, e.vy); e.timer--;
     e.z = Math.sin(Math.PI * (1 - e.timer / 26)) * 7;
-    if (e.timer <= 0) { e.mode = 'idle'; e.z = 0; e.timer = w.rng.range(30, 80) | 0; }
+    if (e.timer <= 0) { e.mode = 'idle'; e.z = 0; e.timer = (e.invader ? w.rng.range(15, 40) : w.rng.range(30, 80)) | 0; }
   }
 }
 
@@ -105,12 +109,103 @@ export function updateEnemy(w: World, e: Enemy) {
   if (e.hurtT > 0) {
     e.hurtT--; moveEnemy(w, e, e.kx, e.ky); e.kx *= 0.82; e.ky *= 0.82;
     if (e.hurtT === 0 && e.dying) { w.emit({ t: 'poof', x: e.x, y: e.y - 4 }); sfx(w, 'poof', e); e.dead = true; onEnemyDead(w, e); }
+    if (e.type !== 'king' || e.dying) return;   // o rei apanha sem parar o que estava fazendo
+  }
+  if (e.type === 'king') { updateKing(w, e); return; }
+  if (e.type === 'slime') updateSlime(w, e); else if (e.type === 'bat') updateBat(w, e); else if (e.type === 'chicken') updateChicken(w, e); else updateBeetle(w, e);
+}
+/* ---------- Morcego: voa por cima de água, arbustos e pedras; dá um rasante em quem está perto e recua ---------- */
+const FLY_BLOCK = new Set(['T', 'W', 'o', 'c']);   // árvores, paredes, pilares e paredões param o voo
+function flyBlocked(w: World, x: number, y: number) {
+  const tx = Math.floor(x / TS), ty = Math.floor(y / TS);
+  return !w.map.inBounds(tx, ty) || FLY_BLOCK.has(w.map.tiles[ty][tx]) || monsterSafe(w, x, y);
+}
+function fly(w: World, e: Enemy) {
+  if (!flyBlocked(w, e.x + e.vx, e.y)) e.x += e.vx; else e.vx = -e.vx;
+  if (!flyBlocked(w, e.x, e.y + e.vy)) e.y += e.vy; else e.vy = -e.vy;
+}
+function updateBat(w: World, e: Enemy) {
+  const target = nearest(w, e, 90, p => !p.safe);
+  if (e.mode === 'chase' && target) {                 // rasante: acelera na direção do alvo, baixo o bastante para acertar e ser acertado
+    const a = Math.atan2(target.y - 4 - e.y, target.x - e.x);
+    e.vx += Math.cos(a) * 0.14; e.vy += Math.sin(a) * 0.14;
+    const sp = Math.hypot(e.vx, e.vy); if (sp > 1.9) { e.vx *= 1.9 / sp; e.vy *= 1.9 / sp; }
+    e.z += (2 - e.z) * 0.2;
+    if (--e.timer <= 0 || Math.hypot(target.x - e.x, target.y - e.y) < 8) { e.mode = 'hop'; e.timer = 45; e.vx = -Math.cos(a) * 1.3; e.vy = -Math.sin(a) * 1.3; }
+  } else if (e.mode === 'hop') {                      // recua alto depois do rasante
+    e.z += (11 - e.z) * 0.15;
+    if (--e.timer <= 0) { e.mode = 'idle'; e.timer = 30; }
+  } else {                                            // voo à toa
+    e.mode = 'idle';
+    e.z += (8 + Math.sin(e.anim / 5) * 2 - e.z) * 0.2;
+    if (--e.timer <= 0) { const a = w.rng.range(0, Math.PI * 2); e.vx = Math.cos(a) * 0.6; e.vy = Math.sin(a) * 0.6; e.timer = w.rng.range(20, 50) | 0; }
+    if (target && w.rng.next() < 0.03) { e.mode = 'chase'; e.timer = 60; }
+  }
+  fly(w, e);
+}
+/* ---------- Galinha: cisca à toa; apanhou, foge; apanhou demais do mesmo jogador, chama o bando ---------- */
+export function chickenHit(w: World, e: Enemy, sx: number, sy: number, by?: Player) {
+  if (e.swarm) return;                                   // as do bando não ligam para golpes
+  const a = Math.atan2(e.y - sy, e.x - sx);
+  e.vx = Math.cos(a) * 1.5; e.vy = Math.sin(a) * 1.5; e.mode = 'hop'; e.timer = 40;   // sai correndo
+  sfx(w, 'cluck', e);
+  if (!by) return;
+  if (by.id !== e.angerBy || w.tick - e.angerAt > ticks(20)) e.anger = 0;
+  e.anger++; e.angerBy = by.id; e.angerAt = w.tick;
+  if (e.anger >= w.rules.fun.chickenAnger) { e.anger = 0; summonSwarm(w, by); }
+}
+function summonSwarm(w: World, target: Player) {
+  const r = w.rules.fun, until = w.tick + ticks(r.swarmTime);
+  for (let i = 0; i < r.swarmSize; i++) {
+    const at = swarmSpot(w, target, (i / r.swarmSize) * Math.PI * 2 + w.rng.range(-0.3, 0.3));
+    if (!at) continue;
+    const c = createEnemy(w, 'chicken', 0, 0, -1);
+    c.x = at.x; c.y = at.y; c.z = 10;
+    c.swarm = { target: target.id, until }; c.mode = 'chase'; c.timer = i * 4;   // chegam em leva
+    w.enemies.push(c);
+  }
+  w.emit({ t: 'notice', to: target.id, text: 'As galinhas vieram se vingar! Corra para a Clareira!' });
+  sfx(w, 'swarm', target);
+}
+// De onde vem cada galinha do bando: longe do alvo, dentro do mapa e fora de zona segura (chega mais perto se precisar).
+function swarmSpot(w: World, target: Player, angle: number) {
+  for (let d = 170; d >= 40; d -= 30) for (let k = 0; k < 8; k++) {
+    const a = angle + k * 0.8, x = target.x + Math.cos(a) * d, y = target.y + Math.sin(a) * d;
+    if (x > 8 && y > 8 && x < w.map.width - 8 && y < w.map.height - 8 && !inSafeZone(w, x, y)) return { x, y };
+  }
+  return null;
+}
+function updateChicken(w: World, e: Enemy) {
+  if (Math.abs(e.vx) > 0.05) e.dir = e.vx < 0 ? 2 : 3;   // olha para o lado em que anda
+  if (e.swarm) {
+    const t = w.players.get(e.swarm.target);
+    if (!t || t.state === 'dead' || w.tick > e.swarm.until) {   // vingança cumprida (ou o alvo sumiu): vão embora
+      e.mode = 'idle'; e.z += 0.6; e.y -= 1.2;
+      if (e.z > 40) e.dead = true;
+      return;
+    }
+    if (e.timer > 0) { e.timer--; return; }
+    const a = Math.atan2(t.y - e.y, t.x - e.x) + Math.sin((w.tick + e.id * 17) / 9) * 0.5;   // ziguezague
+    e.vx += Math.cos(a) * 0.25; e.vy += Math.sin(a) * 0.25;
+    const sp = Math.hypot(e.vx, e.vy); if (sp > 2.3) { e.vx *= 2.3 / sp; e.vy *= 2.3 / sp; }
+    e.z += (3 + Math.sin(e.anim / 3) * 2 - e.z) * 0.2;
+    fly(w, e);
     return;
   }
-  if (e.type === 'slime') updateSlime(w, e); else updateBeetle(w, e);
+  if (e.mode === 'hop') {                                  // fugindo
+    moveEnemy(w, e, e.vx, e.vy);
+    if (--e.timer <= 0) { e.mode = 'idle'; e.timer = w.rng.range(30, 90) | 0; }
+    return;
+  }
+  if (--e.timer <= 0) {                                    // cisca: anda um pouco, para, bica o chão
+    const a = w.rng.range(0, Math.PI * 2);
+    e.vx = Math.cos(a) * 0.4; e.vy = Math.sin(a) * 0.4; e.timer = w.rng.range(40, 120) | 0;
+    if (w.rng.next() < 0.4) { e.vx = 0; e.vy = 0; }
+  }
+  moveEnemy(w, e, e.vx, e.vy);
 }
 export function separate(w: World) {
-  const es = w.enemies;
+  const es = w.enemies.filter(e => e.type !== 'bat' && e.type !== 'king' && !e.swarm);   // o rei é pesado demais para ser empurrado   // morcegos voam, não se empurram com quem está no chão
   for (let i = 0; i < es.length; i++) for (let j = i + 1; j < es.length; j++) {
     const a = es[i], b = es[j], dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
     if (d > 0 && d < 13) { const k = (13 - d) * 0.08 / d; moveEnemy(w, a, -dx * k, -dy * k); moveEnemy(w, b, dx * k, dy * k); }

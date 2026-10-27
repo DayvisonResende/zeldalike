@@ -1,0 +1,165 @@
+{
+  "automappingRulesFile": "",
+  "commands": [],
+  "compatibilityVersion": 1100,
+  "extensionsPath": "extensions",
+  "folders": [
+    "."
+  ],
+  "propertyTypes": [
+    {
+      "id": 1,
+      "name": "slime",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ffb65cd8",
+      "drawFill": true,
+      "members": []
+    },
+    {
+      "id": 2,
+      "name": "beetle",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ff4d62b2",
+      "drawFill": true,
+      "members": []
+    },
+    {
+      "id": 3,
+      "name": "placa",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ffb9834b",
+      "drawFill": true,
+      "members": [
+        {
+          "name": "texto",
+          "type": "string",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "name": "regiao",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ff58c2c9",
+      "drawFill": true,
+      "members": [
+        {
+          "name": "id",
+          "type": "string",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "name": "portal",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#fff2a24e",
+      "drawFill": true,
+      "members": [
+        {
+          "name": "destino",
+          "type": "string",
+          "value": ""
+        },
+        {
+          "name": "chegada",
+          "type": "string",
+          "value": ""
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "name": "bau",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ffe9b44c",
+      "drawFill": true,
+      "members": [
+        {
+          "name": "conteudo",
+          "type": "string",
+          "value": "gold:5-10"
+        },
+        {
+          "name": "renasce",
+          "type": "string",
+          "value": "10m"
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "name": "npc",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ff9fe0b0",
+      "drawFill": true,
+      "members": [
+        {
+          "name": "texto",
+          "type": "string",
+          "value": ""
+        },
+        {
+          "name": "capa",
+          "type": "string",
+          "value": "Turquesa"
+        },
+        {
+          "name": "cabelo",
+          "type": "string",
+          "value": "Ameixa"
+        },
+        {
+          "name": "olha",
+          "type": "string",
+          "value": "baixo"
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "name": "chicken",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#fff4f0e8",
+      "drawFill": true,
+      "members": []
+    },
+    {
+      "id": 10,
+      "name": "king",
+      "type": "class",
+      "useAs": [
+        "object"
+      ],
+      "color": "#ffd94fd0",
+      "drawFill": true,
+      "members": []
+    }
+  ]
+}

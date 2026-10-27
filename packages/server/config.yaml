@@ -5,6 +5,12 @@
 # ╚══════════════════════════════════════════════════════════════╝
 # Tempos aceitam 500ms, 30s, 5m, 1h ou um número em segundos.
 
+world:
+  maps:                     # id: arquivo do Tiled (caminho relativo a este arquivo). Portais usam o id em "destino".
+    vale: ../../content/maps/vale.tmj
+    caverna: ../../content/maps/caverna.tmj
+  start: vale               # mapa principal: onde se nasce, e onde renasce quem cai em qualquer mapa
+
 server:
   port: 2567
   maxPlayers: 100
@@ -37,6 +43,7 @@ regrow:
   bush: 3m                  # arbusto cortado ou levantado volta em 3 minutos
   tallGrass: 1m
   rock: 5m
+  secret: 5m                # parede rachada aberta com bomba se fecha de novo
 
 # ── Inimigos ──────────────────────────────────────────
 # hp: golpes de espada para derrubar · damage: vida que tiram do jogador ao encostar · xp: ganho de quem derruba
@@ -62,6 +69,56 @@ enemies:
       shell: 0.4
       heart: 0.25
       mana: 0.15
+      bomb: 0.2
+  bat:                      # morcego: voa por cima de água e arbustos; no Tiled, "quando: noite" faz ele só aparecer à noite
+    hp: 1
+    respawn: 1m
+    damage: 8
+    xp: 4
+    drops:
+      gold: { chance: 0.6, min: 1, max: 2 }
+      mana: 0.15
+  chicken:                  # galinha: inofensiva e imortal (a vingança fica em fun)
+    hp: 1
+    respawn: 1m
+    damage: 0
+    xp: 0
+  king:                     # Rei Geleca, o chefão da caverna (classe king no Tiled)
+    hp: 40
+    respawn: 15m
+    damage: 25              # por onda de choque ao cair de um pulo (e por encostar)
+    xp: 250                 # para cada um que bateu nele, não só para quem deu o último golpe
+    drops:                  # cada um que bateu ganha o próprio loot
+      gold: { chance: 1, min: 30, max: 60 }
+      jelly: { chance: 1, min: 3, max: 5 }
+      heart: { chance: 1, min: 2, max: 2 }
+      bomb: { chance: 0.5, min: 2, max: 4 }
+
+# ── Diversão ──────────────────────────────────────────
+fun:
+  liftPlayers: true         # E de frente para outro jogador levanta e arremessa (para zueira entre amigos)
+  struggle: 10              # teclas que quem está no colo precisa apertar para se soltar
+  chickenAnger: 5           # golpes seguidos na mesma galinha até o bando vir se vingar
+  swarmSize: 8              # galinhas no bando
+  swarmTime: 10s            # quanto tempo o bando persegue
+  swarmDamage: 4            # vida por bicada
+
+# ── Eventos do servidor ───────────────────────────────
+events:
+  invasion:                 # invasão de gelecas: um aviso no chat e depois uma horda marcha até a zona
+    every: 40m              # de quanto em quanto tempo (0 = desligada); para testar, ponha 1m
+    warning: 30s            # tempo entre o aviso e a chegada da horda
+    duration: 3m            # tempo para limpar a horda; acabou, elas recuam
+    count: 20               # gelecas na horda
+    zone: clareira          # região atacada: durante a invasão monstros entram nela (PvP continua proibido)
+    reward:                 # para cada um que derrubou pelo menos uma, se a horda for limpa a tempo
+      xp: 40
+      gold: 20
+
+# ── Dia e noite ───────────────────────────────────────
+daynight:
+  cycle: 24m                # duração de um dia inteiro (24m = 1 minuto real por hora do jogo)
+  start: 8                  # hora em que o servidor começa (0 a 24)
 
 # ── Jogadores ─────────────────────────────────────────
 player:
@@ -86,6 +143,7 @@ pvp:
     dash: 20
     arrow: 10
     thrown: 20
+    bomb: 30
   announceKills: true       # "Fulano derrubou Beltrano" no chat de todos
 
 # ── Progressão e itens ────────────────────────────────

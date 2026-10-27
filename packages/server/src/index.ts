@@ -5,15 +5,28 @@ import { getConfig, setConfig } from './config/store';
 import { startServer } from './app';
 import { openDatabase, setDb } from './persistence/db';
 import { purgeSessions } from './persistence/accounts';
-import { WORLD_MAP } from './map';
+import { MapError, type MapData } from '@vale/shared';
+import { checkPortals, loadMap, setMaps } from './map';
 
 // CONFIG=arquivo.yaml troca a configuração (por exemplo, uma de produção ou de teste).
 const CONFIG_FILE = process.env.CONFIG ? path.resolve(process.env.CONFIG) : fileURLToPath(new URL('../config.yaml', import.meta.url));
 
-try { setConfig(loadConfig(CONFIG_FILE, WORLD_MAP)); }
-catch (e) { console.error(e instanceof ConfigError ? e.message : e); process.exit(1); }
+// Config primeiro (diz quais são os mapas), depois os mapas e os portais entre eles, depois a config de novo, agora conferindo as regiões.
+let WORLD_MAP!: MapData, OTHERS: MapData[] = [];
+try {
+  const world = loadConfig(CONFIG_FILE).world, maps: Record<string, MapData> = {};
+  for (const [id, file] of Object.entries(world.maps)) {
+    const full = path.resolve(path.dirname(CONFIG_FILE), file);
+    maps[id] = loadMap(full);
+    console.log(`[mapa] ${id}: ${full}`);
+  }
+  checkPortals(maps);
+  setMaps(maps, world.start);
+  WORLD_MAP = maps[world.start]; OTHERS = Object.entries(maps).filter(([id]) => id !== world.start).map(([, m]) => m);
+  setConfig(loadConfig(CONFIG_FILE, WORLD_MAP, OTHERS));
+} catch (e) { console.error(e instanceof ConfigError || e instanceof MapError ? e.message : e); process.exit(1); }
 
-watchConfig(CONFIG_FILE, WORLD_MAP,
+watchConfig(CONFIG_FILE, WORLD_MAP, OTHERS,
   c => { setConfig(c); console.log('[config] recarregada'); },
   e => console.error('[config] mudança ignorada, mantendo a anterior.\n' + e.message));
 

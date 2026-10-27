@@ -2,19 +2,23 @@ import fs from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, type Room } from '@colyseus/sdk';
 import { matchMaker } from 'colyseus';
-import { MSG, World, encodeInput, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
+import { MSG, World, damagePlayer, encodeInput, reelCursor, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
 import { parseConfig } from '../src/config/load';
 import { setConfig } from '../src/config/store';
 import { startServer } from '../src/app';
 import { getDb, openDatabase, setDb } from '../src/persistence/db';
-import { WORLD_MAP } from '../src/map';
+import { fileURLToPath } from 'node:url';
+import { loadMap, setMaps } from '../src/map';
+// cópias fixas dos mapas (não os que estão sendo editados no Tiled)
+const fixture = (f: string) => loadMap(fileURLToPath(new URL('../../shared/test/maps/' + f, import.meta.url)), false);
+const WORLD_MAP = fixture('vale.tmj'), CAVE = fixture('caverna.tmj');
 
 // Sobe o servidor de verdade numa porta livre e conecta clientes reais pelo WebSocket.
 const PORT = 25670 + Math.floor(Math.random() * 1000);
 let server: Awaited<ReturnType<typeof startServer>>['server'];
 let roomId = '';
 
-interface Bot { room: Room; welcome: WelcomeMsg; last: SnapshotMsg | null; seq: number; tiles: Map<string, string>; profiles: Map<string, Profile>; chat: ChatMsg[] }
+interface Bot { room: Room; welcome: WelcomeMsg; last: SnapshotMsg | null; seq: number; tiles: Map<string, string>; profiles: Map<string, Profile>; chat: ChatMsg[]; ch?: string[] }
 const API = () => `http://127.0.0.1:${PORT}/api`;
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function api(path: string, body?: unknown, token?: string, method = body === undefined ? 'GET' : 'POST'): Promise<{ status: number; body: any }> {
@@ -40,7 +44,7 @@ async function bot(name: string, look?: unknown): Promise<Bot> {
   const b = { room, last: null, seq: 0, tiles: new Map(), profiles: new Map(), chat: [] } as unknown as Bot;
   room.onMessage(MSG.chat, (m: ChatMsg) => b.chat.push(m));
   room.onMessage(MSG.profile, (m: ProfileMsg) => { if ('gone' in m) b.profiles.delete(m.id); else b.profiles.set(m.id, m); });
-  room.onMessage(MSG.snapshot, (s: SnapshotMsg) => { b.last = s; for (const ev of s.ev) if (ev.t === 'tile') b.tiles.set(ev.tx + ',' + ev.ty, ev.c); });
+  room.onMessage(MSG.snapshot, (s: SnapshotMsg) => { b.last = s; if (s.ch) b.ch = s.ch; for (const ev of s.ev) if (ev.t === 'tile') b.tiles.set(ev.tx + ',' + ev.ty, ev.c); });
   const w = new Promise<WelcomeMsg>(r => room.onMessage(MSG.welcome, r));
   room.send(MSG.hello);
   b.welcome = await w;
@@ -58,8 +62,16 @@ async function hold(b: Bot, patch: Partial<InputState>, ms: number) {
 beforeAll(async () => {
   const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8').replace(/port: \d+/, `port: ${PORT}`).replace(/registerPerHour: \d+/, 'registerPerHour: 1000');
   setConfig(parseConfig(text, WORLD_MAP));
+  setMaps({ vale: WORLD_MAP, caverna: CAVE }, 'vale');
   setDb(await openDatabase(':memory:'));
   ({ server, roomId } = await startServer(PORT));
+  // Monstros quietos num canto do Lago das Garças: os testes não podem depender de uma geleca passar por perto.
+  // (na caverna, num canto longe da escada)
+  const worlds = (matchMaker.getLocalRoomById(roomId) as unknown as { worlds: Map<string, World> }).worlds;
+  for (const [id, w] of worlds) for (const e of w.enemies) {
+    if (id === 'vale') { e.x = 39 * 16 + 8; e.y = 26 * 16 + 8; } else { e.x = 27 * 16 + 8; e.y = 3 * 16 + 8; }
+    e.mode = e.type === 'slime' ? 'idle' : e.type === 'bat' ? 'hop' : 'patrol'; e.timer = 1e9; e.dir = 0; e.vx = e.vy = 0;   // morcego: pairando parado
+  }
 });
 afterAll(async () => { await server.gracefullyShutdown(false); });
 
@@ -67,6 +79,7 @@ describe('rede', () => {
   it('recebe o mapa ao entrar e snapshots com o próprio estado', async () => {
     const a = await bot('Ana');
     expect(a.welcome.tiles.length).toBe(28);
+    expect([a.welcome.map.cols, a.welcome.map.regions.length, a.welcome.map.enemies]).toEqual([48, 6, []]);   // o mapa vem do servidor, sem os monstros
     await sleep(200);
     expect(a.last?.me).toBeTruthy();
     expect(a.last!.ack).toBe(0);
@@ -328,5 +341,110 @@ describe('progresso e itens', () => {
     const row = await getDb().selectFrom('characters').select(['level', 'xp', 'gold', 'items']).where('id', '=', accounts.get('Lootadora')!.charId).executeTakeFirstOrThrow();
     expect(row).toMatchObject({ level: 1, xp: 5, gold: 3 });
     expect(JSON.parse(row.items)[5]).toEqual({ id: 'shell', n: 7 });
+  });
+});
+
+describe('mapas e portais', () => {
+  const room = () => matchMaker.getLocalRoomById(roomId) as unknown as { world: World; worlds: Map<string, World> };
+  it('entrar no portal leva para a caverna com tudo; voltar traz de volta ao Vale', async () => {
+    const a = await bot('Exploradora');
+    const vale = room().world, cave = room().worlds.get('caverna')!;
+    const p = vale.players.get(a.room.sessionId)!;
+    p.x = 44 * 16 + 8; p.y = 2 * 16 + 14; p.gold = 7; p.inPortal = false;   // logo abaixo da entrada da caverna
+    const welcome = new Promise<WelcomeMsg>(r => a.room.onMessage(MSG.welcome, r));
+    await hold(a, { up: true }, 400);
+    const w = await welcome;
+    expect(w.map.name).toBe('Caverna Funda');
+    expect(w.at).toEqual({ x: 14 * 16 + 8, y: 18 * 16 + 2 });   // logo acima da escada, de costas para ela
+    expect(vale.players.has(a.room.sessionId)).toBe(false);
+    expect(cave.players.get(a.room.sessionId)?.gold).toBe(7);        // levou o que tinha
+    await sleep(200);
+    expect(a.last!.me).toMatchObject({ x: 232, gold: 7 });
+    expect(cave.players.has(a.room.sessionId)).toBe(true);           // continuar segurando a tecla não volta pela escada
+    // sai e volta: continua na caverna
+    await a.room.leave(); await sleep(150);
+    const row = await getDb().selectFrom('characters').select(['map', 'x', 'y']).where('id', '=', accounts.get('Exploradora')!.charId).executeTakeFirstOrThrow();
+    expect(row.map).toBe('caverna');
+    const acc = accounts.get('Exploradora')!;
+    const r2 = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: acc.token, characterId: acc.charId });
+    await sleep(150);
+    expect(cave.players.has(r2.sessionId)).toBe(true);
+    // a escada (embaixo) leva de volta ao ponto "caverna" no Vale
+    const q = cave.players.get(r2.sessionId)!; q.x = 14 * 16 + 8; q.y = 18 * 16 + 6; q.inPortal = false; q.portalWait = 0;
+    let seq = 1000;
+    for (let i = 0; i < 25; i++) { r2.send(MSG.input, encodeInput(++seq, { ...emptyInput(), down: true })); await sleep(16); }
+    await sleep(200);
+    expect(vale.players.has(r2.sessionId)).toBe(true);
+    expect(vale.players.get(r2.sessionId)!.x).toBe(44 * 16 + 8);
+    await r2.leave();
+  });
+  it('quem cai na caverna renasce no Vale', async () => {
+    const a = await bot('Azarada');
+    const vale = room().world, cave = room().worlds.get('caverna')!;
+    const p = vale.players.get(a.room.sessionId)!;
+    p.x = 44 * 16 + 8; p.y = 2 * 16 + 14; p.inPortal = false;
+    await hold(a, { up: true }, 400);
+    expect(cave.players.has(a.room.sessionId)).toBe(true);
+    const c = cave.players.get(a.room.sessionId)!;
+    const delay = cave.rules.player.respawnDelay;
+    cave.rules.player.respawnDelay = 0.5;                            // o do config (5 s) passaria do tempo do teste
+    c.inv = 0; damagePlayer(cave, c, 9999, c);
+    cave.rules.player.respawnDelay = delay;
+    await sleep(1200);
+    const back = vale.players.get(a.room.sessionId);
+    expect(back?.state).toBe('walk');
+    expect(back?.hp).toBe(back?.maxHp);
+    expect(vale.map.regionAt(back!.x, back!.y)?.id).toBe(vale.rules.player.respawnPoint);
+    await a.room.leave();
+  });
+});
+
+describe('baús', () => {
+  it('abrir dá o conteúdo; continua vazio para quem abriu mesmo saindo e voltando; outro personagem ainda pode abrir', async () => {
+    const a = await bot('Cacadora');
+    const vale = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    const chest = vale.map.data.chests![0];
+    const p = vale.players.get(a.room.sessionId)!;
+    p.x = chest.x * 16 + 8; p.y = (chest.y + 1) * 16 + 4; p.dir = 1;   // encostada embaixo do baú, olhando para ele
+    await sleep(100);
+    expect(a.ch).toEqual([]);                                          // fechado para ela (a lista vem quando muda)
+    await hold(a, { b: true, tap: 2 }, 50); await hold(a, {}, 600);
+    expect(p.gold).toBeGreaterThanOrEqual(10);
+    expect(a.ch).toEqual([`${chest.x},${chest.y}`]);                   // agora vazio para ela
+    expect(p.chests[`vale:${chest.x},${chest.y}`]).toBeTypeOf('number');
+    await a.room.leave(); await sleep(150);
+    const acc = accounts.get('Cacadora')!;
+    const room2 = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: acc.token, characterId: acc.charId });
+    let ch: string[] | undefined;
+    room2.onMessage(MSG.snapshot, (s: SnapshotMsg) => { if (s.ch) ch = s.ch; });
+    room2.send(MSG.hello);
+    await sleep(250);
+    expect(ch).toEqual([`${chest.x},${chest.y}`]);                     // salvo no banco: continua vazio para ela
+    const b = await bot('Outro');
+    await sleep(150);
+    expect(b.ch).toEqual([]);                                          // para outro personagem, cheio
+    await room2.leave(); await b.room.leave();
+  });
+});
+
+describe('pesca', () => {
+  it('pescar uma truta grava o recorde, anuncia para todos e aparece em /api/records', async () => {
+    const a = await bot('Pescadora'), b = await bot('Plateia');
+    const vale = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    const p = vale.players.get(a.room.sessionId)!;
+    p.x = 20 * 16 + 8; p.y = 8 * 16 + 8; p.dir = 0;   // na margem, olhando para o rio
+    await hold(a, { b: true, tap: 2 }, 50);            // lança a linha
+    await sleep(100);
+    expect(p.state).toBe('fish');
+    // pula a espera: fisgada difícil (só truta de dia), com o cursor na zona no próximo passo
+    const f = p.fish!; f.phase = 'reel'; f.tier = 2; f.t = 10; f.zone = reelCursor({ ...f, t: 11 });
+    await hold(a, { b: true, tap: 2 }, 20);
+    await sleep(300);
+    expect(p.bag.some(s => s?.id === 'trout')).toBe(true);
+    const rec = b.chat.find(m => m.text.startsWith('🏆'));
+    expect(rec?.text).toMatch(/Pescadora pescou Truta dourada de \d+ cm: novo recorde do servidor!/);
+    const list = (await api('/records')).body;
+    expect(list.find((r: { item: string }) => r.item === 'trout')).toMatchObject({ character: 'Pescadora' });
+    await a.room.leave(); await b.room.leave();
   });
 });

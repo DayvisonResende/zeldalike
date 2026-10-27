@@ -33,7 +33,8 @@ packages/
   client/    canvas, sprites, câmera, som, input, interface.
              session/ esconde se o mundo está no servidor (net) ou no navegador (local).
 content/
-  maps/      mapas do mundo (JSON)
+  maps/      mapas do mundo (Tiled: vale.tmj, caverna.tmj), tileset e projeto do Tiled
+packages/tools/   gerar o tileset, conferir o mapa
 ```
 
 Regras para manter o projeto saudável:
@@ -63,6 +64,42 @@ Regras para manter o projeto saudável:
 depois de ligar só desliga após o cooldown, e não desliga logo depois de uma briga. Nome vermelho = pode lutar.
 Zonas seguras (a Clareira, por padrão) não têm PvP nem monstros.
 
+**Dia e noite:** um dia inteiro dura `daynight.cycle` (24 min por padrão); o relógio aparece no HUD e o chat avisa
+quando anoitece e amanhece. À noite o mundo escurece, cada jogador carrega uma luz pequena e as tochas iluminam.
+
+**Levantar amigos:** `E` de frente para outro jogador levanta; `E` de novo arremessa (passa por cima de rio e barranco;
+cair em monstro machuca o monstro). No colo de alguém, aperte as teclas rápido para se soltar. Desliga em `fun.liftPlayers`.
+
+**Galinhas:** inofensivas e imortais (classe `chicken` no Tiled). Bata 5 vezes na mesma e um bando vem bicar só você
+por alguns segundos; a zona segura é o único refúgio. Números em `fun` no config.
+
+**Celular:** em telas de toque aparece um controle (joystick flutuante, botões A/B/C/D, atalhos de coração, poção e
+bomba). Deitado, a tela do jogo ocupa a altura toda e o controle vai para as laterais. Tamanho dos botões e vibração
+ficam em Menu → Opções. Dá para instalar como app (manifest em `packages/client/public`), que abre em tela cheia.
+
+**Rei Geleca** (chefão da Caverna Funda, classe `king` no Tiled, números em `enemies.king`): fica na toca e pula
+atrás de quem chega perto. Ao cair, solta uma onda de choque que machuca quem está no chão (pular ou rolar na hora
+escapa) e esmaga pedras e arbustos. A cada três pulos chama gelecas; com metade da vida fica vermelho e furioso.
+Todo mundo que bateu nele ganha o XP inteiro e um loot só seu. Se todos fogem, ele se cura. A barra de vida dele
+aparece no alto da tela; quando cai ou renasce, o servidor inteiro fica sabendo pelo chat.
+
+**Invasão de gelecas** (evento do servidor, `events.invasion` no config): de tempos em tempos (`every`) sai um
+aviso no chat e, `warning` depois, uma horda de `count` gelecas marcha até a zona `zone`. Enquanto dura, a zona deixa de
+proteger contra monstros (o PvP continua proibido lá). Limpou a horda antes de `duration`: quem derrubou pelo menos
+uma ganha `reward` e o melhor defensor é anunciado; se o tempo acabar, elas recuam. Um contador aparece no HUD. Para
+testar sem esperar, ponha `every: 1m`; `every: 0` desliga.
+
+**Bombas:** `3` põe uma bomba acesa (cai de besouros e de baús). `E` de frente para ela levanta, `E` de novo arremessa;
+segurar demais explode na mão. A explosão abre paredes rachadas (tiles "Paredão rachado" e "Parede de caverna rachada",
+que se fecham de novo depois de `regrow.secret`), quebra arbustos, mato e pedras, fere monstros e empurra todo mundo
+(em outro jogador só causa dano se o PvP deixar).
+
+**Pesca:** de frente para a água, `E` ou `F` lança a linha. No "!", aperte de novo para fisgar; depois aperte com o
+cursor na zona verde (peixes difíceis têm zona menor e cursor mais rápido). Peixes: lambari, tilápia, truta dourada,
+peixe-lua (só à noite), peixe-cego (só na caverna) e a bota velha. Cada peixe tem tamanho; o maior de cada espécie
+vira recorde do servidor (anunciado no chat, e na aba Recordes do menu). A barra roda dentro do passo da jogadora,
+então o cliente vê exatamente o que o servidor julga: o atraso da rede não atrapalha o timing.
+
 **Progresso:** monstros dão XP e soltam loot no chão (só quem derrubou pega nos primeiros segundos).
 `I` (ou 🎒) abre o inventário; `1` usa um coração e `2` uma poção de mana. Largar um item no chão é o jeito
 de passar para um amigo. XP, curva de nível, tabelas de drop e taxas ficam no `config.yaml`.
@@ -70,6 +107,43 @@ de passar para um amigo. XP, curva de nível, tabelas de drop e taxas ficam no `
 `Esc` (ou o botão ☰ na tela) abre o menu: personagem (nome, capa, cabelo), opções
 (nomes sobre a cabeça: todos, só dos outros ou nenhum; som; caminhos dos monstros) e controles.
 Tudo fica salvo no navegador.
+
+## Editar o mapa (Tiled)
+
+O mundo é um mapa do [Tiled](https://www.mapeditor.org) (grátis): `content/maps/vale.tmj`.
+
+1. No Tiled, abra o projeto `content/maps/vale.tiled-project` (Arquivo → Abrir projeto) e depois o `vale.tmj`.
+2. Edite as camadas:
+   - **terreno** — pinte com os tiles do tileset (grama, trilha, água, árvores…). As bordas de grama,
+     margens da água e beiradas de penhasco o jogo desenha sozinho.
+   - **regioes** — retângulos com classe `regiao`; o nome do retângulo aparece na tela ao entrar.
+     A propriedade `id` (opcional) é o que o `config.yaml` usa em `respawnPoint` e `safeZones`.
+   - **monstros** — pontos com classe `slime`, `beetle` ou `bat` (morcego, voa por cima de água e arbustos).
+     Propriedade opcional `quando`: `noite` ou `dia` (o monstro só existe nesse período).
+   - **placas** — pinte o tile de placa no terreno e ponha um ponto com classe `placa` em cima;
+     escreva na propriedade `texto` (linha em branco = próxima página).
+   - **pontos** — um ponto chamado `partida` (onde se nasce neste mapa) e outros pontos com nome,
+     usados como chegada de portais.
+   - **baus** — pontos com classe `bau` em chão livre. Propriedades: `conteudo` (ex.: `gold:10-20, heart:2, shell:1@50%`
+     — quantidade, faixa ou chance; itens: gold, heart, mana, jelly, shell) e `renasce` (ex.: `10m`). Cada personagem abre
+     cada baú uma vez e espera ele encher de novo; abre com `E` de frente para ele.
+   - **npcs** — pontos com classe `npc`; o nome do objeto é o nome do NPC. Propriedades: `texto` (a conversa;
+     linha em branco = próxima página), `capa` e `cabelo` (nome da cor, como `Carmim` e `Ruivo`, ou o número),
+     `olha` (baixo, cima, esquerda, direita). Conversa com `E` de frente para ele; ele se vira para você.
+   - **portais** — retângulos com classe `portal`: quem pisa vai para o ponto `chegada` do mapa `destino`
+     (o id do mapa em `world.maps` no config; vazio = este mesmo mapa). Dica: ponha a chegada de forma que
+     quem chega já esteja andando para longe do portal de volta (entrou indo para o norte → a saída fica atrás).
+3. Salve e rode `npm run map:check`: ele lista erros e avisos em português (placa sem texto, monstro dentro
+   de árvore, região que o config cita e não existe…).
+   - **Mapa escuro** (caverna): Mapa → Propriedades do mapa → propriedade booleana `escuro` marcada. Fica sempre de noite lá.
+   - **Tochas**: o tile de tocha ilumina à noite e no escuro.
+4. Reinicie o servidor. Quem entrar recebe o mapa novo (o servidor envia o mapa a cada jogador).
+
+O mapa pode ter qualquer tamanho. Vários mapas: liste em `world.maps` no `config.yaml` (cada um é um mundo
+separado, com monstros e chat "Perto" próprios) e ligue com portais; `world.start` é o mapa principal, onde
+renasce quem cai em qualquer mapa. O `npm run map:check` confere todos os mapas e os portais entre eles.
+Tipo de tile novo: acrescente no fim de `TILE_KINDS` (shared/src/world/tiles.ts), desenhe em
+client/src/render/tiles.ts e rode `npm run map:tileset` para atualizar o tileset do Tiled.
 
 ## Contas e banco de dados
 

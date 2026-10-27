@@ -2,10 +2,11 @@ import { ticks } from '../constants';
 import type { Player } from '../entities/player';
 import type { World } from '../world';
 import { damagePlayer } from './life';
+import { monsterSafe } from './invasion';
 
 /* ---------- PvP: modos, zonas seguras e dano entre jogadores ---------- */
 export type PvpMode = 'off' | 'optional' | 'open';
-export type PvpAttack = 'sword' | 'spin' | 'dash' | 'arrow' | 'thrown';
+export type PvpAttack = 'sword' | 'spin' | 'dash' | 'arrow' | 'thrown' | 'bomb';
 
 export function inSafeZone(w: World, x: number, y: number) {
   const r = w.map.regionAt(x, y);
@@ -43,9 +44,10 @@ export function setPvp(w: World, p: Player, on: boolean): PvpToggle {
 }
 
 // Uma vez por passo: estado de PvP de cada um e aviso ao entrar/sair de zona segura.
+// `safe` é a proteção contra monstros, que some na zona invadida (o PvP lá continua proibido, por pvpActive).
 export function updatePvp(w: World) {
   for (const p of w.players.values()) {
-    const safe = inSafeZone(w, p.x, p.y);
+    const safe = monsterSafe(w, p.x, p.y);
     if (safe !== p.safe) { p.safe = safe; w.emit({ t: 'zone', to: p.id, safe }); }
     p.pvpActive = pvpActive(w, p);
   }

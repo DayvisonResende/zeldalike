@@ -3,6 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#0e0c22">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <title>A Lâmina do Vale</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -17,14 +23,18 @@
       <div class="bar hp" role="meter" aria-label="Vida" aria-valuemin="0"><span></span></div>
       <div class="bar mp" role="meter" aria-label="Mana" aria-valuemin="0"><span></span></div>
       <div class="xprow"><span class="lvl" id="lvl">Nv 1</span><div class="xpbar" id="xpbar" role="meter" aria-label="Experiência" aria-valuemin="0"><i></i></div></div>
+      <span class="clock" id="clock"></span>
+      <span class="raid" id="raid" role="status" hidden></span>
       <span class="gold" id="gold"><canvas width="10" height="9" aria-hidden="true"></canvas><b>0</b></span>
       <span class="badge" id="pvpBadge" hidden></span>
     </div>
+    <div class="boss" id="boss" hidden><b>Rei Geleca</b><div class="bar" role="meter" aria-label="Vida do Rei Geleca" aria-valuemin="0"></div></div>
     <div class="death" id="death" role="alert" hidden><strong>Você caiu</strong><span id="deathTimer"></span></div>
     <div class="status" id="status" role="status" hidden></div>
-    <div class="dialog" id="dialog" aria-live="polite" hidden><p id="dlgText"></p><span class="more" id="dlgMore">▼</span></div>
+    <div class="dialog" id="dialog" aria-live="polite" hidden><b class="who" id="dlgWho" hidden></b><p id="dlgText"></p><span class="more" id="dlgMore">▼</span></div>
     <div class="names" id="names" aria-hidden="true"></div>
     <div class="floaters" id="floaters" aria-hidden="true"></div>
+    <div class="fishbar" id="fishbar" role="status" hidden><span></span><div class="fishtrack"><i class="zone"></i><i class="cursor"></i></div></div>
     <div class="start" id="start">
       <div class="startcard">
         <strong>A Lâmina do Vale</strong>
@@ -99,7 +109,7 @@
           <p id="bagInfo" class="hint">Escolha um item.</p>
           <div class="row"><button type="button" class="primary" id="bagUse" disabled>Usar</button><button type="button" class="link" id="bagDrop" disabled>Largar no chão</button></div>
         </div>
-        <p class="hint">Atalhos: <kbd>1</kbd> usa um coração, <kbd>2</kbd> uma poção de mana. <kbd>I</kbd> ou <kbd>Esc</kbd> fecha.</p>
+        <p class="hint">Atalhos: <kbd>1</kbd> usa um coração, <kbd>2</kbd> uma poção de mana, <kbd>3</kbd> põe uma bomba. <kbd>I</kbd> ou <kbd>Esc</kbd> fecha.</p>
       </div>
     </div>
     <button class="bagbtn" id="bagBtn" type="button" aria-label="Inventário (I)">🎒</button>
@@ -111,6 +121,7 @@
           <button type="button" role="tab" data-tab="char" aria-selected="true">Personagem</button>
           <button type="button" role="tab" data-tab="opts" aria-selected="false" tabindex="-1">Opções</button>
           <button type="button" role="tab" data-tab="keys" aria-selected="false" tabindex="-1">Controles</button>
+          <button type="button" role="tab" data-tab="records" aria-selected="false" tabindex="-1">Recordes</button>
         </div>
 
         <section role="tabpanel" data-panel="char">
@@ -141,6 +152,17 @@
           <label class="toggle"><input type="checkbox" id="optBubbles"><span>Balões de fala</span></label>
           <label class="toggle"><input type="checkbox" id="optSound"><span>Som</span><kbd>M</kbd></label>
           <label class="toggle"><input type="checkbox" id="optPaths"><span>Caminhos dos monstros</span><kbd>P</kbd></label>
+          <fieldset class="group touch-only">
+            <legend>Controle de toque</legend>
+            <div class="seg">
+              <label><input type="radio" name="padSize" value="s"><span>Pequeno</span></label>
+              <label><input type="radio" name="padSize" value="m"><span>Médio</span></label>
+              <label><input type="radio" name="padSize" value="l"><span>Grande</span></label>
+            </div>
+            <label class="toggle"><input type="checkbox" id="optVibrate"><span>Vibrar ao apertar</span></label>
+            <label class="toggle"><input type="checkbox" id="optAssist"><span>Ajuda na mira</span></label>
+            <p class="hint">Espada, flecha e arremesso miram no inimigo mais perto à sua frente; quem estiver colado em você, mesmo atrás, também conta: o personagem se vira sozinho.</p>
+          </fieldset>
         </section>
 
         <section role="tabpanel" data-panel="keys" hidden>
@@ -150,12 +172,21 @@
             <dt>Arco</dt><dd><kbd>L</kbd> <kbd>C</kbd> ou clique direito.</dd>
             <dt>Dash</dt><dd>Segure <kbd>Shift</kbd> ou <kbd>Q</kbd>. Corre até bater em algo ou virar para trás.</dd>
             <dt>Levantar e ler</dt><dd><kbd>E</kbd> <kbd>K</kbd> ou <kbd>X</kbd>. Aperte de novo para arremessar.</dd>
+            <dt>Celular</dt><dd>Encoste em qualquer lugar do lado esquerdo para andar. Os botões redondos são as teclas; os de cima usam coração, poção e bomba. Jogue deitado e use ⛶ para tela cheia (no iPhone: Compartilhar → Adicionar à Tela de Início).</dd>
             <dt>Mira</dt><dd>Com o mouse sobre a tela, espada, flechas e arremessos seguem o cursor.</dd>
+            <dt>Levantar amigos</dt><dd><kbd>E</kbd> de frente para outro jogador levanta; <kbd>E</kbd> de novo arremessa. No colo de alguém? Aperte as teclas rápido para se soltar.</dd>
+            <dt>Bombas</dt><dd><kbd>3</kbd> põe uma bomba acesa. <kbd>E</kbd> de frente para ela levanta, <kbd>E</kbd> de novo arremessa. Abre paredes rachadas.</dd>
+            <dt>Pescar</dt><dd>De frente para a água, <kbd>E</kbd> ou <kbd>F</kbd> lança a linha. No "!", aperte de novo para fisgar; depois aperte com o cursor na zona verde. Andar recolhe a linha.</dd>
             <dt>Chat</dt><dd><kbd>Enter</kbd> abre e envia, <kbd>Tab</kbd> troca entre Perto e Todos, <kbd>Esc</kbd> cancela. <kbd>/t</kbd> antes da mensagem manda para todos.</dd>
             <dt>PvP</dt><dd><kbd>V</kbd> liga e desliga (quando o servidor permite escolher). Nome vermelho = pode lutar.</dd>
             <dt>Inventário</dt><dd><kbd>I</kbd> abre. <kbd>1</kbd> usa um coração, <kbd>2</kbd> uma poção de mana. Itens no chão: é só passar por cima.</dd>
             <dt>Menu</dt><dd><kbd>Esc</kbd></dd>
           </dl>
+        </section>
+
+        <section role="tabpanel" data-panel="records" hidden>
+          <p class="hint">O maior de cada peixe já pescado neste servidor.</p>
+          <ol class="records" id="recordList"></ol>
         </section>
 
         <button type="button" class="close" id="closeMenu">Voltar ao jogo</button>
@@ -164,12 +195,21 @@
   </div>
 
   <div class="pad" id="pad">
-    <div class="stick" id="stick"><div class="knob" id="knob"></div></div>
-    <div class="btns">
-      <button class="btn c" id="btnC" type="button">C<span>Arco</span></button>
-      <button class="btn d" id="btnD" type="button">D<span>Dash</span></button>
-      <button class="btn b" id="btnB" type="button">B<span>Levantar</span></button>
-      <button class="btn a" id="btnA" type="button">A<span>Espada</span></button>
+    <div class="stickzone" id="stickZone"><div class="stick" id="stick"><div class="knob" id="knob"></div></div></div>
+    <div class="padright">
+      <div class="quick">
+        <button class="qbtn" id="q1" type="button" aria-label="Usar coração"><canvas width="8" height="7"></canvas><b>0</b></button>
+        <button class="qbtn" id="q2" type="button" aria-label="Usar poção de mana"><canvas width="8" height="7"></canvas><b>0</b></button>
+        <button class="qbtn" id="q3" type="button" aria-label="Pôr bomba"><canvas width="8" height="7"></canvas><b>0</b></button>
+        <button class="qbtn fs" id="fsBtn" type="button" aria-label="Tela cheia" hidden>⛶</button>
+      </div>
+      <div class="btns">
+        <button class="btn c" id="btnC" type="button">C<span>Arco</span></button>
+        <button class="btn d" id="btnD" type="button">D<span>Dash</span></button>
+        <button class="btn b" id="btnB" type="button">B<span>Ação</span></button>
+        <button class="btn a" id="btnA" type="button">A<span>Espada</span></button>
+        <button class="btn e" id="btnBomb" type="button" aria-label="Pôr bomba"><canvas width="8" height="7"></canvas><b>0</b></button>
+      </div>
     </div>
   </div>
 </main>

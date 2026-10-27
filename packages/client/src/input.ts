@@ -4,9 +4,9 @@ type Key = 'up' | 'down' | 'left' | 'right' | Button;
 type Source = 'kb' | 'mouse' | 'touch';
 const MAP: Record<string, Key> = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
-  KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
+  KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyF: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
 };
-export interface InputHooks { started(): boolean; start(): void; toggleMute(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2): void }
+export interface InputHooks { started(): boolean; start(): void; toggleMute(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void }
 // Cliques e teclas dentro do menu são do menu, não do jogo.
 export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn';
 const inMenu = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(UI_SELECTOR);
@@ -18,6 +18,7 @@ export class Input {
   private src: Record<Source, Set<Key>> = { kb: new Set(), mouse: new Set(), touch: new Set() };
   private codes = new Set<string>();
   private tap = 0;
+  usingTouch = false;   // o último comando veio da tela de toque (liga a ajuda na mira)
   readonly mouse = { x: 0, y: 0, active: false };   // em pixels da tela do jogo
 
   constructor(stage: HTMLElement, canvas: HTMLCanvasElement, private hooks: InputHooks) {
@@ -31,7 +32,7 @@ export class Input {
       if (e.code === 'KeyP') { if (!e.repeat) hooks.togglePaths(); return; }
       if (e.code === 'KeyV') { if (!e.repeat && hooks.started()) hooks.togglePvp(); return; }
       if (e.code === 'KeyI') { if (!e.repeat && hooks.started()) hooks.toggleBag(); return; }
-      if (e.code === 'Digit1' || e.code === 'Digit2') { if (!e.repeat && hooks.started()) hooks.quickUse(e.code === 'Digit1' ? 1 : 2); return; }
+      if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') { if (!e.repeat && hooks.started()) hooks.quickUse(Number(e.code.slice(5)) as 1 | 2 | 3); return; }
       const k = MAP[e.code]; if (!k) return;
       e.preventDefault();
       if (!hooks.started()) { hooks.start(); return; }
@@ -59,7 +60,7 @@ export class Input {
 
   private set(src: Source, k: Key, v: boolean) {
     const before = this.held(k);
-    if (v) this.src[src].add(k); else this.src[src].delete(k);
+    if (v) { this.src[src].add(k); this.usingTouch = src === 'touch'; } else this.src[src].delete(k);
     if (!before && v && k in BUTTON) this.tap |= BUTTON[k as Button];
   }
   private held(k: Key) { return this.src.kb.has(k) || this.src.mouse.has(k) || this.src.touch.has(k); }
@@ -78,12 +79,18 @@ export class Input {
     return s;
   }
   clearTaps() { this.tap = 0; }
+  // Direção que o jogador está apertando (-1, 0 ou 1 em cada eixo).
+  moving() { return { x: +this.held('right') - +this.held('left'), y: +this.held('down') - +this.held('up') }; }
+  // O botão está segurado ou foi tocado desde o último passo?
+  wants(k: Button) { return this.held(k) || (this.tap & BUTTON[k]) !== 0; }
 }
 
 // Joystick e botões virtuais (só aparecem em telas de toque).
-export function bindTouch(input: Input, hooks: InputHooks) {
-  const stick = document.getElementById('stick')!, knob = document.getElementById('knob')!;
-  let stickId: number | null = null;
+// O joystick é flutuante: encostar em qualquer lugar da área dele põe o centro ali, e soltar o devolve ao lugar.
+export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolean) {
+  const zone = document.getElementById('stickZone')!, stick = document.getElementById('stick')!, knob = document.getElementById('knob')!;
+  const buzz = () => { if (vibrate()) try { navigator.vibrate?.(12); } catch { } };
+  let stickId: number | null = null, ox = 0, oy = 0;
   const setStick = (dx: number, dy: number) => {
     const r = stick.clientWidth / 2, l = Math.hypot(dx, dy), m = Math.min(l, r * 0.6), a = Math.atan2(dy, dx);
     knob.style.transform = l ? `translate(${Math.cos(a) * m}px,${Math.sin(a) * m}px)` : '';
@@ -91,14 +98,40 @@ export function bindTouch(input: Input, hooks: InputHooks) {
     if (l > r * 0.28) { const sec = Math.round(a / (Math.PI / 4)); vx = Math.round(Math.cos(sec * Math.PI / 4)); vy = Math.round(Math.sin(sec * Math.PI / 4)); }
     input.touch('left', vx < 0); input.touch('right', vx > 0); input.touch('up', vy < 0); input.touch('down', vy > 0);
   };
-  const onStick = (e: PointerEvent) => { const b = stick.getBoundingClientRect(); setStick(e.clientX - b.left - b.width / 2, e.clientY - b.top - b.height / 2); };
-  stick.addEventListener('pointerdown', e => { e.preventDefault(); hooks.start(); stickId = e.pointerId; try { stick.setPointerCapture(e.pointerId); } catch { } onStick(e); });
-  stick.addEventListener('pointermove', e => { if (e.pointerId === stickId) onStick(e); });
-  for (const t of ['pointerup', 'pointercancel'] as const) stick.addEventListener(t, e => { if (e.pointerId === stickId) { stickId = null; setStick(0, 0); } });
+  zone.addEventListener('pointerdown', e => {
+    e.preventDefault(); if (!hooks.started()) { hooks.start(); return; }
+    if (stickId !== null) return;
+    const b = zone.getBoundingClientRect(), r = stick.clientWidth / 2;
+    // centro onde o dedo encostou, sem deixar o joystick sair da área
+    ox = Math.max(r, Math.min(b.width - r, e.clientX - b.left)); oy = Math.max(r, Math.min(b.height - r, e.clientY - b.top));
+    stick.style.left = ox + 'px'; stick.style.top = oy + 'px'; stick.classList.add('on');
+    stickId = e.pointerId; try { zone.setPointerCapture(e.pointerId); } catch { }
+    setStick(e.clientX - b.left - ox, e.clientY - b.top - oy);
+  });
+  zone.addEventListener('pointermove', e => { if (e.pointerId !== stickId) return; const b = zone.getBoundingClientRect(); setStick(e.clientX - b.left - ox, e.clientY - b.top - oy); });
+  for (const t of ['pointerup', 'pointercancel'] as const) zone.addEventListener(t, e => {
+    if (e.pointerId !== stickId) return;
+    stickId = null; setStick(0, 0); stick.style.left = stick.style.top = ''; stick.classList.remove('on');
+  });
   for (const [id, k] of [['btnA', 'a'], ['btnB', 'b'], ['btnC', 'c'], ['btnD', 'd']] as const) {
     const el = document.getElementById(id)!;
-    el.addEventListener('pointerdown', e => { e.preventDefault(); if (!hooks.started()) { hooks.start(); return; } el.classList.add('on'); input.touch(k, true); });
+    el.addEventListener('pointerdown', e => { e.preventDefault(); if (!hooks.started()) { hooks.start(); return; } el.classList.add('on'); input.touch(k, true); buzz(); });
     for (const t of ['pointerup', 'pointercancel', 'pointerleave'] as const) el.addEventListener(t, () => { el.classList.remove('on'); input.touch(k, false); });
   }
-  document.getElementById('pad')!.addEventListener('contextmenu', e => e.preventDefault());
+  // Atalhos de item: coração, poção e bomba (as teclas 1, 2 e 3)
+  document.getElementById('btnBomb')!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(3); buzz(); } });
+  for (const n of [1, 2, 3] as const) document.getElementById('q' + n)!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(n); buzz(); } });
+  // Tela cheia (e deitado, onde o navegador deixa); no iPhone não existe para páginas: lá é "Adicionar à Tela de Início"
+  const fs = document.getElementById('fsBtn')!;
+  fs.hidden = !document.fullscreenEnabled;
+  fs.addEventListener('click', async () => {
+    try {
+      if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+      await (screen.orientation as ScreenOrientation & { lock?(o: string): Promise<void> }).lock?.('landscape');
+    } catch { }
+  });
+  const pad = document.getElementById('pad')!;
+  pad.addEventListener('contextmenu', e => e.preventDefault());
+  pad.addEventListener('pointerdown', () => { input.usingTouch = true; }, true);   // qualquer toque no controle já liga a ajuda na mira
 }

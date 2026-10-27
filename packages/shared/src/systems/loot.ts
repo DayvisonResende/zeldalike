@@ -2,6 +2,8 @@ import { ticks } from '../constants';
 import type { Enemy } from '../entities/enemy';
 import type { Player } from '../entities/player';
 import { ITEMS, addItem, canFit, takeItem, type LootId } from '../items';
+import type { DropRule } from '../rules';
+import { useBomb } from './bombs';
 import type { World } from '../world';
 import { sfx } from './fx';
 
@@ -18,17 +20,21 @@ function spawnDrop(w: World, item: LootId, n: number, x: number, y: number, owne
   w.drops.push(d);
   return d;
 }
-// Monstro derrubado: sorteia a tabela dele; o loot fica reservado a quem deu o último golpe.
-export function dropLoot(w: World, e: Enemy, killer: Player | undefined) {
-  const r = w.rules, owner = killer?.id ?? null;
+// Sorteia uma lista de drops e espalha em volta de um ponto, reservada a `owner`.
+export function spawnLoot(w: World, list: DropRule[], x: number, y: number, owner: string | null, dropRate = w.rules.rates.drop) {
+  const r = w.rules;
   let k = 0;
-  for (const d of r.enemies[e.type].drops) {
-    if (w.rng.next() >= Math.min(1, d.chance * r.rates.drop)) continue;
+  for (const d of list) {
+    if (w.rng.next() >= Math.min(1, d.chance * dropRate)) continue;
     let n = d.min + w.rng.int(d.max - d.min + 1);
     if (d.item === 'gold') n = Math.max(1, Math.round(n * r.rates.gold));
     const a = k++ * 2.4;   // espalha um pouco em volta
-    spawnDrop(w, d.item, n, e.x + Math.cos(a) * (k > 1 ? 7 : 0), e.y + Math.sin(a) * (k > 1 ? 5 : 0), owner);
+    spawnDrop(w, d.item, n, x + Math.cos(a) * (k > 1 ? 7 : 0), y + Math.sin(a) * (k > 1 ? 5 : 0), owner);
   }
+}
+// Monstro derrubado: sorteia a tabela dele; o loot fica reservado a quem deu o último golpe.
+export function dropLoot(w: World, e: Enemy, killer: Player | undefined) {
+  spawnLoot(w, w.rules.enemies[e.type].drops, e.x, e.y, killer?.id ?? null);
 }
 const lootName = (item: LootId, n: number) => item === 'gold' ? `${n} de ouro` : `${n > 1 ? n + ' ' : ''}${ITEMS[item].name}`;
 
@@ -71,6 +77,11 @@ export function useItem(w: World, p: Player, slot: number): ItemResult {
   if (!s) return { ok: false, reason: 'Esse espaço está vazio.' };
   if (p.state === 'dead') return { ok: false, reason: 'Você está caído.' };
   const def = ITEMS[s.id];
+  if (s.id === 'bomb') {
+    if (p.carry || p.state === 'fish') return { ok: false, reason: 'Mãos ocupadas.' };
+    if (w.tick - p.useAt < USE_COOLDOWN) return { ok: false, reason: 'Calma, um de cada vez.' };
+    p.useAt = w.tick; useBomb(w, p, slot); return { ok: true };
+  }
   if (!def.heal && !def.mana) return { ok: false, reason: `${def.name} não tem uso por enquanto.` };
   if (w.tick - p.useAt < USE_COOLDOWN) return { ok: false, reason: 'Calma, um de cada vez.' };
   if ((!def.heal || p.hp >= p.maxHp) && (!def.mana || p.mp >= p.maxMp)) return { ok: false, reason: def.heal ? 'Sua vida já está cheia.' : 'Sua mana já está cheia.' };

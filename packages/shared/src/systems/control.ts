@@ -7,6 +7,8 @@ import { interact, throwObj } from './carry';
 import { dashHits, pokeTip, swordHits } from './combat';
 import { burst, sfx } from './fx';
 import { fireArrow } from './projectiles';
+import { updateFishing } from './fishing';
+import { struggle, throwPlayer } from './throwing';
 
 export function faceAim(p: Player) { p.aim = p.input.aim ?? FACE[p.dir]; p.dir = angDir(p.aim); }
 function startSwing(w: World, p: Player) { faceAim(p); p.state = 'swing'; p.t = 0; p.hit.clear(); sfx(w, 'swing', p, p.id); }
@@ -68,12 +70,15 @@ function updateHop(w: World, p: Player) {
 
 export function updatePlayer(w: World, p: Player) {
   const inp = p.input;
+  p.steps++;
   if (p.inv > 0) p.inv--;
   const ix = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), iy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
   const tap = (b: Button) => (inp.tap & BUTTON[b]) !== 0;
   let speed = 1.35, turn = true;
   switch (p.state) {
-    case 'dead': return;
+    case 'dead': case 'flying': return;   // voando: quem manda é o arremesso (ver throwing)
+    case 'held': struggle(w, p); return;
+    case 'fish': updateFishing(w, p, tap('b'), !!(ix || iy)); return;
     case 'hurt': p.t--; move(w.map, p, p.kx, p.ky); p.kx *= 0.86; p.ky *= 0.86; if (p.t <= 0) p.state = p.carry ? 'carry' : 'walk'; return;
     case 'lift': if (++p.t >= 12) p.state = 'carry'; return;
     case 'throw': if (--p.t <= 0) p.state = 'walk'; return;
@@ -99,7 +104,7 @@ export function updatePlayer(w: World, p: Player) {
       if (inp.aim !== null) faceAim(p);
       pokeTip(w, p); speed = 0.75; turn = false; break;
     case 'carry':
-      if (tap('a') || tap('b')) { throwObj(w, p); return; }
+      if (tap('a') || tap('b')) { if (p.carry === 'player') throwPlayer(w, p); else throwObj(w, p); return; }
       speed = 1.1; break;
     default:
       if (tap('a')) { startSwing(w, p); return; }

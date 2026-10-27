@@ -2,8 +2,9 @@ import { DEFAULT_LOOK, cleanLook, cleanName, type ProfileRequest } from '@vale/s
 
 // Preferências deste navegador: o seu personagem e as opções de exibição.
 export type NameMode = 'all' | 'others' | 'none';
-export interface Settings { names: NameMode; bubbles: boolean; sound: boolean; paths: boolean }
-const DEFAULTS: Settings = { names: 'all', bubbles: true, sound: true, paths: false };
+export type PadSize = 's' | 'm' | 'l';
+export interface Settings { names: NameMode; bubbles: boolean; sound: boolean; paths: boolean; padSize: PadSize; vibrate: boolean; aimAssist: boolean }
+const DEFAULTS: Settings = { names: 'all', bubbles: true, sound: true, paths: false, padSize: 'm', vibrate: true, aimAssist: true };
 
 function read<T>(key: string): Partial<T> | null {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; }
@@ -27,7 +28,10 @@ export function loadSettings(): Settings {
     names: s.names === 'others' || s.names === 'none' ? s.names : DEFAULTS.names,
     bubbles: typeof s.bubbles === 'boolean' ? s.bubbles : DEFAULTS.bubbles,
     sound: typeof s.sound === 'boolean' ? s.sound : DEFAULTS.sound,
-    paths: typeof s.paths === 'boolean' ? s.paths : DEFAULTS.paths
+    paths: typeof s.paths === 'boolean' ? s.paths : DEFAULTS.paths,
+    padSize: s.padSize === 's' || s.padSize === 'l' ? s.padSize : DEFAULTS.padSize,
+    vibrate: typeof s.vibrate === 'boolean' ? s.vibrate : DEFAULTS.vibrate,
+    aimAssist: typeof s.aimAssist === 'boolean' ? s.aimAssist : DEFAULTS.aimAssist
   };
 }
 export const saveSettings = (s: Settings) => write('vale.opcoes', s);

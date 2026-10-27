@@ -1,12 +1,13 @@
-import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, angDir, distAt, nextLower, swordPose, type EnemyView, type Look, type PlayerView, type SwordPose, type WorldMap } from '@vale/shared';
+import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, bobberOf, hash, sunlight, angDir, distAt, nextLower, swordPose, type EnemyView, type Look, type PlayerView, type SwordPose, type WorldMap } from '@vale/shared';
 import type { Camera } from '../camera';
 import type { Scene } from '../session/types';
 import type { Particles } from './particles';
-import { BANG, ITEM_ICON, OBJ, QUES, SHADOW, beetleSprite, heroSprite, slimeSprite } from './sprites';
+import { BANG, CHEST, ITEM_ICON, OBJ, bombFrame, QUES, SHADOW, batSprite, chickenSprite, kingSprite, beetleSprite, heroSprite, mk, slimeSprite } from './sprites';
 import { drawTiles } from './tiles';
 
 type Ctx = CanvasRenderingContext2D;
-export interface View { me: PlayerView | undefined; cam: Camera; particles: Particles; showPaths: boolean; reticle: { x: number; y: number } | null; shake: number; tick: number }
+// talking: "x,y" do NPC que está conversando com você (ele se vira para você).
+export interface View { lock?: { x: number; y: number } | null; talking?: string | null; me: PlayerView | undefined; cam: Camera; particles: Particles; showPaths: boolean; reticle: { x: number; y: number } | null; shake: number; tick: number }
 
 function drawShadow(ctx: Ctx, x: number, y: number) { ctx.drawImage(SHADOW, Math.round(x - 7), Math.round(y - 3)); }
 function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
@@ -73,13 +74,29 @@ function drawLifeBar(ctx: Ctx, p: PlayerView) {
   ctx.fillStyle = '#4a2030'; ctx.fillRect(x, y, 14, 2);
   ctx.fillStyle = p.hp / p.maxHp > 0.3 ? '#e2574c' : '#ff9f43'; ctx.fillRect(x + 1, y, w, 2);
 }
+// Vara de pesca: linha da mão até a boia, que balança; na mordida, a boia afunda e aparece um "!".
+function drawRod(ctx: Ctx, p: PlayerView, tick: number) {
+  const b = bobberOf(p), bite = p.fish?.phase === 'bite', dip = bite ? ((tick >> 2) & 1) * 2 : Math.round(Math.sin(tick / 12));
+  const hx = Math.round(p.x + (p.dir === 3 ? 6 : p.dir === 2 ? -6 : 3)), hy = Math.round(p.y - 9);
+  const tipX = hx + (b.x - p.x) * 0.45, tipY = hy - 8;
+  ctx.fillStyle = '#7a4a2a';
+  for (let i = 0; i <= 6; i++) ctx.fillRect(Math.round(hx + (tipX - hx) * i / 6), Math.round(hy + (tipY - hy) * i / 6), 1, 1);
+  ctx.fillStyle = 'rgba(240,240,255,0.7)';
+  for (let i = 1; i < 10; i++) { const k = i / 10; ctx.fillRect(Math.round(tipX + (b.x - tipX) * k), Math.round(tipY + (b.y + dip - tipY) * k + Math.sin(k * Math.PI) * 3), 1, 1); }
+  ctx.fillStyle = '#1b1226'; ctx.fillRect(Math.round(b.x) - 2, Math.round(b.y) + dip - 2, 4, 4);
+  ctx.fillStyle = '#e2574c'; ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y) + dip - 1, 2, 1);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(b.x) - 1, Math.round(b.y) + dip, 2, 1);
+  if (bite) ctx.drawImage(BANG, Math.round(p.x - 2), Math.round(p.y - 30 - ((tick >> 3) & 1)));
+}
 function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: number, mine: boolean) {
   if (p.state === 'dead') { drawFallen(ctx, p, look); return; }
-  const blink = p.inv > 0 && ((p.inv >> 2) & 1);
+  if (p.state === 'fish') drawRod(ctx, p, tick);
+  const blink = p.inv > 0 && ((p.inv >> 2) & 1) && p.state !== 'flying';
   const s = swordPose(p);
-  const dir = p.state === 'spin' && s ? angDir(s.ang) : p.dir;
+  const spinning = p.state === 'held' || p.state === 'flying';   // no colo se debate; voando, gira
+  const dir = spinning ? ([0, 3, 1, 2] as const)[(tick >> (p.state === 'flying' ? 2 : 3)) & 3] : p.state === 'spin' && s ? angDir(s.ang) : p.dir;
   const bow = p.state === 'bow';
-  const pose = (p.state === 'lift' || p.state === 'carry') ? 'lift' : ((s || bow) ? 'atk' : 'n');
+  const pose = (p.state === 'lift' || p.state === 'carry' || spinning) ? 'lift' : ((s || bow) ? 'atk' : 'n');
   const step = p.state === 'hurt' ? 0 : p.step;
   const px = Math.round(p.x), py = Math.round(p.y - p.z);
   const behind = s && Math.sin(s.ang) < -0.35;
@@ -95,19 +112,34 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
   }
   if (s && !behind) drawSword(ctx, p, s, tick);
   if (bow && Math.sin(p.aim) >= -0.35) drawBow(ctx, p);
-  if (p.carry) {
+  if (p.carry && !spinning) {
     let cx = p.x, cy = p.y - p.z - 20 + (p.step ? ((p.walkT >> 3) & 1) : 0);
     if (p.state === 'lift' && p.liftFrom) {
       const t = Math.min(1, p.t / 12);
       cx = p.liftFrom.x + (p.x - p.liftFrom.x) * t;
       cy = p.liftFrom.y + (p.y - 20 - p.liftFrom.y) * t - Math.sin(t * Math.PI) * 6;
     }
-    ctx.drawImage(OBJ[p.carry], Math.round(cx - 8), Math.round(cy - 8));
+    if (p.carry === 'bomb') ctx.drawImage(bombFrame(p.carryFuse ?? 150, tick), Math.round(cx - 6), Math.round(cy - 6));
+    else if (p.carry !== 'player') ctx.drawImage(OBJ[p.carry], Math.round(cx - 8), Math.round(cy - 8));   // pessoa no colo se desenha sozinha
   }
   if (!mine && p.hp < p.maxHp && !p.carry) drawLifeBar(ctx, p);
 }
 function drawEnemy(ctx: Ctx, e: EnemyView, tick: number) {
   const fl = e.hurtT > 0 && ((e.hurtT >> 1) & 1) === 1;
+  if (e.type === 'chicken') {   // furiosa (do bando) voa e bate as asas; comum cisca
+    const angry = e.mode === 'chase', dir = e.dir === 2 ? 2 : 3;
+    ctx.drawImage(chickenSprite(dir, (e.anim >> (angry ? 2 : 4)) & 1, angry), Math.round(e.x - 7), Math.round(e.y - 11 - e.z));
+    return;
+  }
+  if (e.type === 'king') {
+    const sq = e.mode === 'hop' ? (e.z > 4 ? 2 : 1) : e.timer < 10 ? 1 : ((e.anim >> 4) & 1);
+    ctx.drawImage(kingSprite(sq, e.hp <= e.maxHp / 2, fl), Math.round(e.x - 15), Math.round(e.y - 25 - e.z));
+    return;
+  }
+  if (e.type === 'bat') {
+    ctx.drawImage(batSprite(((e.anim >> 2) & 1) === 1, fl), Math.round(e.x - 8), Math.round(e.y - 9 - e.z));
+    return;
+  }
   if (e.type === 'slime') {
     let sq = 0;
     if (e.mode === 'hop') sq = e.z > 2 ? 2 : 0;
@@ -150,6 +182,15 @@ function drawPaths(ctx: Ctx, w: Scene, v: View) {
     } else { ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(e.x, e.y, 96, 0, Math.PI * 2); ctx.stroke(); }
   }
 }
+// Marca da ajuda na mira: quatro cantinhos em volta do alvo, pulsando.
+function drawLock(ctx: Ctx, t: { x: number; y: number }, tick: number) {
+  const r = 9 + ((tick >> 3) & 1), x = Math.round(t.x), y = Math.round(t.y);
+  for (const [sx, sy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+    const cx = x + sx * r, cy = y + sy * r;
+    ctx.fillStyle = '#1b1226'; ctx.fillRect(cx - (sx > 0 ? 3 : 0) - 1, cy - 1, 5, 3); ctx.fillRect(cx - 1, cy - (sy > 0 ? 3 : 0) - 1, 3, 5);
+    ctx.fillStyle = '#ffe66b'; ctx.fillRect(cx - (sx > 0 ? 2 : 0), cy, 3, 1); ctx.fillRect(cx, cy - (sy > 0 ? 2 : 0), 1, 3);
+  }
+}
 function drawReticle(ctx: Ctx, r: { x: number; y: number }) {
   const x = Math.round(r.x), y = Math.round(r.y);
   const ticks = [[-5, 0, 3, 1], [3, 0, 3, 1], [0, -5, 1, 3], [0, 3, 1, 3]];
@@ -173,10 +214,27 @@ export function render(ctx: Ctx, w: Scene, v: View) {
   const near = (x: number, y: number) => x > cx - 32 && x < cx + VIEW_W + 32 && y > cy - 32 && y < cy + VIEW_H + 48;
   const list: { y: number; d: () => void }[] = [];
   for (const p of w.players) if (near(p.x, p.y)) {
-    if (p.state !== 'dead') drawShadow(ctx, p.x, p.y + 1);
+    if (p.state !== 'dead' && p.state !== 'held') drawShadow(ctx, p.x, p.y + 1);
     list.push({ y: p.y, d: () => drawHero(ctx, w.map, p, w.profiles.get(p.id)?.look ?? DEFAULT_LOOK, v.tick, p.id === w.meId) });
   }
-  for (const e of w.enemies) if (near(e.x, e.y)) { drawShadow(ctx, e.x, e.y + 2); list.push({ y: e.y, d: () => drawEnemy(ctx, e, v.tick) }); }
+  for (const e of w.enemies) if (near(e.x, e.y)) {
+    const flying = e.type === 'bat' || (e.type === 'chicken' && e.mode === 'chase');
+    if (e.type === 'king') { const s = Math.max(0.5, 1 - e.z / 50); ctx.drawImage(SHADOW, Math.round(e.x - 13 * s), Math.round(e.y - 2), Math.round(26 * s), 6); }
+    else if (flying) ctx.drawImage(SHADOW, Math.round(e.x - 4), Math.round(e.y - 1), 8, 3); else drawShadow(ctx, e.x, e.y + 2);
+    list.push({ y: flying ? e.y + 20 : e.y, d: () => drawEnemy(ctx, e, v.tick) });   // morcego voa: desenhado por cima
+  }
+  for (const n of w.npcs) {
+    const x = n.x * TS + 8, y = n.y * TS + 12;
+    if (!near(x, y)) continue;
+    let dir = n.dir;
+    if (v.talking === `${n.x},${n.y}` && v.me) { const dx = v.me.x - x, dy = v.me.y - y; dir = Math.abs(dx) > Math.abs(dy) ? (dx < 0 ? 2 : 3) : (dy < 0 ? 1 : 0); }
+    drawShadow(ctx, x, y + 1);
+    list.push({ y, d: () => ctx.drawImage(heroSprite(dir, 0, 'n', n.look.cloak, n.look.hair), x - 9, y - 13) });
+  }
+  for (const c of w.chests) {
+    const x = c.x * TS, y = c.y * TS;
+    if (near(x + 8, y + 8)) list.push({ y: y + 12, d: () => ctx.drawImage(c.open ? CHEST.open : CHEST.closed, x, y + 2) });
+  }
   // Drops: flutuam de leve; os reservados a outro jogador ficam meio apagados; piscam antes de sumir.
   for (const d of w.drops) {
     if (!near(d.x, d.y) || (d.fading && (v.tick >> 3) & 1)) continue;
@@ -188,13 +246,55 @@ export function render(ctx: Ctx, w: Scene, v: View) {
       ctx.globalAlpha = 1;
     } });
   }
-  for (const o of w.thrown) if (near(o.x, o.y)) { drawShadow(ctx, o.x, o.y); list.push({ y: o.y, d: () => ctx.drawImage(OBJ[o.type], Math.round(o.x - 8), Math.round(o.y - 8 - o.z)) }); }
+  for (const o of w.thrown) if (near(o.x, o.y)) { drawShadow(ctx, o.x, o.y); list.push({ y: o.y, d: () => o.type === 'bomb' ? ctx.drawImage(bombFrame(100, v.tick), Math.round(o.x - 6), Math.round(o.y - 9 - o.z)) : ctx.drawImage(OBJ[o.type], Math.round(o.x - 8), Math.round(o.y - 8 - o.z)) }); }
+  for (const b of w.bombs) if (near(b.x, b.y)) { ctx.drawImage(SHADOW, Math.round(b.x - 5), Math.round(b.y - 1), 10, 4); list.push({ y: b.y, d: () => ctx.drawImage(bombFrame(b.fuse, v.tick), Math.round(b.x - 6), Math.round(b.y - 11)) }); }
   for (const a of w.arrows) {
     if (!near(a.x, a.y) || (a.stuck && a.stuck < 10 && (a.stuck & 2))) continue;
     list.push({ y: a.y, d: () => drawArrow(ctx, a.x - Math.cos(a.ang) * 5, a.y - 6 - Math.sin(a.ang) * 5, a.ang) });
   }
   list.sort((a, b) => a.y - b.y).forEach(i => i.d());
   v.particles.draw(ctx);
+  if (v.lock) drawLock(ctx, v.lock, v.tick);
+  torchFlames(ctx, w, cx, cy, v.tick);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
+  drawLight(ctx, w, cx - sx, cy - sy, v.tick);
   if (v.reticle) drawReticle(ctx, v.reticle);
+}
+
+/* ---------- Tochas e luz ---------- */
+function visibleTiles(w: Scene, cx: number, cy: number, f: (tx: number, ty: number, c: string) => void) {
+  for (let ty = Math.max(0, Math.floor(cy / TS) - 1); ty <= Math.min(w.map.rows - 1, Math.floor((cy + VIEW_H) / TS) + 1); ty++)
+    for (let tx = Math.max(0, Math.floor(cx / TS) - 1); tx <= Math.min(w.map.cols - 1, Math.floor((cx + VIEW_W) / TS) + 1); tx++) f(tx, ty, w.map.tiles[ty][tx]);
+}
+// Chama tremulando por cima do desenho fixo da tocha.
+function torchFlames(ctx: Ctx, w: Scene, cx: number, cy: number, tick: number) {
+  visibleTiles(w, cx, cy, (tx, ty, c) => {
+    if (c !== 't') return;
+    const k = hash(tx, ty, tick >> 3), x = tx * TS, y = ty * TS;
+    ctx.fillStyle = k < 0.5 ? '#f5c542' : '#ee8b3d'; ctx.fillRect(x + 7 + (k < 0.3 ? -1 : 0), y + 1 - (k > 0.7 ? 1 : 0), 2, 2);
+    ctx.fillStyle = '#fff3b0'; ctx.fillRect(x + 7 + (k > 0.5 ? 1 : 0), y + 2, 1, 1);
+  });
+}
+// Escuridão da noite (ou da caverna) com buracos de luz em degraus, no estilo pixel art.
+const lightCv = mk(VIEW_W, VIEW_H), lctx = lightCv.getContext('2d')!;
+function drawLight(ctx: Ctx, w: Scene, cx: number, cy: number, tick: number) {
+  const sun = w.dark ? 0 : sunlight(w.day), h = w.day * 24;
+  const dusk = !w.dark && ((h >= 16.5 && h < 19.5) || (h >= 4.5 && h < 7)) ? 1 - Math.abs(sun - 0.5) * 2 : 0;
+  if (dusk > 0) { ctx.fillStyle = `rgba(255,130,60,${(0.16 * dusk).toFixed(3)})`; ctx.fillRect(0, 0, VIEW_W, VIEW_H); }   // entardecer e amanhecer alaranjados
+  const dark = w.dark ? 0.8 : (1 - sun) * 0.74;
+  if (dark < 0.02) return;
+  lctx.globalCompositeOperation = 'source-over';
+  lctx.clearRect(0, 0, VIEW_W, VIEW_H);
+  lctx.fillStyle = `rgba(6,8,26,${dark.toFixed(3)})`; lctx.fillRect(0, 0, VIEW_W, VIEW_H);
+  lctx.globalCompositeOperation = 'destination-out';
+  const hole = (x: number, y: number, r: number) => {
+    for (const [f, a] of [[1, 0.35], [0.72, 0.35], [0.45, 0.4]] as const) { lctx.fillStyle = `rgba(0,0,0,${a})`; lctx.beginPath(); lctx.arc(Math.round(x - cx), Math.round(y - cy), r * f, 0, Math.PI * 2); lctx.fill(); }
+  };
+  for (const p of w.players) if (p.state !== 'dead') hole(p.x, p.y - 6, p.id === w.meId ? 42 : 32);   // cada um carrega uma luz pequena
+  visibleTiles(w, cx, cy, (tx, ty, c) => {
+    if (c === 't') hole(tx * TS + 8, ty * TS + 3, 62 + Math.round(hash(tx, ty, tick >> 4) * 4));
+    else if (c === 'u') hole(tx * TS + 8, ty * TS + 6, 26);
+    else if (c === 'h') hole(tx * TS + 8, ty * TS + 10, 18);
+  });
+  ctx.drawImage(lightCv, 0, 0);
 }

@@ -27,14 +27,16 @@ export class NetSession implements Session {
   private smooth = { x: 0, y: 0 };
   private profiles = new Map<string, Profile>();
   private pvpInfo: PvpInfo | null = null;
-  private bag: Slot[] = []; private xpNext = 50;
+  private bag: Slot[] = []; private xpNext = 50; private day = 0.33; private invasion: [number, number] | null = null;
+  private openChests = new Set<string>();
   onWelcome?: (motd: string) => void;
   onChat?: (m: ChatMsg) => void;
   onLeave?: (code: number) => void;
+  onMapChange?: () => void;
   leave() { return this.room?.leave(); }
 
   constructor(data: MapData) {
-    this.pred = new World({ ...data, enemies: [] });
+    this.pred = new World({ ...data, enemies: [] }); this.pred.predicting = true;
     this.auth = this.pred.map.tiles.map(r => r.slice());
   }
   get map() { return this.pred.map; }
@@ -55,10 +57,20 @@ export class NetSession implements Session {
 
   private welcome(m: WelcomeMsg) {
     this.meId = m.id; this.sendEvery = m.sendEvery;
+    // o mapa do servidor manda: se for outro (ou outra versão), recria o mundo da previsão com ele
+    if (JSON.stringify(m.map) !== JSON.stringify({ ...this.pred.map.data, enemies: [] })) {
+      const changed = !!this.meId && this.pred.players.size > 0;
+      this.pred = new World({ ...m.map, enemies: [] }); this.pred.predicting = true;
+      this.auth = this.pred.map.tiles.map(r => r.slice());
+      if (changed) this.onMapChange?.();
+    }
     m.tiles.forEach((row, ty) => [...row].forEach((c, tx) => { this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); }));
     this.overlay.clear(); this.pending = []; this.queued = []; this.interp.clear(); this.offset = NaN;
-    if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, ''); }
+    if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, '', m.at.x, m.at.y); }
+    else { const p = this.player; p.x = m.at.x; p.y = m.at.y; }
+    this.smooth = { x: 0, y: 0 };
     this.profiles = new Map(m.profiles.map(p => [p.id, p]));
+    this.openChests = new Set();   // o servidor manda a lista do mapa novo no próximo snapshot
     this.status = 'online';
     this.onWelcome?.(m.motd);
   }
@@ -68,8 +80,9 @@ export class NetSession implements Session {
     const est = s.t - this.local;
     if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
     this.interp.push(toFrame(s));
-    this.pvpInfo = s.pvp; this.xpNext = s.xpNext;
+    this.pvpInfo = s.pvp; this.xpNext = s.xpNext; this.day = s.day; this.invasion = s.iv ?? null;
     if (s.bag) this.bag = s.bag;
+    if (s.ch) this.openChests = new Set(s.ch);
     if (s.ev.length) this.queued.push({ t: s.t, ev: s.ev });
     this.reconcile(s);
   }
@@ -89,7 +102,7 @@ export class NetSession implements Session {
     this.pred.setInput(this.meId, input);
     const evs = this.pred.step({ life: false });
     for (const ev of evs) if (ev.t === 'tile') this.overlay.set(ev.tx + ',' + ev.ty, this.local + OVERLAY_TICKS);
-    this.pred.thrown = []; this.pred.arrows = []; this.pred.regrow.clear();   // objetos voando e regeneração vêm do servidor
+    this.pred.thrown = []; this.pred.arrows = []; this.pred.drops = []; this.pred.bombs = []; this.pred.regrow.clear();   // objetos voando, drops e regeneração vêm do servidor
     return evs;
   }
   private applyTile(tx: number, ty: number, c: string) {
@@ -143,6 +156,8 @@ export class NetSession implements Session {
     const v = this.interp.at(this.renderTick), me = this.me();
     const players = me ? [me, ...v.players] : v.players;
     const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;
-    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, profiles: this.profiles, flow };
+    const chests = (this.map.data.chests ?? []).map(c => ({ x: c.x, y: c.y, open: this.openChests.has(`${c.x},${c.y}`) }));
+    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, bombs: v.bombs, chests, npcs: this.map.data.npcs ?? [],
+      day: this.day, invasion: this.invasion, dark: !!this.map.data.dark, profiles: this.profiles, flow };
   }
 }

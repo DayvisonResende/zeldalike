@@ -14,9 +14,13 @@ import { updatePlayer } from './systems/control';
 import { updateLife } from './systems/life';
 import { inSafeZone, updatePvp } from './systems/pvp';
 import { updateLoot, type Drop } from './systems/loot';
+import { updatePortals } from './systems/portals';
+import { updateBombs, type Bomb } from './systems/bombs';
+import { updateCarried } from './systems/throwing';
 import { updateArrows, updateThrown, type Arrow, type Thrown } from './systems/projectiles';
 import { updateRegrowth, type Regrow } from './systems/regrowth';
-import { createEnemy, updateSpawns, type Spawn } from './systems/spawner';
+import { createEnemy, inPeriod, updateSpawns, type Spawn } from './systems/spawner';
+import { updateInvasion, type Invasion } from './systems/invasion';
 
 // O mundo inteiro: mapa, jogadores, inimigos e objetos voando. Roda igual no servidor e no navegador.
 export class World {
@@ -30,17 +34,24 @@ export class World {
   thrown: Thrown[] = [];
   arrows: Arrow[] = [];
   drops: Drop[] = [];
+  bombs: Bomb[] = [];
   spawns: Spawn[];
   regrow = new Map<string, Regrow>();
   flow: DistMap | null = null;
   flowKey = '';
   private events: GameEvent[] = [];
+  id = 'local';                  // id do mapa (o servidor põe o de world.maps); entra na chave dos baús
+  now: () => number = Date.now;  // relógio de parede, para o que dura entre sessões (baús)
+  predicting = false;            // mundo da previsão no cliente: só a própria jogadora, o resto vem do servidor
+  invasion: Invasion | null = null;
+  nextInvasion = 0; invasionEvery = -1;   // tick da próxima invasão; `every` usado para agendar (reagenda se o config mudar)
+  home = true;   // é o mapa principal? Quem cai fora dele renasce no principal (o servidor cuida da transferência)
 
   constructor(data: MapData, rules: Rules = DEFAULT_RULES, seed = 1) {
     this.map = new WorldMap(data); this.rules = rules; this.rng = new Rng(seed);
-    this.spawns = data.enemies.map(s => ({ type: s.type, tx: s.x, ty: s.y, alive: null, at: 0 }));
+    this.spawns = data.enemies.map(s => ({ type: s.type, tx: s.x, ty: s.y, alive: null, at: 0, when: s.when }));
     this.spawns.forEach((s, i) => {
-      if (inSafeZone(this, s.tx * 16 + 8, s.ty * 16 + 8)) return;   // zona segura não tem monstros
+      if (inSafeZone(this, s.tx * 16 + 8, s.ty * 16 + 8) || !inPeriod(this, s)) return;   // zona segura não tem monstros; os de outro período esperam
       const e = createEnemy(this, s.type, s.tx, s.ty, i); this.enemies.push(e); s.alive = e.id;
     });
   }
@@ -75,9 +86,12 @@ export class World {
     for (const e of this.enemies) updateEnemy(this, e);
     separate(this);
     this.enemies = this.enemies.filter(e => !e.dead);
-    updateThrown(this); updateArrows(this); contact(this);
+    updateCarried(this);
+    updateThrown(this); updateArrows(this); updateBombs(this); contact(this);
+    updatePortals(this);
     if (opts.life !== false) { updateLife(this); updatePvp(this); updateLoot(this); }
     updateRegrowth(this); updateSpawns(this);
+    if (opts.life !== false) updateInvasion(this);
     for (const p of this.players.values()) {
       const r = this.map.regionAt(p.x, p.y);
       if (r && r.id !== p.region) { p.region = r.id; this.emit({ t: 'region', to: p.id, name: r.name }); }

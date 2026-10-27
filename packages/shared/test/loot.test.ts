@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_RULES, TICK_RATE, World, addItem, dropItem, emptyInventory, gainXp, parseInventory, useItem, xpToNext, type MapData, type Rules } from '../src';
-import vale from '../../../content/maps/vale.json';
+import vale from './fixtures';
 
 const calm = (): MapData => ({ ...(vale as MapData), enemies: [{ type: 'slime', x: 20, y: 7 }] });
 // geleca que sempre solta 2 de ouro e 1 coração

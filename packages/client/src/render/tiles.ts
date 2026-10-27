@@ -1,4 +1,4 @@
-import { GRASSY, TS, hash, type WorldMap } from '@vale/shared';
+import { GRASSY, TS, hash, nearCave, type WorldMap } from '@vale/shared';
 import { OBJ, mk } from './sprites';
 
 /* ---------- Tiles: pintados uma vez por variação e guardados em cache ---------- */
@@ -87,6 +87,53 @@ function paintCliff(x: Ctx, v: number, m: number) {
   if (m & 4) { x.fillStyle = '#5a3721'; x.fillRect(0, 14, 16, 2); }
 }
 
+/* ---------- Caverna ---------- */
+function paintCaveFloor(x: Ctx, v: number) {
+  x.fillStyle = '#3b3446'; x.fillRect(0, 0, 16, 16);
+  for (let k = 0; k < 7; k++) {
+    x.fillStyle = k % 3 ? '#2f2939' : '#4a4258';
+    x.fillRect((hash(v, k, 21) * 15) | 0, (hash(v, k, 22) * 15) | 0, k % 2 ? 2 : 1, 1);
+  }
+}
+// Parede: rocha escura em cima; onde a parede termina (embaixo não é parede) aparece a face, mais clara.
+function paintCaveWall(x: Ctx, v: number, face: boolean) {
+  x.fillStyle = '#211c2b'; x.fillRect(0, 0, 16, 16);
+  for (let k = 0; k < 5; k++) { x.fillStyle = '#2d2639'; x.fillRect((hash(v, k, 23) * 13) | 0, (hash(v, k, 24) * 10) | 0, 3, 2); }
+  if (face) {
+    x.fillStyle = '#4b4160'; x.fillRect(0, 9, 16, 7);
+    x.fillStyle = '#5d5176'; x.fillRect(0, 9, 16, 1);
+    for (let k = 0; k < 4; k++) { x.fillStyle = '#3a3150'; x.fillRect(((hash(v, k, 25) * 14) | 0), 11 + (k & 1) * 2, 1, 3); }
+    x.fillStyle = '#16121e'; x.fillRect(0, 15, 16, 1);
+  }
+}
+// Entrada de caverna: arco escuro aberto numa rocha.
+function paintCaveMouth(x: Ctx) {
+  x.fillStyle = '#9b6641'; x.fillRect(0, 0, 16, 16);
+  x.fillStyle = '#744629'; x.fillRect(0, 0, 16, 2); x.fillRect(0, 0, 2, 16); x.fillRect(14, 0, 2, 16);
+  x.fillStyle = '#1b1226';
+  x.fillRect(3, 5, 10, 11); x.fillRect(4, 3, 8, 2); x.fillRect(6, 2, 4, 1);
+  x.fillStyle = '#0a0710'; x.fillRect(5, 7, 6, 9);
+  x.fillStyle = '#ba824f'; x.fillRect(3, 4, 1, 1); x.fillRect(12, 4, 1, 1);
+}
+// Escada de pedra subindo (saída da caverna).
+function paintStairs(x: Ctx) {
+  x.fillStyle = '#3b3446'; x.fillRect(0, 0, 16, 16);
+  for (let i = 0; i < 4; i++) {
+    const y = 2 + i * 3, inset = i;
+    x.fillStyle = '#8f897f'; x.fillRect(1 + inset, y, 14 - inset * 2, 3);
+    x.fillStyle = '#c6bfb4'; x.fillRect(1 + inset, y, 14 - inset * 2, 1);
+    x.fillStyle = '#5e5a54'; x.fillRect(1 + inset, y + 2, 14 - inset * 2, 1);
+  }
+  x.fillStyle = '#f2e6b8'; x.fillRect(7, 1, 2, 1);   // luz lá de cima
+}
+
+// Rachaduras: o mesmo paredão/parede, com fendas escuras (a bomba abre).
+function paintCracks(x: Ctx) {
+  x.fillStyle = '#2a1a14';
+  for (const [a, b] of [[7, 2], [8, 3], [7, 4], [6, 5], [7, 6], [8, 7], [9, 8], [8, 9], [7, 10], [5, 7], [4, 8], [10, 5], [11, 4]]) x.fillRect(a, b, 1, 1);
+  x.fillStyle = '#c8956a'; x.fillRect(9, 3, 1, 1); x.fillRect(5, 6, 1, 1);
+}
+
 // Vizinhos fora do mapa contam como iguais ao tile, para a borda do mundo não ganhar contorno.
 function nb(map: WorldMap, tx: number, ty: number, self: string) { return map.inBounds(tx, ty) ? map.tiles[ty][tx] : self; }
 function maskOf(map: WorldMap, tx: number, ty: number, test: (c: string) => boolean) {
@@ -108,7 +155,16 @@ export function tileFor(map: WorldMap, tx: number, ty: number, wf: number) {
     case 'k': { const m = maskOf(map, tx, ty, ch => ch !== 'k'); return tileImg('k' + m, x => paintBridge(x, m)); }
     case 'c': { const m = (nb(map, tx, ty - 1, 'c') !== 'c' ? 1 : 0) | (nb(map, tx, ty + 1, 'c') !== 'c' ? 4 : 0); return tileImg('c' + v + '_' + m, x => paintCliff(x, v, m)); }
     case 'o': return tileImg('o' + v, x => { paintStone(x, v, 0); x.drawImage(OBJ.o, 0, 0); });
-    default: return tileImg(c + v, x => { paintGrass(x, v, false); x.drawImage(OBJ[c], 0, 0); });
+    case 'q': return tileImg('q' + v, x => paintCaveFloor(x, v));
+    case 'W': { const face = nb(map, tx, ty + 1, 'W') !== 'W'; return tileImg('W' + v + (face ? 'f' : ''), x => paintCaveWall(x, v, face)); }
+    case 'h': return tileImg('h', paintCaveMouth);
+    case 'u': return tileImg('u', paintStairs);
+    case 'X': { const m = (nb(map, tx, ty - 1, 'c') !== 'c' ? 1 : 0) | (nb(map, tx, ty + 1, 'c') !== 'c' ? 4 : 0); return tileImg('X' + v + '_' + m, x => { paintCliff(x, v, m); paintCracks(x); }); }
+    case 'Y': { const face = nb(map, tx, ty + 1, 'W') !== 'W'; return tileImg('Y' + v + (face ? 'f' : ''), x => { paintCaveWall(x, v, face); paintCracks(x); }); }
+    default: {   // objetos (árvore, arbusto, pedra, placa) em cima do chão em volta: grama ou chão de caverna
+      const cave = nearCave((x, y) => nb(map, x, y, c), tx, ty);
+      return tileImg(c + v + (cave ? 'q' : ''), x => { if (cave) paintCaveFloor(x, v); else paintGrass(x, v, false); x.drawImage(OBJ[c], 0, 0); });
+    }
   }
 }
 // Só os tiles que aparecem na câmera.
