@@ -4,7 +4,7 @@ import type { MapData } from '@vale/shared';
 import { parseConfig, toRules } from '../src/config/load';
 import vale from '../../shared/test/fixtures';
 
-const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8');
+const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');   // no Windows (autocrlf) o arquivo chega com CRLF
 const map = vale as MapData;
 
 describe('config.yaml', () => {

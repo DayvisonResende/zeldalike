@@ -7,7 +7,7 @@ function tiny(enemies: MapData['enemies'] = []): MapData {
   return { name: 'teste', cols: 8, rows: 3, spawn: { x: 24, y: 24 }, regions: [{ id: 'a', name: 'Área', x: 0, y: 0, w: 8, h: 3 }],
     tiles: ['TTTTTTTT', 'T..b.r.T', 'TTTTTTTT'], enemies, signs: {} };
 }
-const rules = { ...DEFAULT_RULES, regrow: { bush: 2, tallGrass: 1, rock: 3, secret: 3 } };
+const rules = { ...DEFAULT_RULES, regrow: { ...DEFAULT_RULES.regrow, bush: 2, tallGrass: 1, rock: 3, secret: 3 } };
 function hold(w: World, id: string, patch: Partial<ReturnType<typeof emptyInput>>, n: number) {
   for (let i = 0; i < n; i++) { w.setInput(id, { ...emptyInput(), ...patch }); w.step(); patch = { ...patch, tap: 0 }; }
 }
