@@ -180,12 +180,12 @@ function handle(ev: GameEvent) {
   }
 }
 // Alvo da ajuda na mira (sem mouse, jogando pelo toque); recalculado a cada quadro para a marca na tela.
-// Só no celular: a mesma condição que mostra o controle de toque (tela de toque, sem mouse).
+// No celular (tela de toque, sem mouse) e no controle de videogame; teclado e mouse miram sozinhos.
 const PHONE = matchMedia('(hover:none) and (pointer:coarse)');
 let lock: { x: number; y: number } | null = null;
 function updateLock(scene: Scene) {
   const me = session.me();
-  lock = me && settings.aimAssist && PHONE.matches && input.usingTouch && !input.mouse.active && me.state !== 'dead' ? assistTarget(me, scene.enemies, scene.players, input.moving()) : null;
+  lock = me && settings.aimAssist && ((PHONE.matches && input.usingTouch) || input.usingPad) && !input.mouse.active && pads.aim === null && me.state !== 'dead' ? assistTarget(me, scene.enemies, scene.players, input.moving()) : null;
 }
 function aim() {
   const me = session.me();

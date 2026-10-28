@@ -96,7 +96,8 @@ O servidor confere ouro, espaço no inventário e se você está perto do lojist
 **Controle de videogame:** qualquer controle que o navegador reconheça (Bluetooth ou USB, no celular ou no PC).
 Analógico/direcional anda, botão de baixo é a espada, direita a ação, esquerda o arco, cima/RB o dash, analógico
 direito mira; LT coração, RT poção, LB bomba; Start menu, Select inventário. Menus, inventário e loja se navegam
-pelo direcional. Com controle conectado no celular, os botões de toque somem.
+pelo direcional. Com controle conectado no celular, os botões de toque somem. A ajuda na mira do celular
+vale também no controle (o analógico direito, quando usado, mira livre).
 
 **Celular:** em telas de toque aparece um controle (joystick flutuante, botões A/B/C/D, atalhos de coração, poção e
 bomba). Deitado, a tela do jogo ocupa a altura toda e o controle vai para as laterais. Tamanho dos botões e vibração

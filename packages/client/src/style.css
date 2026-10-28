@@ -240,14 +240,15 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .keys dt{color:var(--amber)}
 .keys dd{margin:0;color:#e4def0}
 @keyframes blink{50%{opacity:0}}
-.touch-only{display:none}
+.touch-only,.assist-opt{display:none}
+body.gamepad .assist-opt{display:flex}
 /* controle de videogame conectado: sem botões de toque, tela do jogo do maior tamanho possível */
 body.gamepad .pad{display:none!important}
 body.gamepad .stage{width:min(100vw,calc(100dvh * 256 / 224))}
 @media (hover:none) and (pointer:coarse){
   html,body{overscroll-behavior:none}   /* nada de puxar para recarregar */
   .stage{touch-action:none}             /* nem zoom de dois toques na tela do jogo */
-  .touch-only{display:flex}
+  .touch-only,.assist-opt{display:flex}
   .pad{display:flex}
   .stage{width:min(100vw,calc((100dvh - 200px) * 256 / 224))}
   .menu,.account,.bag{position:fixed;z-index:10}   /* no celular a tela do jogo é pequena: o menu usa a tela toda */

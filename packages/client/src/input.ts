@@ -19,6 +19,7 @@ export class Input {
   private codes = new Set<string>();
   private tap = 0;
   usingTouch = false;   // o último comando veio da tela de toque (liga a ajuda na mira)
+  usingPad = false;     // ...ou do controle de videogame (idem)
   readonly mouse = { x: 0, y: 0, active: false };   // em pixels da tela do jogo
 
   constructor(stage: HTMLElement, canvas: HTMLCanvasElement, private hooks: InputHooks) {
@@ -60,7 +61,7 @@ export class Input {
 
   private set(src: Source, k: Key, v: boolean) {
     const before = this.held(k);
-    if (v) { this.src[src].add(k); this.usingTouch = src === 'touch'; } else this.src[src].delete(k);
+    if (v) { this.src[src].add(k); this.usingTouch = src === 'touch'; this.usingPad = src === 'pad'; } else this.src[src].delete(k);
     if (!before && v && k in BUTTON) this.tap |= BUTTON[k as Button];
   }
   private held(k: Key) { return this.src.kb.has(k) || this.src.mouse.has(k) || this.src.touch.has(k) || this.src.pad.has(k); }
@@ -134,5 +135,5 @@ export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolea
   });
   const pad = document.getElementById('pad')!;
   pad.addEventListener('contextmenu', e => e.preventDefault());
-  pad.addEventListener('pointerdown', () => { input.usingTouch = true; }, true);   // qualquer toque no controle já liga a ajuda na mira
+  pad.addEventListener('pointerdown', () => { input.usingTouch = true; input.usingPad = false; }, true);   // qualquer toque no controle já liga a ajuda na mira
 }

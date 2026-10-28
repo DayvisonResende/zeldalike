@@ -30,7 +30,7 @@ export class Gamepads {
     this.id = gp.id;
     const now = gp.buttons.map(b => b.pressed || b.value > 0.5), was = this.prev; this.prev = now;
     const hit = (i: number) => now[i] && !was[i];
-    if (now.some((v, i) => v && !was[i])) this.input.usingTouch = false;   // usou o controle: a ajuda de toque desliga
+    if (now.some((v, i) => v && !was[i])) { this.input.usingTouch = false; this.input.usingPad = true; this.input.mouse.active = false; }   // usou o controle: a ajuda na mira segue com ele (e o mouse parado não rouba a mira)
 
     const panel = this.hooks.panel();
     if (panel) { this.release(); this.navigate(panel, hit); return; }
