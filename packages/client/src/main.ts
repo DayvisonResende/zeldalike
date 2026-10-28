@@ -145,7 +145,7 @@ const pads = new Gamepads(input, {
   panel: () => shop.open ? document.getElementById('shop') : bag.open ? document.getElementById('bag') : menu.open ? document.getElementById('menu') : null,
   closePanel: toggleMenu,
   connected: name => {
-    document.body.classList.toggle('gamepad', !!name);
+    if (!name) document.body.classList.remove('gamepad');   // o toque volta; ele some de novo quando um botão do controle for apertado
     chat.add({ ch: 'system', text: name ? `Controle conectado: ${name.replace(/\s*\(.*\)\s*$/, '') || 'controle'}.` : 'Controle desconectado.' }, false);
   }
 });

@@ -20,17 +20,24 @@ class GamepadBridge {
 
     val connected get() = name != null
 
-    /** Procura um controle já conectado (ao abrir o app ou quando um entra ou sai). */
+    /**
+     * Um controle saiu: se não sobrou nenhum, o jogo volta para o toque. Controle novo só conta depois que
+     * algum botão ou analógico dele é usado (como nos navegadores): alguns celulares têm peças internas
+     * (sensor de digital, botões laterais) que se dizem "controle", e isso esconderia os botões de toque.
+     */
     fun refresh() {
-        name = InputDevice.getDeviceIds().asSequence().mapNotNull { InputDevice.getDevice(it) }.firstOrNull { isGamepad(it) }?.name
-        if (name == null) synchronized(this) { buttons.fill(0f); axes.fill(0f) }
+        if (InputDevice.getDeviceIds().asSequence().mapNotNull { InputDevice.getDevice(it) }.none { isGamepad(it) }) {
+            name = null
+            synchronized(this) { buttons.fill(0f); axes.fill(0f) }
+        }
     }
 
     /** Botão do controle. Devolve true se era de controle (o app consome; a página não rola nem perde o foco). */
     fun onKey(event: KeyEvent): Boolean {
-        if (!fromGamepad(event.source)) return false
+        val dev = event.device
+        if (!fromGamepad(event.source) || dev == null || !isGamepad(dev)) return false
         val i = BUTTONS[event.keyCode] ?: return false
-        if (name == null) name = event.device?.name ?: "Controle"
+        if (name == null) name = dev.name
         val down = event.action == KeyEvent.ACTION_DOWN
         synchronized(this) { buttons[i] = if (down) 1f else 0f }
         return true
@@ -38,8 +45,9 @@ class GamepadBridge {
 
     /** Analógicos, gatilhos e o direcional que alguns controles mandam como eixo (HAT). */
     fun onMotion(event: MotionEvent): Boolean {
-        if (event.source and InputDevice.SOURCE_JOYSTICK != InputDevice.SOURCE_JOYSTICK || event.action != MotionEvent.ACTION_MOVE) return false
-        if (name == null) name = event.device?.name ?: "Controle"
+        val dev = event.device
+        if (event.source and InputDevice.SOURCE_JOYSTICK != InputDevice.SOURCE_JOYSTICK || event.action != MotionEvent.ACTION_MOVE || dev == null || !isGamepad(dev)) return false
+        if (name == null) name = dev.name
         val hatX = event.getAxisValue(MotionEvent.AXIS_HAT_X)
         val hatY = event.getAxisValue(MotionEvent.AXIS_HAT_Y)
         synchronized(this) {
@@ -83,7 +91,8 @@ class GamepadBridge {
         private fun fromGamepad(source: Int) =
             source and InputDevice.SOURCE_GAMEPAD == InputDevice.SOURCE_GAMEPAD || source and InputDevice.SOURCE_JOYSTICK == InputDevice.SOURCE_JOYSTICK
 
-        private fun isGamepad(d: InputDevice) = !d.isVirtual && fromGamepad(d.sources)
+        // Controle de verdade: o Android dá um número de controle (1, 2…) só a gamepads e joysticks de jogo.
+        private fun isGamepad(d: InputDevice) = !d.isVirtual && fromGamepad(d.sources) && d.controllerNumber > 0
 
         private fun quote(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 

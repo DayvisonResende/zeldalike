@@ -133,6 +133,8 @@ export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolea
       await (screen.orientation as ScreenOrientation & { lock?(o: string): Promise<void> }).lock?.('landscape');
     } catch { }
   });
+  // Encostou o dedo na tela: os controles de toque voltam, mesmo com um controle conectado (ou um celular que se diz controle).
+  window.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') document.body.classList.remove('gamepad'); }, true);
   const pad = document.getElementById('pad')!;
   pad.addEventListener('contextmenu', e => e.preventDefault());
   pad.addEventListener('pointerdown', () => { input.usingTouch = true; input.usingPad = false; }, true);   // qualquer toque no controle já liga a ajuda na mira
