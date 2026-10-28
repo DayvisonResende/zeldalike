@@ -192,8 +192,8 @@ leveling:
   maxLevel: 50
   base: 50                  # XP para o próximo nível = base × nível^exponent (50, 141, 260, 400, 559…)
   exponent: 1.5
-  hpPerLevel: 10            # vida máxima a mais por nível
-  manaPerLevel: 5
+  hpPerLevel: 2             # vida máxima a mais por nível (pouco de propósito: quem deixa o personagem forte é o item)
+  manaPerLevel: 1           # no nível 50: 198 de vida e 99 de mana (2× o início)
 
 inventory:
   slots: 20

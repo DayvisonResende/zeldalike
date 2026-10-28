@@ -28,7 +28,8 @@ describe('XP e níveis', () => {
     kill(w, 'a');
     expect(p.level).toBe(2);
     expect(p.xp).toBe(48 + 5 - 50);
-    expect([p.hp, p.maxHp, p.maxMp]).toEqual([110, 110, 55]);
+    const l = rules.leveling, hp = rules.player.maxHp + l.hpPerLevel, mp = rules.player.maxMana + l.manaPerLevel;
+    expect([p.hp, p.maxHp, p.maxMp]).toEqual([hp, hp, mp]);
   });
   it('taxa de XP do config multiplica', () => {
     const w = new World(calm(), { ...rules, rates: { ...rules.rates, xp: 2 } }), p = w.addPlayer('a', 'Ana');

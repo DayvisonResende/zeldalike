@@ -229,6 +229,78 @@ Ideias, da mais importante para a menos:
 
 Fora do escopo: peso, durabilidade, limite de espaços por categoria, crafting dentro do inventário.
 
+### Pegar e receber itens
+
+Hoje o item é pego passando por cima: às vezes pega sem querer, enche a mochila no meio da briga e não dá para deixar
+algo no chão para um amigo. A ideia é que o botão de **Ação (B)** pegue e abra as coisas, e que o que se ganha vá para a mochila.
+
+**Direção definida:**
+
+- **Item no chão é pego com o botão.** Chegando perto, o botão de ação mostra "Pegar" (no celular, o botão B muda de nome,
+  como já faz com "Arremessar" e "Puxar"). Com vários itens perto, pega o mais próximo; segurar o botão pega tudo em volta.
+- **Baú: abrir e receber tudo na mochila.** Duas regras possíveis para quando falta espaço:
+
+  | Regra | Como fica |
+  | --- | --- |
+  | A. Tudo ou nada (proposta original) | sem espaço para tudo, o baú não abre e avisa "Mochila cheia: libere 3 espaços"; faz o jogador planejar a mochila antes de abrir um baú único |
+  | B. O baú guarda o resto | recebe o que cabe; o resto fica no baú esperando; ninguém precisa voltar só por um item |
+
+**Sugestão, a decidir:** o ouro vai direto para a carteira de quem derrubou o monstro, sem cair no chão, porque não ocupa
+espaço e apertar botão para cada moeda cansa.
+
+**Em estudo: o drop de monstro.** Ainda não é uma decisão final. As opções:
+
+| Opção | Como fica | A favor | Contra |
+| --- | --- | --- | --- |
+| No chão (como hoje, estilo Zelda) | os itens se espalham perto do monstro e são pegos com o botão | rápido, combina com o combate de ação | com muitos monstros, o chão fica cheio de itens |
+| Dentro da criatura (estilo Tibia) | o monstro derrubado vira um corpo; abrir manda o loot para a mochila | chão limpo, o "abrir para ver o que veio" | num grupo de 10 gelecas, 10 corpos para abrir um a um; mais lento |
+| Saquinho de loot (meio-termo) | o monstro deixa um saquinho, com a cor da raridade do melhor item dentro; abrir funciona como o baú | uma interação só para baú e drop; chão limpo; brilha quando é bom | um objeto a mais no mundo; precisa testar se não fica repetitivo |
+
+Em qualquer opção: o loot fica reservado para quem derrubou por alguns segundos (como hoje), e no chefe cada um que
+bateu ganha o próprio loot (como no Rei Geleca). Vale testar as opções com o grupo antes de decidir.
+
+## Mais ideias para jogar junto
+
+Ideias que puxam para o diferencial do jogo: jogar junto. As marcadas com ★ são as mais valiosas.
+Ferramentas de criação de conteúdo (itens, monstros, NPCs, magias) ficam em `docs/OFICINA.md`.
+
+### Jogar junto
+
+- ★ **Levantar amigo caído:** quem cai fica no chão alguns segundos antes de renascer na Clareira. Um amigo que segura
+  o botão de Ação em cima dele o levanta ali mesmo, com metade da vida. A morte vira momento de grupo e o curandeiro ganha papel.
+- ★ **Grupo (party):** convidar amigos para um grupo. Vida dos outros no HUD, uma seta na borda da tela apontando para
+  cada amigo, XP e loot divididos. É a base que as masmorras instanciadas pedem.
+- **Marcar no mapa:** uma tecla (ou um toque no mapa) põe um marcador "venham aqui!" que o grupo vê.
+- **Lista de amigos:** quem está online e em que região, com "ir até ele" (ou a viagem rápida, quando existir).
+
+### Brincadeiras sem regra
+
+- ★ **Minijogos na Clareira**, com peças que já existem: futebol com uma bomba falsa (chuta com a espada), corrida pelo Vale
+  com tempo no placar, pique-pega (quem é pego fica lento), "rei da colina" numa arena de PvP com placar.
+- **Bichinho de estimação:** uma galinha ou uma geleca filhote que segue o jogador, só enfeite. Destino para o ouro, junto com os cosméticos.
+- **Modo foto:** esconde o HUD e os nomes para tirar print do grupo na fogueira.
+
+### O mundo mais vivo
+
+- **Clima:** chuva que apaga tochas e enfraquece o fogo; neblina na caverna. Combina com o dia e noite e com as magias de fogo e luz.
+- **Música por região:** calma na Clareira, tensa na caverna, de chefe quando o Rei Geleca acorda.
+- **Eventos de temporada:** Halloween, Natal, aniversário do servidor, montados como pacotes na Oficina e reaproveitados todo ano.
+
+### O app e a comunidade
+
+- ★ **Notificações no app Android:** "A invasão começa em 10 minutos!", "Joel entrou no jogo", "Sua plantação está pronta".
+  Traz a galera de volta sem ninguém precisar chamar no WhatsApp.
+- **Moderação básica:** filtro de palavrões (desligável), silenciar um jogador, denunciar. Com 100 pessoas, alguém vai passar do ponto.
+- **Primeiros minutos guiados:** o Velho Tomé dá uma primeira missão curta que ensina andar, atacar, pegar item e falar
+  com a Rosa. Hoje quem chega precisa descobrir sozinho.
+
+### Cuidado com o jogador
+
+- **Acessibilidade:** ícone além da cor na raridade (daltonismo), tamanho de texto ajustável, teclas e botões do controle remapeáveis.
+
+**Para começar:** levantar amigo caído, grupo e notificações no app. As duas primeiras deixam o jogo mais social na hora
+e preparam a masmorra; a terceira resolve o "como juntar a galera num horário".
+
 ## O que evitar
 
 O que estraga um jogo assim é sistema isolado e obrigação disfarçada de conteúdo.

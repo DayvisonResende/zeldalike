@@ -56,7 +56,7 @@ export const DEFAULT_RULES: Rules = {
     king: { hp: 40, respawn: 900, damage: 25, xp: 250, drops: [{ item: 'gold', chance: 1, min: 30, max: 60 }, { item: 'jelly', chance: 1, min: 3, max: 5 }, { item: 'heart', chance: 1, min: 2, max: 2 }, { item: 'bomb', chance: 0.5, min: 2, max: 4 }] }
   },
   rates: { xp: 1, drop: 1, gold: 1 },
-  leveling: { maxLevel: 50, base: 50, exponent: 1.5, hpPerLevel: 10, manaPerLevel: 5 },
+  leveling: { maxLevel: 50, base: 50, exponent: 1.5, hpPerLevel: 2, manaPerLevel: 1 },
   inventory: { slots: 20, stack: 99 },
   loot: { ownerTime: 10, lifetime: 60 },
   daynight: { cycle: 1440, start: 0.33 },
