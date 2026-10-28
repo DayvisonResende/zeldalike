@@ -3,3 +3,17 @@ dist/
 *.zip
 packages/server/data/
 *.tiled-session
+
+# app Android (android/): arquivos de build e do Android Studio
+android/.gradle/
+android/.kotlin/
+android/.idea/
+android/build/
+android/app/build/
+android/app/release/
+android/local.properties
+android/app/src/main/assets/manutencao.html
+*.apk
+*.aab
+*.jks
+*.keystore

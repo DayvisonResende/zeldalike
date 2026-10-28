@@ -1,4 +1,4 @@
-# A Lâmina do Vale
+# Mossblade
 
 Ação e aventura 2D em pixel art, a caminho de um MMO pequeno para jogar com os amigos.
 A demo original, em um único HTML, fica em `A Lâmina do Vale.html` como referência.

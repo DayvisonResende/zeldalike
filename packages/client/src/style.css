@@ -38,7 +38,7 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .more{position:absolute;right:2.6cqw;bottom:1.6cqw;color:var(--amber);font-size:.8em;animation:blink .8s steps(2) infinite}
 .start{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,8,18,.5);cursor:pointer}
 .startcard{display:flex;flex-direction:column;align-items:center;gap:1.6cqw;padding:4.5cqw 6cqw;background:var(--box);border:3px solid #ece6f5;box-shadow:inset 0 0 0 2px #4d4380;text-align:center;max-width:82%}
-.startcard strong{font-family:var(--f-display);font-size:clamp(16px,5.4cqw,36px);line-height:1.1;color:var(--amber);text-wrap:balance}
+.startlogo{display:block;width:clamp(160px,52cqw,440px);height:auto;image-rendering:pixelated}
 .startcard span{font-family:var(--f-pixel);font-size:clamp(11px,3cqw,19px);color:#f6f2fc}
 .startcard em{font-style:normal;font-family:var(--f-pixel);font-size:clamp(10px,2.4cqw,15px);color:var(--muted)}
 /* Controle de toque. --k escala tudo (tamanho escolhido no menu). Em pé fica embaixo da tela; deitado, nas laterais. */
@@ -177,7 +177,7 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 /* Conta: entrar, criar conta, escolher personagem */
 .account{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,8,18,.6);cursor:auto;font-family:var(--f-pixel);font-size:clamp(12px,2.9cqw,18px);color:#f6f2fc;z-index:5}
 .accountcard{width:min(88%,460px)}
-.logo{font-family:var(--f-display);font-size:clamp(16px,4.6cqw,30px);line-height:1.1;color:var(--amber);text-align:center}
+.logo{display:block;margin:0 auto;width:min(100%,320px);height:auto;image-rendering:pixelated}
 .stack{display:flex;flex-direction:column;gap:.7em;margin:0}
 .stack p{margin:0}
 .row{display:flex;align-items:center;justify-content:space-between;gap:.8em;flex-wrap:wrap}

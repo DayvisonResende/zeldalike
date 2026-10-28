@@ -1,7 +1,7 @@
 # Ideias para evoluir o jogo
 
 O jogo deve crescer em profundidade, não em quantidade de sistemas: mais aventura com as peças que já existem,
-e só as mecânicas novas que se conectam ao resto. A Lâmina do Vale é um Zelda-like para jogar com amigos.
+e só as mecânicas novas que se conectam ao resto. Mossblade é um Zelda-like para jogar com amigos.
 O diferencial é explorar, lutar e resolver quebra-cabeças juntos.
 
 ## Critério para uma mecânica nova

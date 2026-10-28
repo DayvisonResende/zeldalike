@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Por enquanto o jogo roda em http:// (e a conexão em tempo real em ws://), sem criptografia.
+     Este arquivo libera isso. Quando o servidor tiver HTTPS, troque cleartextTrafficPermitted para "false"
+     (ou apague este arquivo e a linha networkSecurityConfig do AndroidManifest.xml). -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">pifatec.useconectai.com.br</domain>
+    </domain-config>
+</network-security-config>
