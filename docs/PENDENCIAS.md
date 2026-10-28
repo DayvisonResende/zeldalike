@@ -5,7 +5,7 @@ ferramentas de criação de conteúdo, em `docs/OFICINA.md`.
 
 ## Correções
 
-### Travado depois de uma desconexão longa
+### Travado depois de uma desconexão longa (corrigido no sprint 1)
 
 **O que aconteceu:** o personagem reconectou sozinho uma vez, mas depois de muito tempo parado desconectou de novo.
 O jogo ficou travado na parte do personagem, sem conseguir voltar à tela de login para entrar de novo.
@@ -31,7 +31,7 @@ O jogo ficou travado na parte do personagem, sem conseguir voltar à tela de log
 
 ## Melhorias
 
-### Tela de fundo antes de jogar
+### Tela de fundo antes de jogar (feito no sprint 1)
 
 Hoje as telas de login, de personagens e de criação aparecem por cima do mundo do jogo, já rodando no fundo.
 A ideia é esconder o jogo até o jogador entrar de fato: uma tela de fundo própria (uma cena de título em pixel art com

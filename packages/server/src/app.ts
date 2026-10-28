@@ -15,6 +15,7 @@ export async function startServer(port: number) {
     rooms: { world: defineRoom(WorldRoom) },
     express: app => {
       app.set('trust proxy', 'loopback');   // atrás de um proxy local (túnel, nginx), o IP real vem no cabeçalho
+      app.get('/api/health', (_req, res) => { res.json({ ok: true }); });   // o jogo pergunta antes de decidir entre login e manutenção
       app.use('/api', authRoutes());
       if (hasClient) app.use(express.static(CLIENT_DIST));
     }

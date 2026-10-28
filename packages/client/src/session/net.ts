@@ -42,8 +42,15 @@ export class NetSession implements Session {
   get map() { return this.pred.map; }
   private get player(): Player | undefined { return this.pred.players.get(this.meId); }
 
-  async connect(url: string, join: JoinOptions) {
-    const room = await new Client(url).join('world', join);
+  // Entra no mundo; sem resposta em `timeout`, desiste (e, se a entrada chegar atrasada, sai dela na hora).
+  async connect(url: string, join: JoinOptions, timeout = 10000) {
+    const joining = new Client(url).join('world', join);
+    let timer = 0;
+    const late = new Promise<never>((_, fail) => { timer = window.setTimeout(() => fail(Object.assign(new Error('O servidor demorou para responder.'), { code: 0 })), timeout); });
+    let room: Room;
+    try { room = await Promise.race([joining, late]); }
+    catch (e) { joining.then(r => r.leave(), () => { }); throw e; }
+    finally { clearTimeout(timer); }
     this.room = room;
     room.onMessage(MSG.welcome, (m: WelcomeMsg) => this.welcome(m));
     room.onMessage(MSG.snapshot, (m: SnapshotMsg) => this.snapshot(m));

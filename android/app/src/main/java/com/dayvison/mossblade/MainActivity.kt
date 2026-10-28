@@ -14,6 +14,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -28,18 +29,34 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.widget.FrameLayout
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
 import android.window.OnBackInvokedDispatcher
+import java.net.HttpURLConnection
+import java.net.URL
 
 /**
  * O app é só uma janela para o jogo: abre BuildConfig.GAME_URL numa WebView em tela cheia.
  * Toque e mira funcionam como no navegador do celular; o controle de videogame passa pelo GamepadBridge.
  * O botão Voltar do Android abre e fecha o menu do jogo (a tecla Esc). Servidor fora do ar: manutencao.html.
+ *
+ * Ao abrir: tela de abertura (ícone e "Conectando…") enquanto o app pergunta ao servidor se ele está no ar
+ * (/api/health, até 5 s). Está: abre o jogo, com até 15 s para aparecer. Não está (ou demorou): manutenção.
+ * Sem isso, com o servidor desligado de vez, a WebView ficava mais de um minuto esperando, com a tela preta.
  */
 class MainActivity : Activity(), InputManager.InputDeviceListener {
     private lateinit var web: WebView   // trocada por uma nova se o navegador interno cair
+    private lateinit var root: FrameLayout
+    private lateinit var splash: View
     private val pad = GamepadBridge()
     private val main = Handler(Looper.getMainLooper())
     private val home: Uri = Uri.parse(BuildConfig.GAME_URL)
+    private var checking = false   // perguntando ao servidor se ele está no ar
+    private var visible = false    // a página atual já apareceu na tela
+    private val loadTimeout = Runnable { if (!visible) { web.stopLoading(); showMaintenance(web) } }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,7 +65,9 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
         WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)   // depurar pelo chrome://inspect no build de teste
 
         web = buildWebView()
-        setContentView(web)
+        splash = buildSplash()
+        root = FrameLayout(this).apply { setBackgroundColor(Color.BLACK); addView(web); addView(splash) }
+        setContentView(root)
         hideSystemBars()
 
         pad.refresh()
@@ -58,7 +77,44 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
             onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { pressEscape() }
 
-        if (savedInstanceState != null) web.restoreState(savedInstanceState) else web.loadUrl(BuildConfig.GAME_URL)
+        if (savedInstanceState != null) { web.restoreState(savedInstanceState); splash.visibility = View.GONE } else openGame()
+    }
+
+    // Tela de abertura: fundo da cor do ícone, o ícone, "Conectando…" e uma rodinha. Some quando a página aparece.
+    private fun buildSplash(): View = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER
+        setBackgroundColor(Color.rgb(14, 12, 34))
+        val dp = resources.displayMetrics.density
+        addView(ImageView(context).apply { setImageResource(R.mipmap.ic_launcher) }, LinearLayout.LayoutParams((96 * dp).toInt(), (96 * dp).toInt()))
+        addView(TextView(context).apply {
+            text = getString(R.string.connecting); setTextColor(Color.rgb(246, 242, 252)); textSize = 16f
+            setPadding(0, (12 * dp).toInt(), 0, (12 * dp).toInt())
+        })
+        addView(ProgressBar(context).apply { isIndeterminate = true })
+    }
+
+    // Pergunta ao servidor (fora da tela principal) e decide: jogo ou manutenção.
+    private fun openGame() {
+        if (checking) return
+        checking = true; visible = false
+        splash.visibility = View.VISIBLE
+        Thread {
+            val up = try {
+                val c = URL(BuildConfig.GAME_URL.trimEnd('/') + "/api/health").openConnection() as HttpURLConnection
+                c.connectTimeout = 5000; c.readTimeout = 5000; c.useCaches = false
+                // qualquer resposta do servidor (até 404, de um servidor antigo sem /api/health) quer dizer "no ar";
+                // erro 5xx é de um proxy na frente com o jogo parado
+                try { c.responseCode < 500 } finally { c.disconnect() }
+            } catch (e: Exception) { false }
+            main.post {
+                checking = false
+                if (!up) { showMaintenance(web); return@post }
+                main.removeCallbacks(loadTimeout)
+                main.postDelayed(loadTimeout, 15000)
+                web.loadUrl(BuildConfig.GAME_URL)
+            }
+        }.start()
     }
 
     @SuppressLint("SetJavaScriptEnabled")
@@ -91,6 +147,12 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
             override fun onPageFinished(view: WebView, url: String) {
                 view.evaluateJavascript(GamepadBridge.SHIM, null)
             }
+            // A página (jogo ou manutenção) apareceu: some a tela de abertura e o tempo limite.
+            override fun onPageCommitVisible(view: WebView, url: String) {
+                visible = true
+                main.removeCallbacks(loadTimeout)
+                splash.visibility = View.GONE
+            }
             // Servidor fora do ar (sem resposta, ou erro 5xx de um proxy na frente): tela de manutenção.
             override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
                 if (request.isForMainFrame) showMaintenance(view)
@@ -105,8 +167,8 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
                 (view.parent as? ViewGroup)?.removeView(view)
                 view.destroy()
                 this@MainActivity.web = buildWebView()
-                setContentView(this@MainActivity.web)
-                this@MainActivity.web.loadUrl(BuildConfig.GAME_URL)
+                root.addView(this@MainActivity.web, 0)
+                openGame()
                 return true
             }
         }
@@ -117,13 +179,16 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
     private val network = object : ConnectivityManager.NetworkCallback() {
         override fun onAvailable(n: Network) {
             main.post {
-                if (web.url?.startsWith("file:") == true) web.loadUrl(BuildConfig.GAME_URL)
+                if (web.url?.startsWith("file:") == true) openGame()
                 else web.evaluateJavascript("window.__reconnectNow && window.__reconnectNow()", null)
             }
         }
     }
 
     private fun showMaintenance(view: WebView) {
+        main.removeCallbacks(loadTimeout)
+        if (view.url?.startsWith("file:///android_asset/manutencao.html") == true) { splash.visibility = View.GONE; return }
+        visible = false
         view.loadUrl("file:///android_asset/manutencao.html?u=" + Uri.encode(BuildConfig.GAME_URL))
     }
 
@@ -177,6 +242,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
     override fun onPause() { web.onPause(); web.pauseTimers(); super.onPause() }   // pausado: o som para e a bateria agradece
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); web.saveState(outState) }
     override fun onDestroy() {
+        main.removeCallbacks(loadTimeout)
         (getSystemService(Context.INPUT_SERVICE) as InputManager).unregisterInputDeviceListener(this)
         (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(network)
         web.destroy()

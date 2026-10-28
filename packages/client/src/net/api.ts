@@ -5,14 +5,15 @@ export class Api {
   constructor(private base: string) { }
   token: string | null = null;
 
+  // Nada espera para sempre: sem resposta em TIMEOUT, vira erro (e os botões da tela de conta voltam a funcionar).
   private async call<T>(path: string, method = 'GET', body?: unknown): Promise<T> {
     let res: Response;
     try {
       res = await fetch(this.base + path, {
-        method, body: body === undefined ? undefined : JSON.stringify(body),
+        method, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(TIMEOUT),
         headers: { 'Content-Type': 'application/json', ...(this.token ? { Authorization: 'Bearer ' + this.token } : {}) }
       });
-    } catch { throw new ApiError(0, 'Não foi possível falar com o servidor.'); }
+    } catch (e) { throw new ApiError(0, e instanceof DOMException && e.name === 'TimeoutError' ? 'O servidor demorou para responder.' : 'Não foi possível falar com o servidor.'); }
     if (res.status === 204) return undefined as T;
     const data = await res.json().catch(() => ({}));
     if (!res.ok) throw new ApiError(res.status, data.error ?? 'Erro no servidor.');
@@ -25,7 +26,12 @@ export class Api {
   createCharacter = (name: string, look: Look) => this.call<CharacterSummary>('/characters', 'POST', { name, look });
   deleteCharacter = (id: number) => this.call<void>('/characters/' + id, 'DELETE');
   records = () => this.call<{ item: string; size: number; character: string; at: number }[]>('/records');
+  // O servidor está no ar? (resposta rápida ou não)
+  async health() {
+    try { return (await fetch(this.base + '/health', { cache: 'no-store', signal: AbortSignal.timeout(5000) })).ok; } catch { return false; }
+  }
 }
+const TIMEOUT = 10000;
 export class ApiError extends Error { constructor(public status: number, message: string) { super(message); } }
 
 // Login lembrado neste navegador.

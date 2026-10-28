@@ -30,10 +30,14 @@ export class AccountScreen {
 
   get open() { return !this.el.hidden; }
   hide() { this.el.hidden = true; }
-  // Começa pela seleção se houver login lembrado; senão, pela tela de entrar.
+  // Começa pela seleção se houver login lembrado; senão, pela tela de entrar. `message`: por que voltou para cá.
   async start(message = '') {
     this.el.hidden = false;
-    if (this.api.token) { this.show('busy'); try { await this.loadAccount(); return; } catch (e) { if (!(e instanceof ApiError) || e.status !== 401) { this.unreachable(e); return; } this.forget(); } }
+    if (this.api.token) {
+      this.show('busy');
+      try { await this.loadAccount(); if (message) this.error('select', message); return; }
+      catch (e) { if (!(e instanceof ApiError) || e.status !== 401) { this.unreachable(e); return; } this.forget(); }
+    }
     this.show('login'); this.error('login', message);
   }
 
@@ -48,7 +52,12 @@ export class AccountScreen {
   private busy<T>(v: View, f: () => Promise<T>) {
     const btns = this.el.querySelectorAll<HTMLButtonElement>(`[data-view="${v}"] button`);
     btns.forEach(b => { b.disabled = true; });
-    return f().catch(e => { this.error(v, e instanceof Error ? e.message : String(e)); }).finally(() => btns.forEach(b => { b.disabled = false; }));
+    return f().catch(e => {
+      // sessão expirada (da conta ou ao entrar no mundo): de volta ao login, em qualquer tela
+      const code = (e as { status?: number; code?: number }).status ?? (e as { code?: number }).code;
+      if (code === 401) { this.forget(); this.info = null; this.show('login'); this.error('login', 'Sua sessão expirou. Entre de novo.'); return; }
+      this.error(v, e instanceof Error ? e.message : String(e));
+    }).finally(() => btns.forEach(b => { b.disabled = false; }));
   }
   private unreachable(e: unknown) {
     this.show('login');

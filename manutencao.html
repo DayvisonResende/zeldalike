@@ -685,10 +685,12 @@
   document.getElementById('dialog').addEventListener('click', finish);
 
   // ---------- Voltar ao jogo ----------
-  // No app, esta tela abre com o endereço do jogo em ?u=. "Tentar de novo" volta para ele, e a cada 15 s
-  // a página confere se o servidor voltou e entra sozinha. Fora do app (sem ?u=), só recarrega.
-  const game = new URLSearchParams(location.search).get('u');
-  const back = () => { if (game) location.href = game; else location.reload(); };
+  // O endereço do jogo vem em ?u= (no app) ou no data-u do quadro (quando o próprio jogo mostra esta tela por cima dele).
+  // "Tentar de novo" volta para ele, e a cada 15 s a página confere se o servidor voltou e entra sozinha.
+  // Sem endereço, só recarrega.
+  const frame = window.frameElement;
+  const game = new URLSearchParams(location.search).get('u') || (frame && frame.dataset.u) || null;
+  const back = () => { if (!game) location.reload(); else (frame ? window.parent : window).location.href = game; };
   document.getElementById('retry').addEventListener('click', back);
   if (game) setInterval(() => { fetch(game, { mode: 'no-cors', cache: 'no-store' }).then(back, () => {}); }, 15000);
 })();

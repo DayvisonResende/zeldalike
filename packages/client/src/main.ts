@@ -1,6 +1,7 @@
 import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type GameEvent, type ProfileRequest } from '@vale/shared';
 import valeTmj from '../../../content/maps/vale.tmj?raw';
 import valeTsj from '../../../content/maps/vale.tsj?raw';
+import maintenanceHtml from '../../../manutencao.html?raw';
 import { ensureAudio, setMuted, sfx } from './audio';
 import { follow, type Camera } from './camera';
 import { Input, UI_SELECTOR, bindTouch } from './input';
@@ -22,6 +23,7 @@ import { showRegion, updateBoss, updateClock, updateHud, updateRaid } from './ui
 import { Menu } from './ui/menu';
 import { NameTags } from './ui/nametags';
 import { updatePad } from './ui/pad';
+import { hideTitle, showTitle, titleShown } from './ui/titlebg';
 import { assistTarget } from './aimassist';
 import { loadProfile, loadSettings, saveProfile, saveSettings, type Settings } from './ui/settings';
 import './style.css';
@@ -70,7 +72,7 @@ async function enterWorld(c: CharacterSummary) {
 const account = new AccountScreen(api, {
   async play(c) {
     try { await enterWorld(c); }
-    catch (e) { throw new Error(e instanceof Error && e.message ? e.message : 'Não foi possível entrar no mundo.'); }
+    catch (e) { throw Object.assign(new Error(e instanceof Error && e.message ? e.message : 'Não foi possível entrar no mundo.'), { code: (e as { code?: number }).code }); }
     profile = { name: c.name, look: { ...c.look } };
     ready = true; account.hide(); begin();
   },
@@ -79,14 +81,36 @@ const account = new AccountScreen(api, {
 
 /* ---------- Reconexão: a internet caiu, o celular dormiu, o app ficou em segundo plano ---------- */
 // O Colyseus já tenta voltar sozinho por uns segundos (o servidor guarda o lugar por 15 s). Se não deu, o jogo
-// entra de novo com o mesmo personagem, esperando 1, 2, 4… até 8 s entre as tentativas, para sempre. A internet
-// voltar (ou o app voltar para a frente) tenta na hora.
-let rejoining = false, retryTimer = 0, retryDelay = 1000;
+// entra de novo com o mesmo personagem, esperando 1, 2, 4… até 8 s entre as tentativas, por até GIVE_UP.
+// A internet voltar (ou o app voltar para a frente) tenta na hora. Não voltou: pergunta ao servidor se ele
+// está no ar. Está: volta para a tela de personagens, com o motivo. Não está: tela de manutenção.
+const GIVE_UP = 30000;
+let rejoining = false, retryTimer = 0, retryDelay = 1000, lostAt = 0;
 function connectionLost(code: number) {
   if (leaving || !playing || rejoining) return;
-  if (code === 4002) return;   // o personagem entrou em outro lugar: aqui não volta (o chat já avisou)
-  rejoining = true; retryDelay = 1000;
+  if (code === 4002) { backToAccount('Seu personagem entrou em outro lugar.'); return; }
+  rejoining = true; retryDelay = 1000; lostAt = Date.now();
   scheduleRetry();
+}
+// Recarrega a página (o mundo some, o login lembrado continua) e mostra o motivo na tela de conta.
+function backToAccount(message: string) {
+  leaving = true; rejoining = false; clearTimeout(retryTimer);
+  try { sessionStorage.setItem('vale.aviso', message); } catch { }
+  location.reload();
+}
+// Servidor fora do ar: a mesma tela de manutenção do app, por cima do jogo. Ela volta sozinha quando o servidor voltar.
+let maintenance = false;
+function showMaintenance() {
+  leaving = true; rejoining = false; clearTimeout(retryTimer);
+  if (maintenance) return;
+  maintenance = true;
+  const f = Object.assign(document.createElement('iframe'), { className: 'maintenance', title: 'Em manutenção', srcdoc: maintenanceHtml });
+  f.dataset.u = location.origin + location.pathname + location.search;
+  document.body.append(f);
+}
+async function giveUp() {
+  if (await api.health()) backToAccount('A conexão com o mundo caiu. Entre de novo.');
+  else showMaintenance();
 }
 function scheduleRetry(now = false) {
   clearTimeout(retryTimer);
@@ -94,13 +118,15 @@ function scheduleRetry(now = false) {
 }
 async function retry() {
   if (!rejoining || !playing) return;
+  if (Date.now() - lostAt > GIVE_UP) { rejoining = false; await giveUp(); return; }
   try {
     await enterWorld(playing);
     rejoining = false; retryDelay = 1000;
     chat.add({ ch: 'system', text: 'Conexão de volta.' }, false);
   } catch (e) {
     const code = (e as { code?: number }).code;
-    if (code === 401 || code === 404) { leaving = true; location.reload(); return; }   // sessão expirou ou o personagem sumiu: volta ao login
+    if (code === 401) { backToAccount('Sua sessão expirou. Entre de novo.'); return; }
+    if (code === 404) { backToAccount('Personagem não encontrado.'); return; }
     retryDelay = Math.min(8000, retryDelay * 2);
     scheduleRetry();
   }
@@ -109,11 +135,16 @@ window.addEventListener('online', () => { if (rejoining) scheduleRetry(true); })
 document.addEventListener('visibilitychange', () => { if (!document.hidden && rejoining) scheduleRetry(true); });
 // o app Android chama isto quando a internet volta
 (window as unknown as { __reconnectNow?: () => void }).__reconnectNow = () => { if (rejoining) scheduleRetry(true); };
+
+// Aviso deixado antes de recarregar (por que voltou para a tela de conta).
+let notice = '';
+try { notice = sessionStorage.getItem('vale.aviso') ?? ''; sessionStorage.removeItem('vale.aviso'); } catch { }
 function goOffline() {
+  hideTitle();
   session = new LocalSession(MAP, profile); bindChat(session);
   ready = true; account.hide(); startEl.hidden = false; startHint.textContent = 'Jogando offline: só você neste mundo.';
 }
-if (!OFFLINE) { startEl.hidden = true; account.start(); }
+if (!OFFLINE) { startEl.hidden = true; showTitle(); account.start(notice); }
 async function switchCharacter() { leaving = true; await (session as NetSession).leave?.(); location.reload(); }
 async function signOut() { leaving = true; try { await api.logout(); } catch { } saveSession(null); await (session as NetSession).leave?.(); location.reload(); }
 const STATUS: Record<Status, string> = { connecting: 'Conectando…', online: 'Online', reconnecting: 'Reconectando…', offline: 'Desconectado', local: 'Offline' };
@@ -276,6 +307,7 @@ function frame(now: number) {
   attachHeld(scene);
   updateLock(scene);
   updateClock(scene.day, scene.dark); updateRaid(scene.invasion);
+  if (titleShown() && ready && session.status === 'online' && session.me()) hideTitle();   // o mundo chegou: a cena de título sai
   const me = session.me();
   updatePad(me, session.inventory(), settings.padSize);
   updateBoss(me ? scene.enemies.find(e => e.type === 'king' && Math.hypot(e.x - me.x, e.y - me.y) < 200) : undefined);

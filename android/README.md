@@ -25,6 +25,8 @@ para `false` lá (o arquivo explica).
 - **Controle de videogame** (Bluetooth ou USB): a WebView do Android nem sempre entende controles, então o app lê
   o controle pelo Android e entrega ao jogo (`GamepadBridge.kt`). O jogo vê um controle normal.
 - **Voltar** do Android abre e fecha o menu do jogo (como a tecla Esc).
+- Ao abrir: tela de abertura ("Conectando…") enquanto o app pergunta ao servidor se ele está no ar (`/api/health`, até 5 s);
+  o jogo tem até 15 s para aparecer.
 - Servidor fora do ar (ou sem internet): mostra a tela de manutenção, `manutencao.html` da raiz do projeto, copiada
   para o app a cada build. Ela tenta voltar ao jogo sozinha a cada 15 segundos.
 - Links para fora do jogo abrem no navegador.
