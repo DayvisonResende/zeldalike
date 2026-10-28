@@ -28,3 +28,5 @@ para `false` lá (o arquivo explica).
 - Servidor fora do ar (ou sem internet): mostra a tela de manutenção, `manutencao.html` da raiz do projeto, copiada
   para o app a cada build. Ela tenta voltar ao jogo sozinha a cada 15 segundos.
 - Links para fora do jogo abrem no navegador.
+- **Reconexão:** o jogo volta sozinho para o mesmo personagem depois de uma queda; quando a internet volta, o app
+  avisa o jogo para tentar na hora. Se o navegador interno travar, o app monta uma tela nova e abre o jogo de novo.

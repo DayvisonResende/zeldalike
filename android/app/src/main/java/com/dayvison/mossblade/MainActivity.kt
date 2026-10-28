@@ -7,6 +7,8 @@ import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.graphics.Color
 import android.hardware.input.InputManager
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -15,11 +17,13 @@ import android.os.Looper
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.WindowInsetsController
 import android.view.WindowManager
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -32,18 +36,34 @@ import android.window.OnBackInvokedDispatcher
  * O botão Voltar do Android abre e fecha o menu do jogo (a tecla Esc). Servidor fora do ar: manutencao.html.
  */
 class MainActivity : Activity(), InputManager.InputDeviceListener {
-    private lateinit var web: WebView
+    private lateinit var web: WebView   // trocada por uma nova se o navegador interno cair
     private val pad = GamepadBridge()
     private val main = Handler(Looper.getMainLooper())
     private val home: Uri = Uri.parse(BuildConfig.GAME_URL)
 
-    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE   // sempre deitado (as duas posições), mesmo com a rotação travada
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)   // a tela não apaga no meio do jogo
+        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)   // depurar pelo chrome://inspect no build de teste
 
-        web = WebView(this).apply {
+        web = buildWebView()
+        setContentView(web)
+        hideSystemBars()
+
+        pad.refresh()
+        (getSystemService(Context.INPUT_SERVICE) as InputManager).registerInputDeviceListener(this, main)
+        (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).registerDefaultNetworkCallback(network)
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { pressEscape() }
+
+        if (savedInstanceState != null) web.restoreState(savedInstanceState) else web.loadUrl(BuildConfig.GAME_URL)
+    }
+
+    @SuppressLint("SetJavaScriptEnabled")
+    private fun buildWebView(): WebView {
+        val web = WebView(this).apply {
             setBackgroundColor(Color.BLACK)
             overScrollMode = View.OVER_SCROLL_NEVER
             isFocusable = true
@@ -59,7 +79,6 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
             cacheMode = WebSettings.LOAD_DEFAULT
             userAgentString = "$userAgentString MossbladeApp/${BuildConfig.VERSION_NAME}"
         }
-        WebView.setWebContentsDebuggingEnabled(BuildConfig.DEBUG)   // depurar pelo chrome://inspect no build de teste
         web.addJavascriptInterface(pad, "AndroidGamepad")
         web.webViewClient = object : WebViewClient() {
             // O jogo abre no app; links para fora (GitHub, por exemplo) abrem no navegador.
@@ -79,17 +98,29 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
             override fun onReceivedHttpError(view: WebView, request: WebResourceRequest, response: WebResourceResponse) {
                 if (request.isForMainFrame && response.statusCode >= 500) showMaintenance(view)
             }
+            // O navegador interno travou ou foi fechado pelo sistema (falta de memória): em vez de o app cair,
+            // monta uma tela nova e abre o jogo de novo (a sessão de login continua guardada).
+            override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+                if (view !== this@MainActivity.web) return true
+                (view.parent as? ViewGroup)?.removeView(view)
+                view.destroy()
+                this@MainActivity.web = buildWebView()
+                setContentView(this@MainActivity.web)
+                this@MainActivity.web.loadUrl(BuildConfig.GAME_URL)
+                return true
+            }
         }
-        setContentView(web)
-        hideSystemBars()
+        return web
+    }
 
-        pad.refresh()
-        (getSystemService(Context.INPUT_SERVICE) as InputManager).registerInputDeviceListener(this, main)
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
-            onBackInvokedDispatcher.registerOnBackInvokedCallback(OnBackInvokedDispatcher.PRIORITY_DEFAULT) { pressEscape() }
-
-        if (savedInstanceState != null) web.restoreState(savedInstanceState) else web.loadUrl(BuildConfig.GAME_URL)
+    // A internet voltou: o jogo tenta reconectar na hora; na tela de manutenção, tenta abrir o jogo.
+    private val network = object : ConnectivityManager.NetworkCallback() {
+        override fun onAvailable(n: Network) {
+            main.post {
+                if (web.url?.startsWith("file:") == true) web.loadUrl(BuildConfig.GAME_URL)
+                else web.evaluateJavascript("window.__reconnectNow && window.__reconnectNow()", null)
+            }
+        }
     }
 
     private fun showMaintenance(view: WebView) {
@@ -147,6 +178,7 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); web.saveState(outState) }
     override fun onDestroy() {
         (getSystemService(Context.INPUT_SERVICE) as InputManager).unregisterInputDeviceListener(this)
+        (getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager).unregisterNetworkCallback(network)
         web.destroy()
         super.onDestroy()
     }

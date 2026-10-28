@@ -1,4 +1,4 @@
-import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type GameEvent, type ProfileRequest } from '@vale/shared';
+import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type GameEvent, type ProfileRequest } from '@vale/shared';
 import valeTmj from '../../../content/maps/vale.tmj?raw';
 import valeTsj from '../../../content/maps/vale.tsj?raw';
 import { ensureAudio, setMuted, sfx } from './audio';
@@ -55,32 +55,74 @@ let session: Session = OFFLINE ? new LocalSession(MAP, profile) : new NetSession
 let ready = OFFLINE;   // já dá para começar a jogar?
 const api = new Api(SERVER.replace(/^ws/, 'http') + '/api');
 api.token = loadSession()?.token ?? null;
+// Entra no mundo com o personagem; a mesma função serve para voltar depois de uma queda.
+let playing: CharacterSummary | null = null;   // personagem em jogo (para reconectar)
+let leaving = false;                           // saída de propósito: trocar de personagem ou sair da conta
+async function enterWorld(c: CharacterSummary) {
+  const net = new NetSession(MAP);
+  net.onWelcome = motd => { if (motd) startHint.textContent = motd; };
+  await net.connect(SERVER, { token: api.token!, characterId: c.id });
+  session = net; bindChat(net);
+  net.onMapChange = () => { stage.classList.remove('fade'); void stage.offsetWidth; stage.classList.add('fade'); };
+  net.onLeave = code => connectionLost(code);
+  playing = c;
+}
 const account = new AccountScreen(api, {
   async play(c) {
-    const net = new NetSession(MAP);
-    net.onWelcome = motd => { if (motd) startHint.textContent = motd; };
-    try { await net.connect(SERVER, { token: api.token!, characterId: c.id }); }
+    try { await enterWorld(c); }
     catch (e) { throw new Error(e instanceof Error && e.message ? e.message : 'Não foi possível entrar no mundo.'); }
-    session = net; bindChat(net);
-    net.onMapChange = () => { stage.classList.remove('fade'); void stage.offsetWidth; stage.classList.add('fade'); };
     profile = { name: c.name, look: { ...c.look } };
     ready = true; account.hide(); begin();
   },
   offline: () => goOffline()
 });
+
+/* ---------- Reconexão: a internet caiu, o celular dormiu, o app ficou em segundo plano ---------- */
+// O Colyseus já tenta voltar sozinho por uns segundos (o servidor guarda o lugar por 15 s). Se não deu, o jogo
+// entra de novo com o mesmo personagem, esperando 1, 2, 4… até 8 s entre as tentativas, para sempre. A internet
+// voltar (ou o app voltar para a frente) tenta na hora.
+let rejoining = false, retryTimer = 0, retryDelay = 1000;
+function connectionLost(code: number) {
+  if (leaving || !playing || rejoining) return;
+  if (code === 4002) return;   // o personagem entrou em outro lugar: aqui não volta (o chat já avisou)
+  rejoining = true; retryDelay = 1000;
+  scheduleRetry();
+}
+function scheduleRetry(now = false) {
+  clearTimeout(retryTimer);
+  retryTimer = window.setTimeout(retry, now ? 0 : retryDelay);
+}
+async function retry() {
+  if (!rejoining || !playing) return;
+  try {
+    await enterWorld(playing);
+    rejoining = false; retryDelay = 1000;
+    chat.add({ ch: 'system', text: 'Conexão de volta.' }, false);
+  } catch (e) {
+    const code = (e as { code?: number }).code;
+    if (code === 401 || code === 404) { leaving = true; location.reload(); return; }   // sessão expirou ou o personagem sumiu: volta ao login
+    retryDelay = Math.min(8000, retryDelay * 2);
+    scheduleRetry();
+  }
+}
+window.addEventListener('online', () => { if (rejoining) scheduleRetry(true); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden && rejoining) scheduleRetry(true); });
+// o app Android chama isto quando a internet volta
+(window as unknown as { __reconnectNow?: () => void }).__reconnectNow = () => { if (rejoining) scheduleRetry(true); };
 function goOffline() {
   session = new LocalSession(MAP, profile); bindChat(session);
   ready = true; account.hide(); startEl.hidden = false; startHint.textContent = 'Jogando offline: só você neste mundo.';
 }
 if (!OFFLINE) { startEl.hidden = true; account.start(); }
-async function switchCharacter() { await (session as NetSession).leave?.(); location.reload(); }
-async function signOut() { try { await api.logout(); } catch { } saveSession(null); await (session as NetSession).leave?.(); location.reload(); }
+async function switchCharacter() { leaving = true; await (session as NetSession).leave?.(); location.reload(); }
+async function signOut() { leaving = true; try { await api.logout(); } catch { } saveSession(null); await (session as NetSession).leave?.(); location.reload(); }
 const STATUS: Record<Status, string> = { connecting: 'Conectando…', online: 'Online', reconnecting: 'Reconectando…', offline: 'Desconectado', local: 'Offline' };
 let shownStatus: Status | null = null;
 function updateStatus() {
   if (account.open) { statusEl.hidden = true; shownStatus = null; return; }
-  if (session.status === shownStatus) return;
-  shownStatus = session.status;
+  const st = rejoining ? 'reconnecting' : session.status;
+  if (st === shownStatus) return;
+  shownStatus = st;
   statusEl.textContent = STATUS[shownStatus]; statusEl.dataset.state = shownStatus;
   statusEl.hidden = shownStatus === 'online';   // só aparece quando há algo a avisar
 }
