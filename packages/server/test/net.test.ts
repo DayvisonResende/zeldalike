@@ -4,7 +4,7 @@ import { Client, type Room } from '@colyseus/sdk';
 import { matchMaker } from 'colyseus';
 import { MSG, World, damagePlayer, encodeInput, reelCursor, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
 import { parseConfig } from '../src/config/load';
-import { setConfig } from '../src/config/store';
+import { getConfig, setConfig } from '../src/config/store';
 import { startServer } from '../src/app';
 import { getDb, openDatabase, setDb } from '../src/persistence/db';
 import { fileURLToPath } from 'node:url';
@@ -26,14 +26,14 @@ async function api(path: string, body?: unknown, token?: string, method = body =
   return { status: res.status, body: res.status === 204 ? null : await res.json() };
 }
 // Uma conta e um personagem por nome, criados na primeira vez; a cada bot o personagem volta ao ponto de partida.
-const accounts = new Map<string, { token: string; charId: number }>();
+const accounts = new Map<string, { token: string; charId: number; user: string }>();
 async function account(name: string, look?: unknown) {
   let a = accounts.get(name);
   if (!a) {
     const user = 'u' + name.toLowerCase().replace(/[^a-z0-9]/g, '') + Math.floor(Math.random() * 1e6);
     const { body: auth } = await api('/register', { username: user, password: 'senha123' });
     const { body: ch } = await api('/characters', { name, look }, auth.token);
-    accounts.set(name, a = { token: auth.token, charId: ch.id });
+    accounts.set(name, a = { token: auth.token, charId: ch.id, user });
   }
   await getDb().updateTable('characters').set({ x: null, y: null, hp: null, mp: null }).where('id', '=', a.charId).execute();
   return a;
@@ -464,6 +464,84 @@ describe('pesca', () => {
     expect(rec?.text).toMatch(/Pescadora pescou Truta dourada de \d+ cm: novo recorde do servidor!/);
     const list = (await api('/records')).body;
     expect(list.find((r: { item: string }) => r.item === 'trout')).toMatchObject({ character: 'Pescadora' });
+    await a.room.leave(); await b.room.leave();
+  });
+});
+
+describe('chat: comandos e moderação', () => {
+  const lastSystem = (b: Bot) => b.chat.filter(m => m.ch === 'system').at(-1)?.text ?? '';
+  const say = async (b: Bot, text: string, ch: 'local' | 'global' = 'global') => { b.room.send(MSG.chat, { ch, text }); await sleep(150); };
+  const vale = () => (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+
+  it('comando não vai para os outros; quem não é administrador só usa /ajuda e /quem', async () => {
+    const a = await bot('Curiosa'), b = await bot('Ouvinte');
+    await sleep(150);
+    await say(a, '/dar coracao 5');
+    expect(lastSystem(a)).toBe('Só administradores podem usar /dar.');
+    expect(b.chat.some(m => m.text.includes('/dar'))).toBe(false);
+    expect(vale().players.get(a.room.sessionId)!.bag.some(s => s?.id === 'heart')).toBe(false);
+    await say(a, '/quem');
+    expect(lastSystem(a)).toMatch(/^Online \(\d+\): .*Curiosa .*Ouvinte/);
+    await say(a, '/voar');
+    expect(lastSystem(a)).toMatch(/Comando desconhecido/);
+    await a.room.leave(); await b.room.leave();
+  });
+
+  it('administrador: /dar para si e para outro, /anunciar para todos, /invasao', async () => {
+    const adm = await bot('Chefa'), b = await bot('Sortudo');
+    getConfig().admins = [accounts.get('Chefa')!.user.toUpperCase()];   // sem diferenciar maiúsculas
+    await sleep(150);
+    const me = vale().players.get(adm.room.sessionId)!, other = vale().players.get(b.room.sessionId)!;
+    await say(adm, '/dar coracao 3');
+    expect(me.bag.find(s => s?.id === 'heart')?.n).toBe(3);
+    await say(adm, '/dar Sortudo cajado-de-fogo');
+    expect(other.bag.some(s => s?.id === 'firestaff')).toBe(true);
+    const gold = other.gold;
+    await say(adm, '/dar Sortudo ouro 50');
+    expect(other.gold).toBe(gold + 50);
+    await say(adm, '/anunciar Festa na Clareira às 20h!');
+    expect(b.chat.at(-1)).toEqual({ ch: 'system', text: 'Festa na Clareira às 20h!' });
+    await say(adm, '/invasao');
+    expect(vale().invasion?.phase).toBe('warn');
+    vale().invasion = null;   // não atrapalha os outros testes
+    getConfig().admins = [];
+    await adm.room.leave(); await b.room.leave();
+  });
+
+  it('/silenciar tira o chat por um tempo; /dessilenciar devolve', async () => {
+    const adm = await bot('Juiza'), b = await bot('Falante'), c = await bot('Plateia2');
+    getConfig().admins = [accounts.get('Juiza')!.user];
+    await sleep(150);
+    await say(adm, '/silenciar Falante 5');
+    await say(b, 'oi gente');
+    expect(c.chat.some(m => m.text === 'oi gente')).toBe(false);
+    expect(lastSystem(b)).toBe('Você está sem chat por mais 5 min.');
+    await say(adm, '/dessilenciar Falante');
+    await say(b, 'voltei');
+    expect(c.chat.some(m => m.text === 'voltei')).toBe(true);
+    getConfig().admins = [];
+    await adm.room.leave(); await b.room.leave(); await c.room.leave();
+  });
+
+  it('/expulsar tira do servidor com o código 4003', async () => {
+    const adm = await bot('Xerife'), b = await bot('Bagunceiro');
+    getConfig().admins = [accounts.get('Xerife')!.user];
+    await sleep(150);
+    const left = new Promise<number>(r => b.room.onLeave(code => r(code)));
+    await say(adm, '/expulsar Bagunceiro spam no chat');
+    expect(await left).toBe(4003);
+    expect(b.chat.some(m => m.text === 'Você foi expulso do servidor. Motivo: spam no chat')).toBe(true);
+    await sleep(150);
+    expect([...vale().players.values()].some(p => p.name === 'Bagunceiro')).toBe(false);
+    getConfig().admins = [];
+    await adm.room.leave();
+  });
+
+  it('palavrão vira asteriscos (filtro ligado no config)', async () => {
+    const a = await bot('Boca'), b = await bot('Ouvido');
+    await sleep(150);
+    await say(a, 'que p0rra é essa');
+    expect(b.chat.at(-1)?.text).toBe('que ***** é essa');
     await a.room.leave(); await b.room.leave();
   });
 });

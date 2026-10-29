@@ -71,10 +71,11 @@ function finish(w: World, won: boolean) {
 // Uma vez por passo, só no mapa principal: agenda, avisa, solta a horda e decide o fim.
 export function updateInvasion(w: World) {
   const cfg = w.rules.events.invasion;
-  if (!w.home || cfg.every <= 0) { if (w.invasion) finish(w, false); return; }
+  if (!w.home) return;
   if (w.invasionEvery !== cfg.every) { w.invasionEvery = cfg.every; w.nextInvasion = w.tick + ticks(cfg.every); }   // config mudou: reagenda
   const inv = w.invasion;
-  if (!inv) { if (w.tick >= w.nextInvasion && w.players.size && !startInvasion(w)) w.nextInvasion = w.tick + ticks(cfg.every); return; }
+  // every 0: nenhuma automática (mas uma começada à mão por um administrador, /invasao, segue até o fim)
+  if (!inv) { if (cfg.every > 0 && w.tick >= w.nextInvasion && w.players.size && !startInvasion(w)) w.nextInvasion = w.tick + ticks(cfg.every); return; }
   if (inv.phase === 'warn') {
     if (w.tick < inv.until) return;
     inv.phase = 'fight'; inv.until = w.tick + ticks(cfg.duration);

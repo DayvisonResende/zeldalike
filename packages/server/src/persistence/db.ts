@@ -7,6 +7,8 @@ import { migrations } from './migrations';
 import type { DB } from './schema';
 
 export type Db = Kysely<DB>;
+// O SQLite por baixo de cada banco aberto (o backup usa a cópia "ao vivo" dele).
+export const sqliteOf = new WeakMap<Db, Database.Database>();
 
 // Abre (ou cria) o arquivo do banco e aplica as migrações pendentes. ':memory:' serve para testes.
 export async function openDatabase(file: string): Promise<Db> {
@@ -18,6 +20,7 @@ export async function openDatabase(file: string): Promise<Db> {
   const { error, results } = await new Migrator({ db, provider: { getMigrations: async () => migrations } }).migrateToLatest();
   for (const r of results ?? []) if (r.status === 'Success') console.log(`[banco] migração aplicada: ${r.migrationName}`);
   if (error) throw error;
+  sqliteOf.set(db, sqlite);
   return db;
 }
 

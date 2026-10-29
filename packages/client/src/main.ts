@@ -1,4 +1,4 @@
-import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type GameEvent, type ProfileRequest } from '@vale/shared';
+import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type ChatRequest, type GameEvent, type ProfileRequest } from '@vale/shared';
 import valeTmj from '../../../content/maps/vale.tmj?raw';
 import valeTsj from '../../../content/maps/vale.tsj?raw';
 import maintenanceHtml from '../../../manutencao.html?raw';
@@ -25,7 +25,7 @@ import { NameTags } from './ui/nametags';
 import { updatePad } from './ui/pad';
 import { hideTitle, showTitle, titleShown } from './ui/titlebg';
 import { assistTarget } from './aimassist';
-import { loadProfile, loadSettings, saveProfile, saveSettings, type Settings } from './ui/settings';
+import { loadIgnored, loadProfile, loadSettings, saveIgnored, saveProfile, saveSettings, type Settings } from './ui/settings';
 import './style.css';
 
 // Mapa que vem no pacote do jogo: usado offline e de fundo antes de entrar. Online, vale o mapa que o servidor manda.
@@ -89,6 +89,7 @@ let rejoining = false, retryTimer = 0, retryDelay = 1000, lostAt = 0;
 function connectionLost(code: number) {
   if (leaving || !playing || rejoining) return;
   if (code === 4002) { backToAccount('Seu personagem entrou em outro lugar.'); return; }
+  if (code === 4003) { backToAccount('Você foi expulso do servidor por um administrador.'); return; }
   rejoining = true; retryDelay = 1000; lostAt = Date.now();
   scheduleRetry();
 }
@@ -186,8 +187,24 @@ const nameTags = new NameTags(document.getElementById('names')!);
 function toggleMute() { ensureAudio(); setSettings({ ...settings, sound: !settings.sound }); }
 function togglePaths() { setSettings({ ...settings, paths: !settings.paths }); }
 const refocus = () => { try { stage.focus({ preventScroll: true }); } catch { } };
-const chat = new ChatBox({ send: req => session.chat(req), closed: refocus });
-const bindChat = (s: Session) => { s.onChat = m => { const mine = m.from !== undefined && m.from === session.me()?.id; chat.add(m, mine); if (m.ch === 'local' && m.from) nameTags.say(m.from, m.text); }; };
+// /ignorar nome: esconde as mensagens (e os balões) de alguém, só para você; fica guardado neste navegador.
+const ignored = loadIgnored();
+function sendChat(req: ChatRequest) {
+  const m = /^\/(ignorar|designorar|ignorados)\b\s*(.*)$/i.exec(req.text);
+  if (!m) { session.chat(req); return; }
+  const cmd = m[1].toLowerCase(), name = m[2].trim().replace(/^"|"$/g, ''), key = name.toLowerCase();
+  const say = (text: string) => chat.add({ ch: 'system', text }, false);
+  if (cmd === 'ignorados') { say(ignored.size ? `Ignorando: ${[...ignored].join(', ')}` : 'Você não está ignorando ninguém.'); return; }
+  if (!name) { say(`Use: /${cmd} nome`); return; }
+  if (cmd === 'ignorar') { ignored.add(key); say(`Você não vê mais as mensagens de ${name}. /designorar ${name} desfaz.`); }
+  else say(ignored.delete(key) ? `Você voltou a ver as mensagens de ${name}.` : `Você não estava ignorando ${name}.`);
+  saveIgnored(ignored);
+}
+const chat = new ChatBox({ send: sendChat, closed: refocus });
+const bindChat = (s: Session) => { s.onChat = m => {
+  if (m.name && ignored.has(m.name.toLowerCase())) return;
+  const mine = m.from !== undefined && m.from === session.me()?.id; chat.add(m, mine); if (m.ch === 'local' && m.from) nameTags.say(m.from, m.text);
+}; };
 bindChat(session);
 // Esc fecha o chat se ele estiver aberto; senão abre/fecha o menu. Enter numa placa avança o texto.
 function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (shop.open) shop.close(); else if (bag.open) bag.close(); else menu.toggle(); }

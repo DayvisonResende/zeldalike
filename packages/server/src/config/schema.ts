@@ -36,7 +36,12 @@ export const configSchema = z.strictObject({
     motd: z.string().default('')
   }),
   network: z.strictObject({ sendRate: z.number().int().min(1).max(60) }),
-  database: z.strictObject({ file: z.string().min(1) }),
+  database: z.strictObject({
+    file: z.string().min(1),
+    // cópias automáticas do banco, feitas com o servidor rodando; every 0 = desligado
+    backup: z.strictObject({ every: duration, keep: z.number().int().min(1).max(1000), dir: z.string().min(1) }).default({ every: 21600, keep: 28, dir: 'data/backups' })
+  }),
+  admins: z.array(z.string()).default([]),   // usuários (o login da conta) com comandos de administrador no chat
   accounts: z.strictObject({
     maxCharacters: z.number().int().min(1).max(20),
     sessionDays: z.number().positive(),
@@ -49,7 +54,9 @@ export const configSchema = z.strictObject({
     localRange: z.number().int().positive(),
     burst: z.number().int().positive(),
     per: duration,
-    announceJoins: z.boolean()
+    announceJoins: z.boolean(),
+    filter: z.boolean().default(true),                 // troca palavrões por ***
+    blockedWords: z.array(z.string()).default([])      // palavras a mais para esconder
   }),
   regrow: z.strictObject({ bush: duration, tallGrass: duration, rock: duration, secret: duration, torch: duration.default(90), block: duration.default(120) }),
   enemies: z.strictObject({ slime: enemy, beetle: enemy, bat: enemy, chicken: enemy, king: enemy }),

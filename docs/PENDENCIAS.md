@@ -39,8 +39,8 @@ a logo do Mossblade, no estilo da tela de manutenção) atrás das telas de cont
 
 ### Infraestrutura (já conhecidas)
 
-- **HTTPS** (adiado): hoje as senhas trafegam sem criptografia. Caddy na frente do servidor (`reverse_proxy localhost:2567`).
+- **HTTPS** (fica para o fim): hoje as senhas trafegam sem criptografia. Caddy na frente do servidor (`reverse_proxy localhost:2567`).
   Com HTTPS, o app Android pode tirar a liberação de `http://` (`res/xml/network_security_config.xml`).
-- **Backup automático do banco.**
-- **Ferramentas de administrador:** anunciar, expulsar, iniciar um evento (o "painel do servidor" em `docs/OFICINA.md`).
+- ~~**Backup automático do banco.**~~ Feito no sprint 2.
+- ~~**Ferramentas de administrador:**~~ comandos no chat feitos no sprint 2; o "painel do servidor" visual continua em `docs/OFICINA.md`.
 - **Teste de carga:** simular uns 100 jogadores antes de chamar todo mundo.

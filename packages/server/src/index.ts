@@ -1,15 +1,17 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ConfigError, loadConfig, watchConfig } from './config/load';
-import { getConfig, setConfig } from './config/store';
+import { configPath, getConfig, setConfig, setConfigDir } from './config/store';
 import { startServer } from './app';
 import { openDatabase, setDb } from './persistence/db';
 import { purgeSessions } from './persistence/accounts';
+import { scheduleBackups } from './persistence/backup';
 import { MapError, type MapData } from '@vale/shared';
 import { checkPortals, loadMap, setMaps } from './map';
 
 // CONFIG=arquivo.yaml troca a configuração (por exemplo, uma de produção ou de teste).
 const CONFIG_FILE = process.env.CONFIG ? path.resolve(process.env.CONFIG) : fileURLToPath(new URL('../config.yaml', import.meta.url));
+setConfigDir(path.dirname(CONFIG_FILE));
 
 // Config primeiro (diz quais são os mapas), depois os mapas e os portais entre eles, depois a config de novo, agora conferindo as regiões.
 let WORLD_MAP!: MapData, OTHERS: MapData[] = [];
@@ -36,6 +38,8 @@ const db = await openDatabase(dbFile);
 setDb(db);
 console.log(`[banco] ${dbFile}`);
 setInterval(() => { purgeSessions(db).catch(e => console.error('[banco]', e)); }, 3_600_000).unref();
+// Backups automáticos (pasta relativa ao arquivo de config, como o banco).
+scheduleBackups(db, () => ({ ...getConfig().database.backup, dir: configPath(getConfig().database.backup.dir) }));
 
 // PORT no ambiente vence o config: é como as hospedagens (Fly, Railway, Render) dizem a porta.
 const port = Number(process.env.PORT) || getConfig().server.port;

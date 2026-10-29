@@ -21,7 +21,15 @@ network:
 
 # ── Contas e banco ────────────────────────────────────
 database:
-  file: data/vale.db        # SQLite; caminho relativo a este arquivo. Backup = copiar o arquivo (com o servidor parado)
+  file: data/vale.db        # SQLite; caminho relativo a este arquivo
+  backup:                   # cópias automáticas, feitas com o servidor rodando (no chat, /backup faz uma na hora)
+    every: 6h               # de quanto em quanto tempo (0 = desligado)
+    keep: 28                # quantas guardar (28 a cada 6h = uma semana); as mais velhas são apagadas
+    dir: data/backups       # pasta, relativa a este arquivo
+
+# Administradores: usuários (o login da conta, não o nome do personagem) que podem usar os comandos de
+# administrador no chat: /anunciar, /expulsar, /silenciar, /invasao, /dar, /backup. Exemplo: [dayvison]
+admins: [kaulzz]
 
 accounts:
   maxCharacters: 3          # personagens por conta
@@ -37,6 +45,8 @@ chat:
   burst: 5                  # contra spam: no máximo 5 mensagens...
   per: 5s                   # ...a cada 5 segundos
   announceJoins: true       # avisar quando alguém entra ou sai
+  filter: true              # troca palavrões por *** (lista embutida + blockedWords)
+  blockedWords: []          # palavras a mais para esconder, por exemplo [palavra1, palavra2]
 
 # ── Regeneração do mundo ──────────────────────────────
 regrow:

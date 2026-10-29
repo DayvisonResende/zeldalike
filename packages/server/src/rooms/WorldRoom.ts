@@ -1,11 +1,14 @@
 import { Room, ServerError, type Client } from 'colyseus';
 import {
-  ITEMS, MSG, buyItem, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
+  ITEMS, MSG, buyItem, startInvasion, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
   type ChatMsg, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { toRules } from '../config/load';
-import { getConfig, onConfig } from '../config/store';
+import { configPath, getConfig, onConfig } from '../config/store';
+import { runCommand, type CommandContext, type Found } from '../chat/commands';
+import { filterChat } from '../chat/filter';
+import { backupNow } from '../persistence/backup';
 import type { Config } from '../config/schema';
 import { getMaps, startMap } from '../map';
 import { eventFor, inView } from './interest';
@@ -23,8 +26,9 @@ interface Seat {
   client: Client; charId: number; map: string;   // map: id do mundo onde o jogador está
   bagSent: number; chestsSent: string; queue: { seq: number; input: InputState }[]; ack: number;
   profileAt: number; chatTokens: number; chatAt: number; kicked?: boolean;
+  username: string;   // login da conta (para saber quem é administrador)
 }
-interface Auth { accountId: number; character: CharacterRow }
+interface Auth { accountId: number; username: string; character: CharacterRow }
 const profileOf = (p: Player): Profile => ({ id: p.id, name: p.name, look: { ...p.look } });
 const fmtWait = (s: number) => s >= 60 ? `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
 
@@ -35,6 +39,7 @@ export class WorldRoom extends Room {
   maxMessagesPerSecond = 90;   // o cliente manda 60 inputs/s; acima disso é abuso
   worlds = new Map<string, World>();
   private seats = new Map<string, Seat>();
+  private muted = new Map<number, number>();   // personagem → até quando está sem chat (ms)
   private events = new Map<string, GameEvent[]>();   // eventos de cada mundo desde o último snapshot
   private ticks = 0;
   private night: boolean | null = null;   // para anunciar quando anoitece e quando amanhece
@@ -82,7 +87,7 @@ export class WorldRoom extends Room {
     if (!acc) throw new ServerError(401, 'Sessão expirada. Entre de novo.');
     const character = Number.isInteger(options?.characterId) ? await getCharacter(getDb(), acc.id, options!.characterId!) : undefined;
     if (!character) throw new ServerError(404, 'Personagem não encontrado.');
-    return { accountId: acc.id, character };
+    return { accountId: acc.id, username: acc.username, character };
   }
 
   onJoin(client: Client, _options: unknown, auth: Auth) {
@@ -102,12 +107,13 @@ export class WorldRoom extends Room {
     const m = maxStats(w, p.level); p.maxHp = m.hp; p.maxMp = m.mp;
     p.hp = Math.min(s.hp, m.hp); p.mp = Math.min(s.mp, m.mp);
     onlineCharacters.add(c.id);
-    this.seats.set(client.sessionId, { client, charId: c.id, map: s.map, bagSent: -1, chestsSent: '', queue: [], ack: 0, profileAt: 0, chatTokens: getConfig().chat.burst, chatAt: Date.now() });
+    this.seats.set(client.sessionId, { client, charId: c.id, map: s.map, bagSent: -1, chestsSent: '', queue: [], ack: 0, profileAt: 0, chatTokens: getConfig().chat.burst, chatAt: Date.now(), username: auth.username });
     this.broadcastProfile(profileOf(p), client);
     if (getConfig().chat.announceJoins) this.sendChat({ ch: 'system', text: `${p.name} entrou no Vale` }, client);
   }
   // Queda de conexão: segura o lugar por 15 s, parado.
   async onDrop(client: Client) {
+    if (!this.seats.has(client.sessionId)) return;   // expulso (ou trocado por outra entrada): não guarda o lugar
     const f = this.find(client.sessionId);
     if (f) { f.p.input = emptyInput(); f.seat.queue = []; }
     await this.allowReconnection(client, 15);
@@ -220,12 +226,50 @@ export class WorldRoom extends Room {
     seat.chatTokens = Math.min(cfg.burst, seat.chatTokens + (now - seat.chatAt) / 1000 * cfg.burst / cfg.per); seat.chatAt = now;
     if (seat.chatTokens < 1) { client.send(MSG.chat, { ch: 'system', text: 'Calma! Espere um pouco antes de mandar outra mensagem.' } satisfies ChatMsg); return; }
     seat.chatTokens--;
-    const msg: ChatMsg = { ch: req.ch, text: req.text, from: p.id, name: p.name };
+    const reply = (text: string) => client.send(MSG.chat, { ch: 'system', text } satisfies ChatMsg);
+    if (req.text.startsWith('/')) { void runCommand(this.commandContext(client.sessionId, reply), req.text); return; }   // comando: nunca vai para os outros
+    const until = this.muted.get(seat.charId) ?? 0;
+    if (until > now) { reply(`Você está sem chat por mais ${Math.ceil((until - now) / 60000)} min.`); return; }
+    const text = cfg.filter ? filterChat(req.text, cfg.blockedWords) : req.text;
+    const msg: ChatMsg = { ch: req.ch, text, from: p.id, name: p.name };
     if (req.ch === 'global') { this.sendChat(msg); return; }
     for (const [id, s] of this.seats) {   // "Perto": só quem está no mesmo mapa e no alcance (inclui quem falou)
       const o = s.map === seat.map ? f.w.players.get(id) : undefined;
       if (o && Math.hypot(o.x - p.x, o.y - p.y) <= cfg.localRange) s.client.send(MSG.chat, msg);
     }
+  }
+  // O que os comandos do chat podem fazer, para quem digitou (`id`).
+  private commandContext(id: string, reply: (text: string) => void): CommandContext {
+    const found = (sid: string): Found | null => { const f = this.find(sid); return f ? { p: f.p, w: f.w, id: sid } : null; };
+    const seat = this.seats.get(id)!;
+    return {
+      admin: getConfig().admins.some(a => a.toLowerCase() === seat.username.toLowerCase()),
+      me: found(id)!,
+      reply,
+      online: () => [...this.seats.keys()].map(found).filter((f): f is Found => !!f),
+      find: name => [...this.seats.keys()].map(found).find(f => f && f.p.name.toLowerCase() === name.toLowerCase()) ?? null,
+      announce: text => this.announce(text),
+      kick: (sid, reason) => {
+        // como "entrou em outro lugar": salva, tira do mundo e só então desconecta (sem guardar o lugar para ele voltar)
+        const k = this.find(sid); if (!k) return;
+        const { seat: s, w, p } = k;
+        s.kicked = true; this.seats.delete(sid); onlineCharacters.delete(s.charId);
+        void this.save([[s, p]]);
+        w.removePlayer(sid);
+        this.broadcastProfile({ id: sid, gone: true });
+        s.client.send(MSG.chat, { ch: 'system', text: 'Você foi expulso do servidor.' + (reason ? ` Motivo: ${reason}` : '') } satisfies ChatMsg);
+        s.client.leave(4003);   // o cliente volta para a tela de personagens (pode entrar de novo)
+        this.sendChat({ ch: 'system', text: `${p.name} foi expulso.` });
+      },
+      mute: (sid, minutes) => {
+        const s = this.seats.get(sid); if (!s) return;
+        this.muted.set(s.charId, Date.now() + minutes * 60000);
+        s.client.send(MSG.chat, { ch: 'system', text: `Você está sem chat por ${minutes} min.` } satisfies ChatMsg);
+      },
+      unmute: sid => { const s = this.seats.get(sid); return !!s && this.muted.delete(s.charId); },
+      startInvasion: () => startInvasion(this.world),
+      backup: () => { const b = getConfig().database.backup; return backupNow(getDb(), configPath(b.dir), b.keep); }
+    };
   }
   // Ligar/desligar o PvP (só no modo optional, respeitando cooldown e combat lock).
   private onPvp(client: Client, raw: unknown) {

@@ -173,7 +173,9 @@ client/src/render/tiles.ts e rode `npm run map:tileset` para atualizar o tileset
 
 ## Contas e banco de dados
 
-- **SQLite** num arquivo só: `packages/server/data/vale.db` (fora do git). Backup = copiar o arquivo com o servidor parado.
+- **SQLite** num arquivo só: `packages/server/data/vale.db` (fora do git).
+- **Backup automático** com o servidor rodando: a cada 6 h em `packages/server/data/backups/`, guardando as 28 mais novas
+  (`database.backup` no config; `/backup` no chat faz uma na hora). Para restaurar: servidor parado, copiar o backup por cima do `vale.db`.
 - O acesso ao banco fica todo em `server/src/persistence/` (Kysely). Trocar por PostgreSQL mexe só ali.
 - Mudança no banco = migração nova em `persistence/migrations.ts`, nunca editar uma antiga.
 - Senhas guardadas só como hash scrypt; tokens de sessão guardados só como sha256.
@@ -186,6 +188,24 @@ client/src/render/tiles.ts e rode `npm run map:tileset` para atualizar o tileset
 jogadores (vida, mana, regeneração, ponto e tempo de renascimento), PvP, taxas de XP e drop.
 Salve o arquivo com o servidor rodando e ele aplica na hora; se houver erro, o servidor
 mostra o campo e a linha e continua com a configuração anterior.
+
+## Administração e chat
+
+Administradores são os usuários (o login da conta) da lista `admins` no `config.yaml`. No chat:
+
+| Comando | Quem | O que faz |
+| --- | --- | --- |
+| `/ajuda` | todos | lista os comandos |
+| `/quem` | todos | quem está online e onde |
+| `/ignorar nome` (`/designorar`, `/ignorados`) | todos | esconde as mensagens de alguém, só para você (fica no navegador) |
+| `/anunciar texto` | admin | aviso para todo o servidor (chat e tela) |
+| `/expulsar nome [motivo]` | admin | tira do servidor (pode voltar) |
+| `/silenciar nome [minutos]`, `/dessilenciar nome` | admin | sem chat por um tempo (padrão 10 min) |
+| `/invasao` | admin | começa uma invasão de gelecas agora (mesmo com `every: 0`) |
+| `/dar [nome] item [quantidade]` | admin | dá item (nome ou id: `coracao`, `cajado-de-fogo`, `firestaff`) ou `ouro`; sem nome, para você |
+| `/backup` | admin | cópia do banco agora |
+
+Comandos nunca aparecem para os outros. Filtro de palavrões: `chat.filter` (lista embutida + `chat.blockedWords`).
 
 ## Etapas
 

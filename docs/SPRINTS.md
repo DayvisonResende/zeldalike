@@ -35,15 +35,18 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 - [x] Sessão expirada na tela de personagens leva ao login; "Sair" sempre visível nas telas de conta.
 - [x] Tela de fundo antes de jogar: cena de título com a logo atrás do login e dos personagens; o mundo só aparece ao entrar.
 - [x] Testar: servidor reiniciado, servidor desligado, sessão que deixou de valer (testados no navegador).
+- [x] App Android sem servidor: tela de abertura e manutenção em até 5 s (antes ficava preto; testado no celular).
 - [ ] Testar no celular: celular dormindo, troca de Wi-Fi para 4G (na sessão de jogo com os amigos).
 
 ## Sprint 2: operação
 
-- [ ] Backup automático do banco: cópia periódica do SQLite, guardando as últimas N.
-- [ ] Administradores numa lista no `config.yaml`.
-- [ ] Comandos de administrador no chat: `/anunciar`, `/expulsar`, `/invasao` (começar agora), `/dar` (item).
-- [ ] Moderação básica: filtro de palavrões (desligável), silenciar um jogador.
-- [ ] (Paralelo, no seu home lab) HTTPS com Caddy.
+- [x] Backup automático do banco: cópia periódica do SQLite, guardando as últimas N.
+- [x] Administradores numa lista no `config.yaml`.
+- [x] Comandos de administrador no chat: `/anunciar`, `/expulsar`, `/invasao` (começar agora), `/dar` (item).
+- [x] Moderação básica: filtro de palavrões (desligável), silenciar um jogador.
+- [x] Também: `/silenciar` e `/dessilenciar`, `/backup`, `/quem`, `/ajuda` e `/ignorar` (pessoal, no jogo).
+- [ ] Pôr o seu usuário em `admins` no `config.yaml` do servidor e testar os comandos com os amigos.
+- HTTPS com Caddy: fica para o fim (decisão de 2026-10-28).
 
 ## Sprint 3: itens
 

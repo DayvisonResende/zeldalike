@@ -35,3 +35,6 @@ export function loadSettings(): Settings {
   };
 }
 export const saveSettings = (s: Settings) => write('vale.opcoes', s);
+// Nomes ignorados no chat (em minúsculas).
+export function loadIgnored() { const v = read<string[]>('vale.ignorados'); return new Set(Array.isArray(v) ? v.filter(n => typeof n === 'string') : []); }
+export const saveIgnored = (s: Set<string>) => write('vale.ignorados', [...s]);
