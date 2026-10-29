@@ -70,15 +70,21 @@ Na pasta do jogo, no servidor Windows (pode ser com o servidor do jogo parado ou
 npm run clock:check
 ```
 
-Ele mede por 4 segundos o ritmo do relógio como o Windows vem e depois com o relógio de 1 ms, e mostra as duas
-linhas. O laço do jogo precisa de um passo a cada 16,7 ms. Algo assim mostra que funcionou:
+Ele mede o ritmo do relógio três vezes: como o Windows vem, com o relógio de 1 ms e, por fim, **com a janela
+minimizada** (quando ele pedir, minimize a janela e volte depois de uns 15 segundos). A última é a que importa: o
+servidor costuma ficar com a janela escondida, e o Windows 11 economiza energia com programas assim, ignorando o
+relógio de 1 ms. O servidor pede para ficar fora dessa economia; a linha `[relógio]` diz se o Windows aceitou.
+O laço do jogo precisa de um passo a cada 16,7 ms. Algo assim mostra que funcionou:
 
 ```
 Relógio padrão       : mediana 15.6 ms · 90% até 31.2 ms · pior 31.9 ms · 120 de 240 passos atrasados (mais de 25 ms)
 Com o relógio de 1 ms: mediana 16.7 ms · 90% até 17.1 ms · pior 18.0 ms · 0 de 240 passos atrasados (mais de 25 ms)
+Com a janela minimizada: mediana 16.7 ms · 90% até 17.2 ms · pior 19.0 ms · 0 de 480 passos atrasados (mais de 25 ms)
 ```
 
-- **A segunda linha com mediana perto de 16,7 ms e quase nenhum passo atrasado:** funcionou.
+- **A segunda e a terceira linhas com mediana perto de 16,7 ms e quase nenhum passo atrasado:** funcionou.
+- **Só a terceira linha ruim:** o Windows não aceitou tirar o servidor da economia de energia; me mande a linha
+  `[relógio]`.
 - **As duas linhas iguais e ruins:** o relógio não ligou; veja a linha `[relógio]` que aparece entre elas.
 - **A primeira linha já boa:** este Windows já estava com o relógio preciso (algum programa aberto, como o Chrome,
   pode ter pedido). O servidor pede de novo ao ligar, então continua valendo mesmo se esse programa fechar.

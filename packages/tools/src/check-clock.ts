@@ -1,16 +1,18 @@
 // Confere o relógio do servidor: npm run clock:check
 // Mede, por alguns segundos, de quanto em quanto tempo um setInterval de 16,7 ms (o do laço do jogo) dispara de
-// verdade. Primeiro como o sistema vem; depois com o relógio de 1 ms (src/timer.ts, só no Windows com o koffi).
+// verdade. Primeiro como o sistema vem; depois com o relógio de 1 ms (src/timer.ts, só no Windows com o koffi);
+// por fim com a janela minimizada, que é como o servidor costuma ficar (o Windows 11 economiza energia com ela escondida).
 import { preciseTimers } from '../../server/src/timer';
 
 const STEP = 1000 / 60, SECONDS = 4;
-function measure(label: string) {
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+function measure(label: string, seconds = SECONDS) {
   return new Promise<void>(done => {
     const gaps: number[] = [];
     let last = performance.now();
     const id = setInterval(() => {
       const now = performance.now(); gaps.push(now - last); last = now;
-      if (gaps.length < SECONDS * 60) return;
+      if (gaps.length < seconds * 60) return;
       clearInterval(id);
       gaps.sort((a, b) => a - b);
       const at = (p: number) => gaps[Math.min(gaps.length - 1, Math.floor(gaps.length * p))].toFixed(1);
@@ -28,4 +30,7 @@ if (!clock) console.log('\nFora do Windows o relógio já é preciso: não há n
 else {
   console.log(`\n[relógio] ${clock}`);
   await measure('Com o relógio de 1 ms');
+  console.log('\nAgora MINIMIZE esta janela (você tem 5 segundos) e volte depois de uns 15 segundos.');
+  await sleep(5000);
+  await measure('Com a janela minimizada', 8);
 }
