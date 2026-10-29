@@ -12,7 +12,7 @@ export { createPlayer, type Player, type PlayerState, type Carryable } from './e
 export type { Enemy } from './entities/enemy';
 export type { Thrown, Arrow } from './systems/projectiles';
 export { swordPose, type SwordPose } from './systems/combat';
-export { damagePlayer, respawnPos } from './systems/life';
+export { REVIVE_RANGE, damagePlayer, respawnPos } from './systems/life';
 export { canHarm, inSafeZone, pvpActive, pvpLock, setPvp, type PvpAttack, type PvpMode, type PvpToggle } from './systems/pvp';
 export * from './protocol';
 export * from './looks';
@@ -32,4 +32,5 @@ export { dayTime, isNight, sunlight } from './systems/daynight';
 export { FISH, TIERS, bobberOf, reelCursor, type Fishing } from './systems/fishing';
 export { BLAST, FUSE, explode, type Bomb } from './systems/bombs';
 export { invaded, remaining, startInvasion, type Invasion } from './systems/invasion';
+export { REVEAL, base64ToBits, bitsToBase64, exploredOf, exploredSize, isExplored, reveal } from './systems/explore';
 export { manaCost, type Spell, type SpellKind } from './systems/magic';

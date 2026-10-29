@@ -50,6 +50,7 @@ export class Menu {
     (document.getElementById('optBubbles') as HTMLInputElement).addEventListener('change', e => this.set({ bubbles: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optSound') as HTMLInputElement).addEventListener('change', e => this.set({ sound: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optPaths') as HTMLInputElement).addEventListener('change', e => this.set({ paths: (e.target as HTMLInputElement).checked }));
+    (document.getElementById('optMinimap') as HTMLInputElement).addEventListener('change', e => this.set({ minimap: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optAssist') as HTMLInputElement).addEventListener('change', e => this.set({ aimAssist: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optVibrate') as HTMLInputElement).addEventListener('change', e => this.set({ vibrate: (e.target as HTMLInputElement).checked }));
     this.el.querySelectorAll<HTMLInputElement>('input[name=padSize]').forEach(r => r.addEventListener('change', () => this.set({ padSize: r.value as PadSize })));
@@ -82,6 +83,7 @@ export class Menu {
     (document.getElementById('optPaths') as HTMLInputElement).checked = s.paths;
     (document.getElementById('optVibrate') as HTMLInputElement).checked = s.vibrate;
     (document.getElementById('optAssist') as HTMLInputElement).checked = s.aimAssist;
+    (document.getElementById('optMinimap') as HTMLInputElement).checked = s.minimap;
     this.el.querySelectorAll<HTMLInputElement>('input[name=padSize]').forEach(r => { r.checked = r.value === s.padSize; });
     this.marks();
   }

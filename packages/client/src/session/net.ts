@@ -1,10 +1,10 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
-  MSG, World, applyOwnState, bfs, cleanLook, cleanName, encodeInput, tileOf, unpackDrop, type Drop,
+  MSG, World, applyOwnState, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
   type ChatMsg, type ChatRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
-import type { Inventory, Scene, Session, Status } from './types';
+import type { Inventory, MapState, Mark, Scene, Session, Status } from './types';
 
 const OVERLAY_TICKS = 90;   // quanto tempo um corte previsto espera a confirmação do servidor
 
@@ -56,14 +56,23 @@ export class NetSession implements Session {
     room.onMessage(MSG.snapshot, (m: SnapshotMsg) => this.snapshot(m));
     room.onMessage(MSG.chat, (m: ChatMsg) => this.onChat?.(m));
     room.onMessage(MSG.profile, (m: ProfileMsg) => { if ('gone' in m) this.profiles.delete(m.id); else this.profiles.set(m.id, m); });
+    room.onMessage(MSG.mark, (m: MarkMsg) => this.onMark(m));
     room.onDrop(() => { this.status = 'reconnecting'; });
     room.onReconnect(() => { this.status = 'online'; });
     room.onLeave(code => { this.status = 'offline'; this.onLeave?.(code); });
     room.send(MSG.hello);
   }
 
+  private onMark(m: MarkMsg) {
+    if ('clear' in m) this.marks.delete(m.id);
+    else this.marks.set(m.id, { id: m.id, name: m.name, x: m.x, y: m.y, until: Date.now() + m.ttl });
+  }
   private welcome(m: WelcomeMsg) {
     this.meId = m.id; this.sendEvery = m.sendEvery;
+    this.explored = base64ToBits(m.explored ?? '', exploredSize(m.map.cols, m.map.rows));
+    this.safe = m.safe ?? [];
+    this.marks = new Map((m.marks ?? []).flatMap(k => 'clear' in k ? [] : [[k.id, { id: k.id, name: k.name, x: k.x, y: k.y, until: Date.now() + k.ttl }] as const]));
+    this.roster = [];
     // o mapa do servidor manda: se for outro (ou outra versão), recria o mundo da previsão com ele
     if (JSON.stringify(m.map) !== JSON.stringify({ ...this.pred.map.data, enemies: [] })) {
       const changed = !!this.meId && this.pred.players.size > 0;
@@ -85,6 +94,18 @@ export class NetSession implements Session {
   // Itens no chão do último snapshot, no formato do mundo, para a previsão saber que o B vai pegar algo
   // (só diz que pegaria; o servidor entrega). Reservado a outro: nunca pegável aqui.
   private dropsNow: Drop[] = [];
+  // Mapa do mundo: o explorado vem do servidor ao entrar no mapa; daí em diante o cliente revela igual a ele, sem esperar.
+  private explored = new Uint8Array(0); private safe: string[] = [];
+  private marks = new Map<string, Mark>(); private roster: { id: string; x: number; y: number }[] = [];
+  mapState(): MapState {
+    const p = this.player, map = this.pred.map;
+    if (p && this.explored.length === exploredSize(map.cols, map.rows)) reveal(this.explored, map.cols, map.rows, Math.floor(p.x / 16), Math.floor(p.y / 16));
+    const now = Date.now();
+    for (const [id, k] of this.marks) if (k.until <= now) this.marks.delete(id);
+    return { explored: this.explored, safe: this.safe, marks: [...this.marks.values()], roster: this.roster };
+  }
+  mark(x: number, y: number) { if (this.status === 'online') this.room?.send(MSG.mark, { x, y }); }
+  clearMark() { if (this.status === 'online') this.room?.send(MSG.mark, { clear: true }); }
   private snapshot(s: SnapshotMsg) {
     this.dropsNow = s.d.map(unpackDrop).map(d => ({ id: d.id, item: d.item, n: d.n, x: d.x, y: d.y, owner: d.reserved ? '?' : null, ownerUntil: d.reserved ? Infinity : 0, expires: Infinity, born: -Infinity }));
     // relógio: estima o passo do servidor a partir do local, sem saltos pequenos
@@ -92,6 +113,7 @@ export class NetSession implements Session {
     if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
     this.interp.push(toFrame(s));
     this.pvpInfo = s.pvp; this.xpNext = s.xpNext; this.day = s.day; this.invasion = s.iv ?? null;
+    if (s.r) this.roster = s.r.map(([id, x, y]) => ({ id, x, y }));
     if (s.bag) this.bag = s.bag;
     if (s.ch) this.openChests = new Set(s.ch);
     if (s.ev.length) this.queued.push({ t: s.t, ev: s.ev });

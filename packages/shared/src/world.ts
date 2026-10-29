@@ -23,6 +23,7 @@ import { createEnemy, inPeriod, updateSpawns, type Spawn } from './systems/spawn
 import { updateInvasion, type Invasion } from './systems/invasion';
 import { updateSpells, type Spell } from './systems/magic';
 import { updateBlocks, type BlockHome } from './systems/blocks';
+import { updateExplore } from './systems/explore';
 
 // O mundo inteiro: mapa, jogadores, inimigos e objetos voando. Roda igual no servidor e no navegador.
 export class World {
@@ -97,7 +98,7 @@ export class World {
     updatePortals(this);
     if (opts.life !== false) { updateLife(this); updatePvp(this); updateLoot(this); }
     updateRegrowth(this); updateSpawns(this);
-    if (opts.life !== false) { updateInvasion(this); updateBlocks(this); }
+    if (opts.life !== false) { updateInvasion(this); updateBlocks(this); updateExplore(this); }
     for (const p of this.players.values()) {
       const r = this.map.regionAt(p.x, p.y);
       if (r && r.id !== p.region) { p.region = r.id; this.emit({ t: 'region', to: p.id, name: r.name }); }

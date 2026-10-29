@@ -16,6 +16,17 @@ const deathTitle = death.querySelector('strong')!, badge = document.getElementBy
 const lvlEl = document.getElementById('lvl')!, xpEl = document.getElementById('xpbar')!, goldEl = document.getElementById('gold')!.querySelector('b')!;
 document.getElementById('gold')!.querySelector('canvas')!.getContext('2d')!.drawImage(ITEM_ICON.gold, 0, 0);
 let progKey = '';
+// Ícones de PvP em pixel art, usados pelo CSS: espadas cruzadas no selo do HUD, caveira ao lado do nome.
+function pixelIcon(rows: string[], pal: Record<string, string>) {
+  const c = document.createElement('canvas'); c.width = rows[0].length; c.height = rows.length;
+  const x = c.getContext('2d')!;
+  rows.forEach((r, j) => [...r].forEach((ch, i) => { if (pal[ch]) { x.fillStyle = pal[ch]; x.fillRect(i, j, 1, 1); } }));
+  return `url(${c.toDataURL()})`;
+}
+const SWORDS = pixelIcon(['kk.....kk', 'kwk...kwk', '.kwk.kwk.', '..kwkwk..', '...kwk...', '..kgkgk..', '.kgk.kgk.', 'kbk...kbk', 'kk.....kk'], { k: '#1b1226', w: '#e6ecf5', g: '#e9b44c', b: '#7a4a2a' });
+const SKULL = pixelIcon(['.kkkkk.', 'kwwwwwk', 'kwkwkwk', 'kwkwkwk', 'kwwkwwk', '.kwwwk.', '.kwkwk.', '..kkk..'], { k: '#1b1226', w: '#f4efe6' });
+document.documentElement.style.setProperty('--icon-pvp', SWORDS);
+document.documentElement.style.setProperty('--icon-skull', SKULL);
 const clockEl = document.getElementById('clock')!;
 let clockKey = '';
 // Relógio: sol de dia, lua de noite, e a hora.
@@ -77,7 +88,7 @@ function updateProgress(inv: Inventory | null) {
   xpEl.title = inv.xpNext > 0 ? `${inv.xp} / ${inv.xpNext} XP` : 'Nível máximo';
   goldEl.textContent = String(inv.gold);
 }
-export function updateHud(me: PlayerView | undefined, inv: Inventory | null = null) {
+export function updateHud(me: PlayerView | undefined, inv: Inventory | null = null, nameOf: (id: string) => string | undefined = () => undefined) {
   updateProgress(inv);
   hud.hidden = !me;
   if (!me) { death.hidden = true; return; }
@@ -88,9 +99,10 @@ export function updateHud(me: PlayerView | undefined, inv: Inventory | null = nu
   if (dead) {
     const s = Math.max(1, Math.ceil(me.t / 60)), title = me.killer ? `${me.killer} te derrubou` : 'Você caiu';
     if (deathTitle.textContent !== title) deathTitle.textContent = title;
-    deathTimer.textContent = `Renascendo em ${s}…`;
+    const by = (me as PlayerView & { reviveBy?: string | null }).reviveBy;
+    deathTimer.textContent = me.revive > 0 ? `${(by && nameOf(by)) ?? 'Alguém'} está te levantando… aguente firme!` : `Renascendo em ${s}…`;
   }
   // selo ao lado das barras: zona segura (verde) ou PvP ativo (vermelho)
   const b = me.safe ? 'safe' : me.pvpActive ? 'pvp' : '';
-  if (badge.dataset.kind !== b) { badge.dataset.kind = b; badge.hidden = !b; badge.textContent = b === 'safe' ? 'Zona segura' : 'PvP'; }
+  if (badge.dataset.kind !== b) { badge.dataset.kind = b; badge.hidden = !b; badge.textContent = b === 'safe' ? 'Zona segura' : 'PvP ligado'; }
 }

@@ -6,9 +6,9 @@ const MAP: Record<string, Key> = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyF: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
 };
-export interface InputHooks { started(): boolean; start(): void; toggleMute(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void }
+export interface InputHooks { started(): boolean; start(): void; toggleMap(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void }
 // Cliques e teclas dentro do menu são do menu, não do jogo.
-export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn';
+export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap';
 const inMenu = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(UI_SELECTOR);
 const typing = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('input, textarea, select');
 
@@ -29,7 +29,7 @@ export class Input {
       if (typing(e.target)) return;                                                            // digitando o nome no menu
       if ((e.code === 'Space' || e.code === 'Enter') && (e.target as Element).closest?.('button')) return;   // botões da página continuam funcionando
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { if (!e.repeat) { e.preventDefault(); if (hooks.started()) hooks.openChat(); else hooks.start(); } return; }
-      if (e.code === 'KeyM') { if (!e.repeat) hooks.toggleMute(); return; }
+      if (e.code === 'KeyM') { if (!e.repeat && hooks.started()) hooks.toggleMap(); return; }
       if (e.code === 'KeyP') { if (!e.repeat) hooks.togglePaths(); return; }
       if (e.code === 'KeyV') { if (!e.repeat && hooks.started()) hooks.togglePvp(); return; }
       if (e.code === 'KeyI') { if (!e.repeat && hooks.started()) hooks.toggleBag(); return; }
@@ -87,6 +87,15 @@ export class Input {
   wants(k: Button) { return this.held(k) || (this.tap & BUTTON[k]) !== 0; }
 }
 
+// Tela cheia (e deitado, onde o navegador deixa). No iPhone não existe para páginas: lá é "Adicionar à Tela de Início";
+// no app Android, o app já é tela cheia (o navegador interno diz que não tem, e os botões somem).
+export async function toggleFullscreen() {
+  try {
+    if (document.fullscreenElement) { await document.exitFullscreen(); return; }
+    await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+    await (screen.orientation as ScreenOrientation & { lock?(o: string): Promise<void> }).lock?.('landscape');
+  } catch { }
+}
 // Joystick e botões virtuais (só aparecem em telas de toque).
 // O joystick é flutuante: encostar em qualquer lugar da área dele põe o centro ali, e soltar o devolve ao lugar.
 export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolean) {
@@ -123,16 +132,9 @@ export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolea
   // Atalhos de item: coração, poção e bomba (as teclas 1, 2 e 3)
   document.getElementById('btnBomb')!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(3); buzz(); } });
   for (const n of [1, 2, 3] as const) document.getElementById('q' + n)!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(n); buzz(); } });
-  // Tela cheia (e deitado, onde o navegador deixa); no iPhone não existe para páginas: lá é "Adicionar à Tela de Início"
   const fs = document.getElementById('fsBtn')!;
   fs.hidden = !document.fullscreenEnabled;
-  fs.addEventListener('click', async () => {
-    try {
-      if (document.fullscreenElement) { await document.exitFullscreen(); return; }
-      await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
-      await (screen.orientation as ScreenOrientation & { lock?(o: string): Promise<void> }).lock?.('landscape');
-    } catch { }
-  });
+  fs.addEventListener('click', toggleFullscreen);
   // Encostou o dedo na tela: os controles de toque voltam, mesmo com um controle conectado (ou um celular que se diz controle).
   window.addEventListener('pointerdown', e => { if (e.pointerType === 'touch') document.body.classList.remove('gamepad'); }, true);
   const pad = document.getElementById('pad')!;

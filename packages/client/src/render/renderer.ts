@@ -5,10 +5,11 @@ import type { Particles } from './particles';
 import { BANG, CHEST, ITEM_ICON, OBJ, bombFrame, QUES, SHADOW, batSprite, chickenSprite, kingSprite, beetleSprite, heroSprite, mk, slimeSprite } from './sprites';
 import { drawTiles, floorUnder } from './tiles';
 import { pickable } from '../pickup';
+import { pin } from './mapimage';
 
 type Ctx = CanvasRenderingContext2D;
 // talking: "x,y" do NPC que está conversando com você (ele se vira para você).
-export interface View { lock?: { x: number; y: number } | null; talking?: string | null; me: PlayerView | undefined; cam: Camera; particles: Particles; showPaths: boolean; reticle: { x: number; y: number } | null; shake: number; tick: number }
+export interface View { marks?: readonly { id: string; x: number; y: number }[]; lock?: { x: number; y: number } | null; talking?: string | null; me: PlayerView | undefined; cam: Camera; particles: Particles; showPaths: boolean; reticle: { x: number; y: number } | null; shake: number; tick: number }
 
 function drawShadow(ctx: Ctx, x: number, y: number) { ctx.drawImage(SHADOW, Math.round(x - 7), Math.round(y - 3)); }
 function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
@@ -35,13 +36,22 @@ function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
     ctx.fillStyle = '#f2a24e'; ctx.fillRect(tx, ty, 1, 1);
   }
 }
-// Cajado ou grimório na mão: erguido ao conjurar, apontado enquanto carrega, e de bastão quando bate sem mana.
+// Cajado ou grimório na mão. Conjurando ou carregando, o cajado fica em pé ao lado do corpo (na mão do lado para onde
+// olha), sobe um pouco e inclina para a mira, com a pedra brilhando. Sem mana, vira bastão: bate como a espada.
 const GEM: Record<string, string> = { firestaff: '#f2862e', lightstaff: '#fffbe6', darktome: '#c79bf0' };
 const staffInHand = (p: PlayerView) => !!p.using && p.using in GEM && (p.state === 'cast' || p.state === 'charge' || p.state === 'swing');
+const staffRaised = (p: PlayerView) => staffInHand(p) && p.state !== 'swing';
 function drawStaff(ctx: Ctx, p: PlayerView, tick: number) {
   const g = p.using!, sw = p.state === 'swing' ? swordPose(p) : null;
-  const ox = p.x + Math.cos(p.aim) * 3, oy = p.y - 6 + Math.sin(p.aim) * 2;
-  const ang = sw ? sw.ang : p.state === 'cast' ? p.aim - 0.9 + Math.min(1, p.t / 6) * 0.9 : p.aim - 0.35, len = sw ? Math.max(9, sw.len) : 12;
+  let ox: number, oy: number, ang: number, len: number;
+  if (sw) { ox = p.x + Math.cos(p.aim) * 3; oy = p.y - 6 + Math.sin(p.aim) * 2; ang = sw.ang; len = Math.max(9, sw.len); }
+  else {
+    // mão do lado para onde olha (de frente ou de costas, a mão direita); a ponta inclina para a mira
+    const side = p.dir === 2 ? -1 : 1, lift = p.state === 'cast' ? Math.min(3, p.t) : 3;
+    ox = Math.round(p.x + side * 6); oy = Math.round(p.y - 1 - lift);
+    const lean = Math.max(-0.55, Math.min(0.55, Math.cos(p.aim) * 0.5 * (p.state === 'cast' ? Math.min(1, p.t / 5) : 1)));
+    ang = -Math.PI / 2 + lean; len = 14;
+  }
   const ca = Math.cos(ang), sa = Math.sin(ang), X = (r: number) => Math.round(ox + ca * r), Y = (r: number) => Math.round(oy + sa * r);
   if (g === 'darktome') {   // grimório: um livro aberto flutuando na frente da mão
     const bx = X(len * 0.6), by = Y(len * 0.6);
@@ -126,17 +136,20 @@ function drawRod(ctx: Ctx, p: PlayerView, tick: number) {
   if (bite) ctx.drawImage(BANG, Math.round(p.x - 2), Math.round(p.y - 30 - ((tick >> 3) & 1)));
 }
 function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: number, mine: boolean) {
-  if (p.state === 'dead') { drawFallen(ctx, p, look); return; }
+  if (p.state === 'dead') {
+    drawFallen(ctx, p, look);
+    return;
+  }
   if (p.state === 'fish') drawRod(ctx, p, tick);
   const blink = p.inv > 0 && ((p.inv >> 2) & 1) && p.state !== 'flying';
   const s = swordPose(p);
   const spinning = p.state === 'held' || p.state === 'flying';   // no colo se debate; voando, gira
   const dir = spinning ? ([0, 3, 1, 2] as const)[(tick >> (p.state === 'flying' ? 2 : 3)) & 3] : p.state === 'spin' && s ? angDir(s.ang) : p.dir;
   const bow = p.state === 'bow', staff = staffInHand(p);
-  const pose = (p.state === 'lift' || p.state === 'carry' || spinning) ? 'lift' : ((s || bow || staff) ? 'atk' : 'n');
+  const pose = (p.state === 'lift' || p.state === 'carry' || spinning) ? 'lift' : (((s && !staffRaised(p)) || bow || (staff && !staffRaised(p))) ? 'atk' : 'n');
   const step = p.state === 'hurt' ? 0 : p.step;
   const px = Math.round(p.x), py = Math.round(p.y - p.z);
-  const behind = s && Math.sin(s.ang) < -0.35, staffBehind = staff && Math.sin(p.aim) < -0.35;
+  const behind = s && Math.sin(s.ang) < -0.35, staffBehind = staff && (staffRaised(p) ? p.dir === 1 : Math.sin(p.aim) < -0.35);   // de costas, o cajado fica atrás
   if (s && behind && !staff) drawSword(ctx, p, s, tick);
   if (staffBehind) drawStaff(ctx, p, tick);
   if (bow && Math.sin(p.aim) < -0.35) drawBow(ctx, p);
@@ -225,6 +238,17 @@ function drawPaths(ctx: Ctx, w: Scene, v: View) {
     } else { ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(e.x, e.y, 96, 0, Math.PI * 2); ctx.stroke(); }
   }
 }
+// Marcador "venham aqui!": alfinete no lugar; fora da tela, uma seta na borda apontando para ele.
+const REVIVE_TICKS = 90;   // 1,5 s, o padrão do config (player.revive): só para a barrinha
+function drawMark(ctx: Ctx, x: number, y: number) {
+  const M = 10;
+  if (x >= M && x <= VIEW_W - M && y >= 18 && y <= VIEW_H - 4) { pin(ctx, Math.round(x), Math.round(y), 0.8); return; }
+  const cx = VIEW_W / 2, cy = VIEW_H / 2, a = Math.atan2(y - cy, x - cx);
+  const k = Math.min((VIEW_W / 2 - M) / Math.abs(Math.cos(a) || 1e-6), (VIEW_H / 2 - M) / Math.abs(Math.sin(a) || 1e-6));
+  const ex = cx + Math.cos(a) * k, ey = cy + Math.sin(a) * k, ca = Math.cos(a), sa = Math.sin(a);
+  const tri = (s: number, c: string) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(ex + ca * (5 + s), ey + sa * (5 + s)); ctx.lineTo(ex - sa * (4 + s) - ca * (2 + s), ey + ca * (4 + s) - sa * (2 + s)); ctx.lineTo(ex + sa * (4 + s) - ca * (2 + s), ey - ca * (4 + s) - sa * (2 + s)); ctx.fill(); };
+  tri(1.5, '#1b1226'); tri(0, '#e0453b');
+}
 // Setinha amarela (com contorno) apontando para o item que o botão de Ação pega.
 function drawPickArrow(ctx: Ctx, x: number, y: number) {
   const cx = Math.round(x), cy = Math.round(y);
@@ -307,12 +331,18 @@ export function render(ctx: Ctx, w: Scene, v: View) {
   }
   for (const s of w.spells) if (near(s.x, s.y)) { ctx.drawImage(SHADOW, Math.round(s.x - 3), Math.round(s.y + 8), 6, 3); list.push({ y: s.y + 10, d: () => drawSpell(ctx, s, v.tick) }); }
   list.sort((a, b) => a.y - b.y).forEach(i => i.d());
+  // alguém está levantando: barrinha verde enchendo, por cima de quem levanta (que fica em pé em cima do caído)
+  for (const p of w.players) if (p.state === 'dead' && p.revive > 0 && near(p.x, p.y)) {
+    const bw = 18, f = Math.min(1, p.revive / REVIVE_TICKS), x = Math.round(p.x - bw / 2), y = Math.round(p.y - 26);
+    ctx.fillStyle = '#1b1226'; ctx.fillRect(x - 1, y - 1, bw + 2, 4); ctx.fillStyle = '#7be08a'; ctx.fillRect(x, y, Math.round(bw * f), 2);
+  }
   v.particles.draw(ctx);
   if (v.lock) drawLock(ctx, v.lock, v.tick);
   torchFlames(ctx, w, cx, cy, v.tick);
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawLight(ctx, w, cx - sx, cy - sy, v.tick);
   if (v.reticle) drawReticle(ctx, v.reticle);
+  for (const m of v.marks ?? []) drawMark(ctx, m.x - cx + sx, m.y - cy + sy);
 }
 
 /* ---------- Tochas e luz ---------- */

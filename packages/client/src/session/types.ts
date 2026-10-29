@@ -12,6 +12,9 @@ export interface Scene {
   profiles: ReadonlyMap<string, Profile>;   // nome e aparência de cada jogador
   flow: DistMap | null;
 }
+// O que o mapa do mundo e o minimapa mostram: o que você já viu, as zonas seguras, os marcadores e onde está cada um.
+export interface Mark { id: string; name: string; x: number; y: number; until: number }   // x, y em pixels; until: Date.now()
+export interface MapState { explored: Uint8Array; safe: readonly string[]; marks: Mark[]; roster: { id: string; x: number; y: number }[] }   // roster em tiles
 // Progresso e inventário do seu personagem.
 export interface Inventory { bag: Slot[]; gold: number; level: number; xp: number; xpNext: number; gear: Record<GearSlot, GearId> }
 export type Status = 'connecting' | 'online' | 'reconnecting' | 'offline' | 'local';
@@ -31,6 +34,9 @@ export interface Session {
   useItem(slot: number): void;
   dropItem(slot: number): void;
   equip(gear: GearId, slot: GearSlot): void;   // põe no botão A ou C
+  mapState(): MapState;
+  mark(x: number, y: number): void;            // marcador "venham aqui!" (pixels)
+  clearMark(): void;
   shop(action: 'buy' | 'sell', shop: string, item: ItemId, n: number): void;   // comprar/vender (o mundo confere tudo)
   onChat?: (m: ChatMsg) => void;         // mensagens que chegam (inclusive as suas)
 }

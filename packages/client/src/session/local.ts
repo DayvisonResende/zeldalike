@@ -1,5 +1,5 @@
-import { World, buyItem, equipGear, sellItem, type GearId, type GearSlot, type ItemId, dayTime, remaining, dropItem, openChests, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
-import type { Inventory, Scene, Session, Status } from './types';
+import { MARK_TTL, World, buyItem, exploredOf, equipGear, sellItem, type GearId, type GearSlot, type ItemId, dayTime, remaining, dropItem, openChests, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
+import type { Inventory, MapState, Mark, Scene, Session, Status } from './types';
 
 // Sem servidor: o mundo inteiro roda no navegador. Útil para desenvolver e quando o servidor está fora.
 export class LocalSession implements Session {
@@ -13,6 +13,13 @@ export class LocalSession implements Session {
   }
   get map() { return this.world.map; }
   me() { return this.player; }
+  private myMark: Mark | null = null;
+  mapState(): MapState {
+    if (this.myMark && this.myMark.until <= Date.now()) this.myMark = null;
+    return { explored: exploredOf(this.world, this.player), safe: this.world.rules.pvp.safeZones, marks: this.myMark ? [this.myMark] : [], roster: [] };
+  }
+  mark(x: number, y: number) { this.myMark = { id: this.player.id, name: this.player.name, x, y, until: Date.now() + MARK_TTL }; }
+  clearMark() { this.myMark = null; }
   // Sozinho no mundo: a mensagem só volta para você.
   chat(req: ChatRequest) { const text = cleanChat(req.text, 120); if (text) this.onChat?.({ ch: req.ch, text, from: this.player.id, name: this.player.name }); }
   inventory(): Inventory {

@@ -11,6 +11,6 @@ export interface DB {
     x: number | null; y: number | null;   // null = nunca jogou: nasce no ponto de partida
     hp: number | null; mp: number | null;
     created_at: number; last_played: number | null;
-    level: Generated<number>; xp: Generated<number>; gold: Generated<number>; items: Generated<string>; map: Generated<string>; chests: Generated<string>; gear: Generated<string>; chest_loot: Generated<string>;
+    level: Generated<number>; xp: Generated<number>; gold: Generated<number>; items: Generated<string>; map: Generated<string>; chests: Generated<string>; gear: Generated<string>; chest_loot: Generated<string>; explored: Generated<string>;
   };
 }

@@ -3,8 +3,8 @@ import { DEFAULT_LOOK, cleanLook, cleanName, type ProfileRequest } from '@vale/s
 // Preferências deste navegador: o seu personagem e as opções de exibição.
 export type NameMode = 'all' | 'others' | 'none';
 export type PadSize = 's' | 'm' | 'l';
-export interface Settings { names: NameMode; bubbles: boolean; sound: boolean; paths: boolean; padSize: PadSize; vibrate: boolean; aimAssist: boolean }
-const DEFAULTS: Settings = { names: 'all', bubbles: true, sound: true, paths: false, padSize: 'm', vibrate: true, aimAssist: true };
+export interface Settings { names: NameMode; bubbles: boolean; sound: boolean; paths: boolean; padSize: PadSize; vibrate: boolean; aimAssist: boolean; minimap: boolean }
+const DEFAULTS: Settings = { names: 'all', bubbles: true, sound: true, paths: false, padSize: 'm', vibrate: true, aimAssist: true, minimap: true };
 
 function read<T>(key: string): Partial<T> | null {
   try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; }
@@ -31,7 +31,8 @@ export function loadSettings(): Settings {
     paths: typeof s.paths === 'boolean' ? s.paths : DEFAULTS.paths,
     padSize: s.padSize === 's' || s.padSize === 'l' ? s.padSize : DEFAULTS.padSize,
     vibrate: typeof s.vibrate === 'boolean' ? s.vibrate : DEFAULTS.vibrate,
-    aimAssist: typeof s.aimAssist === 'boolean' ? s.aimAssist : DEFAULTS.aimAssist
+    aimAssist: typeof s.aimAssist === 'boolean' ? s.aimAssist : DEFAULTS.aimAssist,
+    minimap: typeof s.minimap === 'boolean' ? s.minimap : DEFAULTS.minimap
   };
 }
 export const saveSettings = (s: Settings) => write('vale.opcoes', s);

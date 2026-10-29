@@ -89,7 +89,8 @@ export const configSchema = z.strictObject({
     regenDelay: duration,
     respawnPoint: z.string(),
     respawnDelay: duration,
-    invulnerableAfterRespawn: duration
+    invulnerableAfterRespawn: duration,
+    revive: duration.default(1.5)   // levantar amigo caído: tempo segurando o botão de Ação ao lado dele (0 = desligado)
   }),
   rates: z.strictObject({ xp: rate, drop: rate, gold: rate }),
   leveling: z.strictObject({

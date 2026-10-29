@@ -12,7 +12,7 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 | 1 | Estabilidade: ninguém fica travado | M |
 | 2 | Operação: cuidar do servidor | M |
 | 3 | Itens: pegar e receber melhor | M |
-| 4 | Jogar junto: levantar amigo caído e marcar no mapa | M |
+| 4 | Jogar junto: mapa do mundo, marcador, levantar amigo caído | M |
 | 5 | Grupo (party) | M |
 | 6 | Atributos | G |
 | 7 | Oficina: base e construtor de itens | G |
@@ -21,10 +21,10 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 
 ## Sprint 0: ponto seguro
 
-- [ ] Revisar e commitar o que está pendente no `zeldalike`: app Android, nome Mossblade, logo e ícones, tela de manutenção,
+- [x] Revisar e commitar o que está pendente no `zeldalike`: app Android, nome Mossblade, logo e ícones, tela de manutenção,
       reconexão automática, crescimento por nível menor, documentos.
-- [ ] Subir para o GitHub e atualizar o servidor.
-- [ ] Avisar a galera: a vida máxima por nível diminuiu (personagens de nível alto perdem vida máxima).
+- [x] Subir para o GitHub e atualizar o servidor.
+- [x] Avisar a galera: a vida máxima por nível diminuiu (personagens de nível alto perdem vida máxima).
 
 ## Sprint 1: estabilidade
 
@@ -55,10 +55,22 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 - [x] Decidido: o ouro continua caindo no chão (e é pego com o botão, como os itens).
 - [x] Drop de monstro: continua no chão. Sugestão para depois: saquinho pessoal só no chefe (ver `docs/IDEIAS.md`).
 
+## Ajustes entre o sprint 3 e o 4
+
+- [x] Cajado: em pé ao lado do corpo, sobe e inclina para a mira ao conjurar (antes parecia um arco apontado).
+- [x] PvP na tela: espadas cruzadas no selo "PvP ligado" do HUD; caveira ao lado do nome de quem está com PvP.
+- [x] Tela cheia no PC: botão ⛶ no canto (no celular continua no controle de toque; no app já é tela cheia).
+
 ## Sprint 4: jogar junto
 
-- [ ] Levantar amigo caído: segurar o botão de Ação em cima dele o levanta com metade da vida.
-- [ ] Marcar no mapa: "venham aqui!" que os outros veem.
+- [x] Mapa do mundo (tecla M, botão 🗺, L3 no controle), desenhado a partir do próprio mapa, **explorado** (se revela
+      andando, salvo no personagem): regiões, você, quem está no mapa, marcadores, lojas, portais, zona segura e baús.
+      O som saiu do M e ficou só em Opções.
+- [x] Minimapa opcional no canto (liga e desliga em Opções; tocar abre o mapa).
+- [x] Marcar no mapa: tocar ou clicar põe "venham aqui!" (todos no mesmo mapa veem por 1 minuto; quando o grupo existir, só o grupo).
+      No mundo, alfinete; fora da tela, seta na borda.
+- [x] Levantar amigo caído: segurar o botão de Ação ao lado por 1,5 s levanta com metade da vida; a contagem para enquanto
+      alguém levanta. Decidido: continua 5 s caído (mais tensão).
 - [ ] Primeiros minutos guiados: missão curta do Velho Tomé (andar, atacar, pegar item, falar com a Rosa).
 
 ## Sprint 5: grupo

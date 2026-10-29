@@ -132,6 +132,20 @@
     <button class="bagbtn" id="bagBtn" type="button" aria-label="Inventário (I)">🎒</button>
     <button class="chatbtn" id="chatBtn" type="button" aria-label="Chat (Enter)">💬</button>
     <button class="menubtn" id="menuBtn" type="button" aria-label="Menu (Esc)" aria-controls="menu">☰</button>
+    <button class="fsbtn" id="fsCorner" type="button" aria-label="Tela cheia" hidden>⛶</button>
+    <button class="mapbtn" id="mapBtn" type="button" aria-label="Mapa (M)">🗺</button>
+    <canvas class="minimap" id="minimap" aria-label="Minimapa: toque para abrir o mapa" hidden></canvas>
+    <div class="worldmap" id="worldmap" role="dialog" aria-label="Mapa" hidden>
+      <div class="menucard mapcard">
+        <div class="row"><strong id="mapTitle">Mapa</strong><button type="button" class="link" id="mapClose">Fechar (M)</button></div>
+        <canvas id="mapCanvas" aria-label="Mapa do mundo: toque ou clique para marcar um lugar"></canvas>
+        <div class="row maprow">
+          <button type="button" class="primary" id="markHere">Marcar onde estou</button>
+          <button type="button" class="link" id="markClear" disabled>Tirar marcador</button>
+        </div>
+        <p class="hint">Toque ou clique no mapa para marcar um lugar ("venham aqui!"). Todos neste mapa veem por 1 minuto.</p>
+      </div>
+    </div>
     <div class="menu" id="menu" role="dialog" aria-modal="true" aria-label="Menu" hidden>
       <div class="menucard">
         <div class="tabs" role="tablist">
@@ -167,7 +181,8 @@
             <p class="hint" id="pvpHint"></p>
           </fieldset>
           <label class="toggle"><input type="checkbox" id="optBubbles"><span>Balões de fala</span></label>
-          <label class="toggle"><input type="checkbox" id="optSound"><span>Som</span><kbd>M</kbd></label>
+          <label class="toggle"><input type="checkbox" id="optSound"><span>Som</span></label>
+          <label class="toggle"><input type="checkbox" id="optMinimap"><span>Minimapa no canto</span></label>
           <label class="toggle"><input type="checkbox" id="optPaths"><span>Caminhos dos monstros</span><kbd>P</kbd></label>
           <fieldset class="group touch-only">
             <legend>Controle de toque</legend>
@@ -196,6 +211,8 @@
             <dt>Controle</dt><dd>Conecte um controle (Bluetooth ou USB). Analógico ou direcional anda; botão de baixo: espada; direita: ação; esquerda: arco; cima ou RB: dash; analógico direito mira. LT: coração, RT: poção, LB: bomba. Start: menu; Select: inventário. Nos menus, o direcional escolhe, baixo confirma e direita fecha.</dd>
             <dt>Celular</dt><dd>Encoste em qualquer lugar do lado esquerdo para andar. Os botões redondos são as teclas; os de cima usam coração, poção e bomba. Jogue deitado e use ⛶ para tela cheia (no iPhone: Compartilhar → Adicionar à Tela de Início).</dd>
             <dt>Mira</dt><dd>Com o mouse sobre a tela, espada, flechas e arremessos seguem o cursor.</dd>
+            <dt>Mapa</dt><dd><kbd>M</kbd>, o botão 🗺 ou o minimapa (controle: aperte o analógico esquerdo). O mapa se revela conforme você explora. Toque ou clique num lugar para marcar "venham aqui!": todos no mapa veem por 1 minuto.</dd>
+            <dt>Amigo caído</dt><dd>Segure <kbd>E</kbd> ao lado de um amigo caído para levantá-lo com metade da vida. Enquanto você segura, a contagem dele para.</dd>
             <dt>Levantar amigos</dt><dd><kbd>E</kbd> de frente para outro jogador levanta; <kbd>E</kbd> de novo arremessa. No colo de alguém? Aperte as teclas rápido para se soltar.</dd>
             <dt>Bombas</dt><dd><kbd>3</kbd> põe uma bomba acesa. <kbd>E</kbd> de frente para ela levanta, <kbd>E</kbd> de novo arremessa. Abre paredes rachadas.</dd>
             <dt>Pescar</dt><dd>De frente para a água, <kbd>E</kbd> ou <kbd>F</kbd> lança a linha. No "!", aperte de novo para fisgar; depois aperte com o cursor na zona verde. Andar recolhe a linha.</dd>

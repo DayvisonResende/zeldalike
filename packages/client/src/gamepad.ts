@@ -3,10 +3,10 @@ import type { Input, InputHooks } from './input';
 // Controle de videogame (Bluetooth ou USB, no celular ou no PC), pelo mapeamento "standard" dos navegadores:
 //   analógico esquerdo ou direcional: andar      analógico direito: mira livre (como o mouse)
 //   botão de baixo (A no Xbox, X no PlayStation): espada     direita: ação/levantar     esquerda: arco     cima: dash
-//   LB/L1: bomba   LT/L2: coração   RT/R2: poção   RB/R1: dash   Start: menu   Select: inventário
+//   LB/L1: bomba   LT/L2: coração   RT/R2: poção   RB/R1: dash   Start: menu   Select: inventário   L3: mapa
 // Com um painel aberto (menu, inventário, loja), o direcional anda entre os botões, baixo confirma e direita fecha.
 const DEAD = 0.4, AIM_DEAD = 0.5;
-const B = { south: 0, east: 1, west: 2, north: 3, lb: 4, rb: 5, lt: 6, rt: 7, select: 8, start: 9, up: 12, down: 13, left: 14, right: 15 } as const;
+const B = { south: 0, east: 1, west: 2, north: 3, lb: 4, rb: 5, lt: 6, rt: 7, select: 8, start: 9, l3: 10, up: 12, down: 13, left: 14, right: 15 } as const;
 const FOCUSABLE = 'button:not(:disabled):not([hidden]), input:not(:disabled), [tabindex="0"]';
 
 export interface PadHooks extends InputHooks { panel(): HTMLElement | null; closePanel(): void; connected(name: string | null): void }
@@ -37,6 +37,7 @@ export class Gamepads {
     if (hit(B.start)) { this.hooks.toggleMenu(); return; }
     if (!this.hooks.started()) { if (now.some((v, i) => v && !was[i])) this.hooks.start(); return; }
     if (hit(B.select)) { this.hooks.toggleBag(); return; }
+    if (hit(B.l3)) { this.hooks.toggleMap(); return; }   // apertar o analógico esquerdo: mapa
     if (hit(B.lb)) this.hooks.quickUse(3);
     if (hit(B.lt)) this.hooks.quickUse(1);
     if (hit(B.rt)) this.hooks.quickUse(2);

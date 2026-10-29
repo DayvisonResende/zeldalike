@@ -1,10 +1,10 @@
-import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type ChatRequest, type GameEvent, type ProfileRequest } from '@vale/shared';
+import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type ChatRequest, type GameEvent, type Profile, type ProfileRequest } from '@vale/shared';
 import valeTmj from '../../../content/maps/vale.tmj?raw';
 import valeTsj from '../../../content/maps/vale.tsj?raw';
 import maintenanceHtml from '../../../manutencao.html?raw';
 import { ensureAudio, setMuted, sfx } from './audio';
 import { follow, type Camera } from './camera';
-import { Input, UI_SELECTOR, bindTouch } from './input';
+import { Input, UI_SELECTOR, bindTouch, toggleFullscreen } from './input';
 import { Gamepads } from './gamepad';
 import { Particles } from './render/particles';
 import { addGlow, addSlide, render } from './render/renderer';
@@ -19,6 +19,7 @@ import { Floaters } from './ui/floaters';
 import { updateFishBar } from './ui/fishbar';
 import { Dialog } from './ui/dialog';
 import { ShopPanel } from './ui/shop';
+import { Minimap, WorldMapPanel } from './ui/worldmap';
 import { showRegion, updateBoss, updateClock, updateHud, updateRaid } from './ui/hud';
 import { Menu } from './ui/menu';
 import { NameTags } from './ui/nametags';
@@ -184,7 +185,6 @@ const menu = new Menu({
 });
 const nameTags = new NameTags(document.getElementById('names')!);
 // M liga/desliga o som, P mostra o mapa de caminhos dos monstros
-function toggleMute() { ensureAudio(); setSettings({ ...settings, sound: !settings.sound }); }
 function togglePaths() { setSettings({ ...settings, paths: !settings.paths }); }
 const refocus = () => { try { stage.focus({ preventScroll: true }); } catch { } };
 // /ignorar nome: esconde as mensagens (e os balões) de alguém, só para você; fica guardado neste navegador.
@@ -207,7 +207,7 @@ const bindChat = (s: Session) => { s.onChat = m => {
 }; };
 bindChat(session);
 // Esc fecha o chat se ele estiver aberto; senão abre/fecha o menu. Enter numa placa avança o texto.
-function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (shop.open) shop.close(); else if (bag.open) bag.close(); else menu.toggle(); }
+function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (worldMap.open) worldMap.close(); else if (shop.open) shop.close(); else if (bag.open) bag.close(); else menu.toggle(); }
 function openChat() { if (!started || menu.open) return; if (dialog.open) { dialog.update(BUTTON.b); return; } chat.show(); }
 function togglePvp() {
   const info = session.pvp(), me = session.me();
@@ -219,6 +219,16 @@ function togglePvp() {
 const floaters = new Floaters(document.getElementById('floaters')!);
 const bag = new BagPanel({ inventory: () => session.inventory(), use: s => session.useItem(s), drop: s => session.dropItem(s), equip: (g, s) => session.equip(g, s), closed: refocus });
 const shop = new ShopPanel({ inventory: () => session.inventory(), deal: (a, s, item, n) => session.shop(a, s, item, n), closed: refocus });
+// Mapa do mundo (M) e minimapa: o que a sessão sabe do mapa atual.
+let profilesNow: ReadonlyMap<string, Profile> = new Map();   // nomes de quem está online (da cena do quadro)
+const mapView = () => {
+  const me = session.me(); if (!ready) return null;
+  return { map: session.map, me, state: session.mapState(), profiles: profilesNow, meId: me?.id ?? '' };
+};
+const worldMap = new WorldMapPanel({ view: mapView, mark: (x, y) => session.mark(x, y), clearMark: () => session.clearMark(), closed: refocus });
+const minimap = new Minimap(() => toggleMap());
+function toggleMap() { if (!started || menu.open || chat.open || shop.open || bag.open) return; worldMap.toggle(); }
+document.getElementById('mapBtn')!.addEventListener('click', () => toggleMap());
 function toggleBag() { if (!started || menu.open || chat.open) return; bag.toggle(); }
 function quickUse(n: 1 | 2 | 3) {
   const inv = session.inventory(); if (!inv) return;
@@ -226,13 +236,16 @@ function quickUse(n: 1 | 2 | 3) {
   if (slot < 0) { const me = session.me(); if (me) floaters.add(me.x, me.y, n === 1 ? 'Sem corações' : n === 2 ? 'Sem poções' : 'Sem bombas', 'notice'); return; }
   session.useItem(slot);
 }
-const hooks = { started: () => started, start: begin, toggleMute, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
+const hooks = { started: () => started, start: begin, toggleMap, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
 const input = new Input(stage, cv, hooks);
 bindTouch(input, hooks, () => settings.vibrate);
+const fsCorner = document.getElementById('fsCorner')!;
+fsCorner.hidden = !document.fullscreenEnabled;
+fsCorner.addEventListener('click', () => { void toggleFullscreen(); });
 // Controle de videogame: com um conectado, o controle de toque some e a tela do jogo cresce.
 const pads = new Gamepads(input, {
   ...hooks,
-  panel: () => shop.open ? document.getElementById('shop') : bag.open ? document.getElementById('bag') : menu.open ? document.getElementById('menu') : null,
+  panel: () => worldMap.open ? document.getElementById('worldmap') : shop.open ? document.getElementById('shop') : bag.open ? document.getElementById('bag') : menu.open ? document.getElementById('menu') : null,
   closePanel: toggleMenu,
   connected: name => {
     if (!name) document.body.classList.remove('gamepad');   // o toque volta; ele some de novo quando um botão do controle for apertado
@@ -291,7 +304,7 @@ function update() {
   if (shake > 0) shake--;
   let inp = emptyInput();
   pads.poll();
-  if (!started || menu.open || chat.open || bag.open || shop.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
+  if (!started || menu.open || chat.open || bag.open || shop.open || worldMap.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
   else if (dialog.open) dialog.update(input.sample(null).tap);   // lendo: o personagem fica parado, mas o mundo continua
   else inp = input.sample(aim());
   for (const ev of session.step(inp)) handle(ev);
@@ -321,20 +334,24 @@ function frame(now: number) {
   while (acc >= STEP) { update(); acc -= STEP; }
   const reticle = input.mouse.active && started && !dialog.open && !menu.open ? input.mouse : null;
   const scene = session.scene(settings.paths);
+  profilesNow = scene.profiles;
   attachHeld(scene);
   updateLock(scene);
   updateClock(scene.day, scene.dark); updateRaid(scene.invasion);
   if (titleShown() && ready && session.status === 'online' && session.me()) hideTitle();   // o mundo chegou: a cena de título sai
   const me = session.me();
-  updatePad(me, session.inventory(), settings.padSize, scene.drops);
+  updatePad(me, session.inventory(), settings.padSize, scene.drops, scene.players);
   updateBoss(me ? scene.enemies.find(e => e.type === 'king' && Math.hypot(e.x - me.x, e.y - me.y) < 200) : undefined);
   updateFishBar(session.me());
   if (!dialog.open) talking = null;
-  render(ctx, scene, { me: session.me(), cam, particles, lock, showPaths: settings.paths, reticle, shake, tick, talking });
+  const marks = ready ? session.mapState().marks : [];
+  render(ctx, scene, { me: session.me(), cam, particles, lock, marks, showPaths: settings.paths, reticle, shake, tick, talking });
   nameTags.update(scene, cam, settings.names, settings.bubbles);
   floaters.update(cam);
   bag.render(); shop.render();
-  updateHud(session.status === 'connecting' ? undefined : session.me(), session.inventory());
+  worldMap.render(tick);
+  minimap.render(started && !account.open && !worldMap.open ? mapView() : null, settings.minimap, tick);
+  updateHud(session.status === 'connecting' ? undefined : session.me(), session.inventory(), id => profilesNow.get(id)?.name);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

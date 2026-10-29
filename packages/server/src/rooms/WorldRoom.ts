@@ -1,6 +1,6 @@
 import { Room, ServerError, type Client } from 'colyseus';
 import {
-  ITEMS, LOOT_IDS, MSG, buyItem, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
+  ITEMS, LOOT_IDS, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
   type ChatMsg, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
@@ -40,6 +40,8 @@ export class WorldRoom extends Room {
   worlds = new Map<string, World>();
   private seats = new Map<string, Seat>();
   private muted = new Map<number, number>();   // personagem → até quando está sem chat (ms)
+  private marks = new Map<string, { map: string; name: string; x: number; y: number; until: number }>();   // marcador de cada um
+  private markAt = new Map<string, number>();   // último marcador de cada um (no máximo um por segundo)
   private events = new Map<string, GameEvent[]>();   // eventos de cada mundo desde o último snapshot
   private ticks = 0;
   private night: boolean | null = null;   // para anunciar quando anoitece e quando amanhece
@@ -66,6 +68,7 @@ export class WorldRoom extends Room {
     this.onMessage(MSG.pvp, (client, msg) => this.onPvp(client, msg));
     this.onMessage(MSG.item, (client, msg) => this.onItem(client, msg));
     this.onMessage(MSG.shop, (client, msg) => this.onShop(client, msg));
+    this.onMessage(MSG.mark, (client, msg) => this.onMark(client, msg));
     this.setFixedTimestep(() => this.step(), TICK_RATE);
     this.scheduleSave();
   }
@@ -104,6 +107,7 @@ export class WorldRoom extends Room {
     const s = resume ?? this.loadState(c), w = this.worlds.get(s.map)!;
     const p = w.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
     p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear;
+    for (const [id, b64] of Object.entries(s.explored)) { const o = this.worlds.get(id); if (o) p.explored[id] = base64ToBits(b64, exploredSize(o.map.cols, o.map.rows)); }
     const m = maxStats(w, p.level); p.maxHp = m.hp; p.maxMp = m.mp;
     p.hp = Math.min(s.hp, m.hp); p.mp = Math.min(s.mp, m.mp);
     onlineCharacters.add(c.id);
@@ -133,6 +137,9 @@ export class WorldRoom extends Room {
     f?.w.removePlayer(client.sessionId);
     this.seats.delete(client.sessionId);
     this.broadcastProfile({ id: client.sessionId, gone: true });
+    const mark = this.marks.get(client.sessionId);
+    if (mark) { this.marks.delete(client.sessionId); this.sendToMap(mark.map, { id: client.sessionId, clear: true }); }
+    this.markAt.delete(client.sessionId);
   }
   async onDispose() { this.unsub?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
 
@@ -178,13 +185,16 @@ export class WorldRoom extends Room {
         if (items.length) chestLoot[k] = items;
       }
     } catch { }
-    return { map, ...at, chests, chestLoot, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
+    const explored: Record<string, string> = {};
+    try { for (const [k, v] of Object.entries(JSON.parse(c.explored ?? '{}'))) if (typeof v === 'string' && this.worlds.has(k)) explored[k] = v; } catch { }
+    return { map, ...at, chests, chestLoot, explored, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
       level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack), gear: parseGear(gear) };
   }
   // Quem sai caído volta no ponto de renascimento do mapa principal, com a vida cheia.
   private stateOf(p: Player, map: string): CharacterState {
     const w = this.worlds.get(map); if (w) pruneChests(w, p);
-    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear } };
+    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear },
+      explored: Object.fromEntries(Object.entries(p.explored).map(([k, v]) => [k, bitsToBase64(v)])) };
     if (p.state === 'dead') {
       const at = respawnPos(this.world, this.world.rules.player.respawnPoint);
       return { map: startMap(), ...at, hp: p.maxHp, mp: p.maxMp, ...keep };
@@ -210,7 +220,9 @@ export class WorldRoom extends Room {
     const msg: WelcomeMsg = {
       id: client.sessionId, tick: w.tick, tiles: w.map.tiles.map(r => r.join('')), sendEvery: this.sendEvery, motd: getConfig().server.motd,
       map: { ...w.map.data, enemies: [] }, at: me ? { x: me.x, y: me.y } : w.map.data.spawn,
-      profiles: [...this.worlds.values()].flatMap(o => [...o.players.values()].map(profileOf))
+      profiles: [...this.worlds.values()].flatMap(o => [...o.players.values()].map(profileOf)),
+      explored: me ? bitsToBase64(exploredOf(w, me)) : '', safe: getConfig().pvp.safeZones,
+      marks: [...this.marks].filter(([, m]) => m.map === w.id && m.until > Date.now()).map(([id, m]) => ({ id, name: m.name, x: m.x, y: m.y, ttl: m.until - Date.now() }))
     };
     client.send(MSG.welcome, msg);
   }
@@ -246,6 +258,22 @@ export class WorldRoom extends Room {
       if (o && Math.hypot(o.x - p.x, o.y - p.y) <= cfg.localRange) s.client.send(MSG.chat, msg);
     }
   }
+  // Marcador "venham aqui!": um por jogador, vale MARK_TTL, chega a quem está no mesmo mapa. { x, y } em pixels, ou { clear: true }.
+  private onMark(client: Client, raw: unknown) {
+    const f = this.find(client.sessionId), m = raw as { x?: unknown; y?: unknown; clear?: unknown } | null;
+    if (!f || !m) return;
+    const now = Date.now();
+    if (now - (this.markAt.get(client.sessionId) ?? 0) < 1000) return;
+    this.markAt.set(client.sessionId, now);
+    if (m.clear) { if (this.marks.delete(client.sessionId)) this.sendToMap(f.seat.map, { id: client.sessionId, clear: true }); return; }
+    const x = Number(m.x), y = Number(m.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= f.w.map.width || y >= f.w.map.height) return;
+    const old = this.marks.get(client.sessionId);
+    if (old && old.map !== f.seat.map) this.sendToMap(old.map, { id: client.sessionId, clear: true });
+    this.marks.set(client.sessionId, { map: f.seat.map, name: f.p.name, x: Math.round(x), y: Math.round(y), until: now + MARK_TTL });
+    this.sendToMap(f.seat.map, { id: client.sessionId, name: f.p.name, x: Math.round(x), y: Math.round(y), ttl: MARK_TTL });
+  }
+  private sendToMap(map: string, msg: MarkMsg) { for (const s of this.seats.values()) if (s.map === map) s.client.send(MSG.mark, msg); }
   // O que os comandos do chat podem fazer, para quem digitou (`id`).
   private commandContext(id: string, reply: (text: string) => void): CommandContext {
     const found = (sid: string): Found | null => { const f = this.find(sid); return f ? { p: f.p, w: f.w, id: sid } : null; };
@@ -388,6 +416,7 @@ export class WorldRoom extends Room {
       };
       const inv = this.world.invasion;
       if (inv) msg.iv = [inv.phase === 'warn' ? -1 : remaining(this.world), Math.max(0, Math.ceil((inv.until - this.world.tick) / TICK_RATE))];
+      if (w.tick % 40 < this.sendEvery) msg.r = [...w.players.values()].filter(o => o.id !== id && o.state !== 'dead').map(o => [o.id, Math.floor(o.x / 16), Math.floor(o.y / 16)]);
       if (seat.bagSent !== me.bagVersion) { msg.bag = me.bag; seat.bagSent = me.bagVersion; }
       const ch = openChests(w, me), mark = ch.join(';') || '-';   // muda ao abrir e quando um baú enche de novo ('' = nunca enviado)
       if (mark !== seat.chestsSent) { msg.ch = ch; seat.chestsSent = mark; }

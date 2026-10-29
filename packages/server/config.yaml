@@ -176,6 +176,8 @@ player:
   respawnPoint: clareira    # id da região onde se renasce
   respawnDelay: 5s
   invulnerableAfterRespawn: 3s
+  revive: 1.5s              # segurar o botão de Ação ao lado de um amigo caído por esse tempo o levanta (0 = desligado);
+                            # enquanto alguém está levantando, a contagem para renascer para
 
 # ── PvP ───────────────────────────────────────────────
 pvp:

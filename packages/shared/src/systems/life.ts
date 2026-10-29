@@ -2,7 +2,7 @@ import { TICK_RATE, TS, ticks } from '../constants';
 import type { Player } from '../entities/player';
 import { blockedAt } from '../world/collision';
 import type { World } from '../world';
-import { sfx } from './fx';
+import { burst, sfx } from './fx';
 import { dropCarried } from './throwing';
 import { maxStats } from './progress';
 
@@ -35,17 +35,46 @@ export function respawnPos(w: World, regionId: string) {
 }
 export function respawn(w: World, p: Player) {
   const at = respawnPos(w, w.rules.player.respawnPoint);
-  p.x = at.x; p.y = at.y; p.state = 'walk'; p.t = 0; p.killer = null;
+  p.x = at.x; p.y = at.y; p.state = 'walk'; p.t = 0; p.killer = null; p.revive = 0; p.reviveBy = null;
   p.hp = p.maxHp; p.mp = p.maxMp; p.inv = ticks(w.rules.player.invulnerableAfterRespawn);
   w.emit({ t: 'poof', x: p.x, y: p.y - 4 });
 }
-// Uma vez por passo do mundo: limites da config, regeneração e contagem até renascer.
+/* ---------- Levantar amigo caído ----------
+   Quem cai fica no chão por respawnDelay. Um amigo que segura o botão de Ação ao lado dele por `revive` o levanta ali
+   mesmo, com metade da vida. Enquanto alguém está levantando, a contagem para; soltou ou se afastou, volta a correr. */
+export const REVIVE_RANGE = 16;
+function reviver(w: World, p: Player) {
+  let best: Player | null = null, bd = REVIVE_RANGE;
+  for (const o of w.players.values()) {
+    if (o === p || !o.input.b || (o.state !== 'walk' && o.state !== 'lift')) continue;
+    const d = Math.hypot(o.x - p.x, o.y - p.y);
+    if (d <= bd) { bd = d; best = o; }
+  }
+  return best;
+}
+function revive(w: World, p: Player, by: Player) {
+  p.state = 'walk'; p.t = 0; p.killer = null; p.revive = 0; p.reviveBy = null;
+  p.hp = Math.ceil(p.maxHp / 2); p.inv = ticks(w.rules.player.invulnerableAfterRespawn);
+  w.emit({ t: 'notice', to: p.id, text: `${by.name} te levantou!` });
+  w.emit({ t: 'gain', to: by.id, x: by.x, y: by.y - 8, text: `Levantou ${p.name}!` });
+  burst(w, p.x, p.y - 6, 'heal', 16, { s: 1.2, z: 6, up: 1.5 });
+  sfx(w, 'heal', p);
+}
+
+// Uma vez por passo do mundo: limites da config, regeneração, resgate e contagem até renascer.
 export function updateLife(w: World) {
   const r = w.rules.player;
   for (const p of w.players.values()) {
     const m = maxStats(w, p.level);
     p.maxHp = m.hp; p.maxMp = m.mp;
     if (p.state === 'dead') {
+      const helper = r.revive > 0 ? reviver(w, p) : null;
+      if (helper) {
+        if (p.reviveBy !== helper.id) { p.reviveBy = helper.id; p.revive = 0; }
+        if (++p.revive >= ticks(r.revive)) revive(w, p, helper);
+        continue;   // alguém está levantando: a contagem para
+      }
+      p.revive = 0; p.reviveBy = null;
       if (--p.t > 0) continue;
       if (w.home) respawn(w, p); else { p.t = 1e9; w.emit({ t: 'gohome', id: p.id }); }   // o servidor leva para o mapa principal
       continue;

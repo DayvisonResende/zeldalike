@@ -89,6 +89,15 @@ fica apertada com um bloco em cima ou com alguém de pé nela; com todas as plac
 outra) apertadas, os portões (`G`) a até 8 tiles abrem, e fecham quando uma solta. Blocos fora do lugar voltam
 sozinhos depois de `regrow.block` sem ninguém perto. Nas Ruínas de Aurel há uma cripta com um baú.
 
+**Mapa do mundo:** `M` (ou o botão 🗺, ou tocar no minimapa do canto) abre o mapa do mapa atual, desenhado a partir dos
+tiles. Ele começa escuro e se revela conforme você anda (o explorado fica salvo no personagem). Mostra regiões, zonas
+seguras, lojas, portais, baús, quem está no mapa e os marcadores: tocar ou clicar põe o seu "venham aqui!", que todos no
+mesmo mapa veem por 1 minuto (no mundo, um alfinete; fora da tela, uma seta na borda). O minimapa liga e desliga em Opções.
+O som agora fica só em Opções (o `M` é do mapa).
+
+**Amigo caído:** quem cai fica no chão por `player.respawnDelay`. Um amigo que segura o botão de Ação ao lado dele por
+`player.revive` (1,5 s) o levanta ali mesmo, com metade da vida; enquanto alguém está levantando, a contagem para.
+
 **Pegar itens:** o que cai no chão (ouro e itens) fica lá até alguém apertar o botão de Ação perto: um toque pega o
 mais perto (uma setinha mostra qual; no celular o botão vira "Pegar"), segurar pega tudo em volta. O loot continua
 reservado a quem derrubou por `loot.ownerTime`. **Baús** mandam tudo direto para a mochila (ouro, para a carteira); o que
