@@ -91,9 +91,25 @@ sozinhos depois de `regrow.block` sem ninguém perto. Nas Ruínas de Aurel há u
 
 **Mapa do mundo:** `M` (ou o botão 🗺, ou tocar no minimapa do canto) abre o mapa do mapa atual, desenhado a partir dos
 tiles. Ele começa escuro e se revela conforme você anda (o explorado fica salvo no personagem). Mostra regiões, zonas
-seguras, lojas, portais, baús, quem está no mapa e os marcadores: tocar ou clicar põe o seu "venham aqui!", que todos no
-mesmo mapa veem por 1 minuto (no mundo, um alfinete; fora da tela, uma seta na borda). O minimapa liga e desliga em Opções.
+seguras, lojas, portais, baús, quem está no mapa e os marcadores: tocar ou clicar põe o seu "venham aqui!", que vale por
+1 minuto (no mundo, um alfinete; fora da tela, uma seta na borda). Em grupo, só o grupo vê; sem grupo, todos no mapa. O minimapa liga e desliga em Opções.
 O som agora fica só em Opções (o `M` é do mapa).
+
+**Atributos:** ataque, poder mágico, velocidade de ataque, defesa, vida, mana e regenerações. Vêm do que está nos
+botões A e C (seção `gear` do `config.yaml`; as armas atuais estão zeradas, os números virão com os itens da Oficina);
+o nível dá só vida e mana. O dano em monstros é em pontos de vida (`weapons` e `magic`). Entre jogadores, os atributos
+valem `pvp.factor` (0,5 = metade do ataque, do poder mágico e da defesa). Menu → Atributos mostra a
+ficha e o que cada botão faz; no inventário, escolher uma arma mostra os números dela e o que muda ao equipar no A ou
+no C (verde melhora, vermelho piora).
+
+**Grupo:** `G` (ou Menu → Grupo) mostra quem está online, em que região, com "Convidar". O convite aparece no alto da
+tela (Aceitar/Recusar) e na aba Grupo; também dá pelo chat: `/convidar nome`, `/aceitar`, `/recusar`, `/sairdogrupo`,
+`/grupo`. Até `party.maxSize` (4) por grupo; quem convidou lidera (pode convidar e tirar; saindo, o mais antigo lidera).
+No grupo: a vida de cada um aparece embaixo da sua (e onde está, se estiver em outro mapa), uma seta verde na borda da
+tela aponta para quem está longe, o nome fica verde, o XP de monstro é dividido igualmente com quem estiver até
+`party.xpRange` pixels (arredondado para cima), ninguém fere ninguém (nem com PvP) e há o canal de chat "Grupo"
+(`Tab` ou `/p mensagem`). O loot continua como antes. O grupo dura enquanto estiverem online (sobrevive a uma queda de
+conexão; quem sai do jogo sai do grupo).
 
 **Amigo caído:** quem cai fica no chão por `player.respawnDelay`. Um amigo que segura o botão de Ação ao lado dele por
 `player.revive` (1,5 s) o levanta ali mesmo, com metade da vida; enquanto alguém está levantando, a contagem para.

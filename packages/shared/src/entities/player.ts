@@ -4,6 +4,7 @@ import { DEFAULT_LOOK, type Look } from '../looks';
 import { emptyInventory, type LootId, type Slot } from '../items';
 import type { Fishing } from '../systems/fishing';
 import type { Body } from '../world/collision';
+import type { Stats } from '../systems/stats';
 import { DEFAULT_GEAR, type GearId, type GearSlot } from '../gear';
 
 export type Carryable = 'b' | 'r' | 'bomb' | 'player';
@@ -45,6 +46,8 @@ export interface Player extends Body {
   fish: Fishing | null;   // baús que abriu ("mapa:x,y" → quando, em ms)
   input: InputState;
   region: string | null;
+  stats: Stats;              // atributos (do equipamento); o servidor calcula e manda
+  party: string | null;      // grupo em que está (o servidor cuida; aqui só para dividir XP e não se ferir)
 }
 
 export function createPlayer(id: string, name: string, x: number, y: number, look: Look = DEFAULT_LOOK, maxHp = 100, maxMp = 50): Player {
@@ -52,5 +55,6 @@ export function createPlayer(id: string, name: string, x: number, y: number, loo
     inv: 0, kx: 0, ky: 0, carry: null, liftFrom: null, carryFuse: 0, holding: null, heldBy: null, struggle: 0, prevDirs: 0, vz: 0, throwBy: null, flyFrom: null, charge: 0, charged: false, gear: { ...DEFAULT_GEAR }, using: null, useBtn: 'a', big: false, slowUntil: 0, shove: 0, holdB: 0, revive: 0, reviveBy: null, explored: {}, hit: new Set(),
     hp: maxHp, maxHp, mp: maxMp, maxMp, hurtAt: -Infinity, killer: null, pvp: false, pvpOnAt: -Infinity, combatAt: -Infinity, pvpActive: false, safe: false,
     level: 1, xp: 0, gold: 0, bag: emptyInventory(20), bagVersion: 0, useAt: -Infinity, inPortal: true, portalWait: 0, chests: {}, chestsVersion: 0, chestLoot: {}, steps: 0, fish: null,
-    input: emptyInput(), region: null };
+    input: emptyInput(), region: null, party: null,
+    stats: { attack: 0, magic: 0, attackSpeed: 0, defense: 0, hp: 0, mp: 0, hpRegen: 0, mpRegen: 0 } };
 }

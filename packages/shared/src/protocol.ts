@@ -13,7 +13,7 @@ import type { MapData } from './world/map';
 
 /* Mensagens entre cliente e servidor. Tudo em arrays curtos: com 100 jogadores, cada byte conta.
    Posições viajam em décimos de pixel e ângulos em milésimos de radiano, como inteiros. */
-export const MSG = { hello: 'h', input: 'i', snapshot: 's', welcome: 'w', profile: 'p', chat: 'c', pvp: 'v', item: 't', shop: 'k', mark: 'm' } as const;
+export const MSG = { hello: 'h', input: 'i', snapshot: 's', welcome: 'w', profile: 'p', chat: 'c', pvp: 'v', item: 't', shop: 'k', mark: 'm', party: 'g', rules: 'r' } as const;   // rules: GearRules (números das armas), ao entrar e quando o config muda
 
 /* ---------- Input: [seq, bits, mira] ---------- */
 const HELD = ['up', 'down', 'left', 'right', 'a', 'b', 'c', 'd'] as const;
@@ -93,19 +93,19 @@ export const packBomb = (b: BombView): BombTuple => [b.id, q(b.x), q(b.y), b.fus
 export const unpackBomb = (t: BombTuple): BombView => ({ id: t[0], x: uq(t[1]), y: uq(t[2]), fuse: t[3] });
 
 /* ---------- Estado completo do próprio jogador (para a previsão no cliente) ---------- */
-type OwnKeys = 'x' | 'y' | 'z' | 'push' | 'dvx' | 'dvy' | 'hop' | 'dir' | 'aim' | 'state' | 't' | 'step' | 'walkT' | 'inv' | 'kx' | 'ky' | 'carry' | 'liftFrom' | 'charge' | 'charged' | 'hp' | 'maxHp' | 'mp' | 'maxMp' | 'killer' | 'pvp' | 'pvpActive' | 'safe' | 'level' | 'xp' | 'gold' | 'inPortal' | 'portalWait' | 'steps' | 'fish' | 'carryFuse' | 'holding' | 'heldBy' | 'struggle' | 'prevDirs' | 'gear' | 'using' | 'useBtn' | 'big' | 'slowUntil' | 'shove' | 'holdB' | 'revive' | 'reviveBy';
+type OwnKeys = 'x' | 'y' | 'z' | 'push' | 'dvx' | 'dvy' | 'hop' | 'dir' | 'aim' | 'state' | 't' | 'step' | 'walkT' | 'inv' | 'kx' | 'ky' | 'carry' | 'liftFrom' | 'charge' | 'charged' | 'hp' | 'maxHp' | 'mp' | 'maxMp' | 'killer' | 'pvp' | 'pvpActive' | 'safe' | 'level' | 'xp' | 'gold' | 'inPortal' | 'portalWait' | 'steps' | 'fish' | 'carryFuse' | 'holding' | 'heldBy' | 'struggle' | 'prevDirs' | 'gear' | 'using' | 'useBtn' | 'big' | 'slowUntil' | 'shove' | 'holdB' | 'revive' | 'reviveBy' | 'stats';
 export type OwnState = Pick<Player, OwnKeys> & { hit: (number | string)[] };
 export function ownState(p: Player): OwnState {
   return { x: p.x, y: p.y, z: p.z, push: p.push, dvx: p.dvx, dvy: p.dvy, hop: p.hop && { ...p.hop }, dir: p.dir, aim: p.aim, state: p.state, t: p.t, step: p.step, walkT: p.walkT,
     inv: p.inv, kx: p.kx, ky: p.ky, carry: p.carry, liftFrom: p.liftFrom && { ...p.liftFrom }, charge: p.charge, charged: p.charged, hit: [...p.hit],
     hp: Math.round(p.hp * 10) / 10, maxHp: p.maxHp, mp: Math.round(p.mp * 10) / 10, maxMp: p.maxMp,
     killer: p.killer, pvp: p.pvp, pvpActive: p.pvpActive, safe: p.safe, level: p.level, xp: p.xp, gold: p.gold, inPortal: p.inPortal, portalWait: p.portalWait, steps: p.steps, fish: p.fish && { ...p.fish }, carryFuse: p.carryFuse, holding: p.holding, heldBy: p.heldBy, struggle: p.struggle, prevDirs: p.prevDirs,
-    gear: { ...p.gear }, using: p.using, useBtn: p.useBtn, big: p.big, slowUntil: p.slowUntil, shove: p.shove, holdB: p.holdB, revive: p.revive, reviveBy: p.reviveBy };
+    gear: { ...p.gear }, using: p.using, useBtn: p.useBtn, big: p.big, slowUntil: p.slowUntil, shove: p.shove, holdB: p.holdB, revive: p.revive, reviveBy: p.reviveBy, stats: { ...p.stats } };
 }
 export function applyOwnState(p: Player, s: OwnState) {
-  const { hit, hop, liftFrom, fish, gear, ...rest } = s;
+  const { hit, hop, liftFrom, fish, gear, stats, ...rest } = s;
   Object.assign(p, rest);
-  p.gear = { ...gear };
+  p.gear = { ...gear }; p.stats = { ...stats };
   p.fish = fish && { ...fish };
   p.hop = hop && { ...hop }; p.liftFrom = liftFrom && { ...liftFrom }; p.hit = new Set(hit);
 }
@@ -149,6 +149,18 @@ export interface SnapshotMsg {
   iv?: [number, number];  // invasão em andamento: [gelecas restantes (-1 = ainda no aviso), segundos até o fim do aviso/da luta]
   bag?: Slot[];           // inventário: só vem quando mudou
   ch?: string[];          // baús deste mapa vazios para você ("x,y"): só vem quando muda
+  g?: PartyInfo;          // seu grupo (só vem se você estiver em um)
 }
+/* ---------- Grupo ---------- */
+// Cada membro (você incluído, na ordem em que entraram): [id, nome, nível, vida em %, caído (1/0), x, y, onde].
+// x e y em pixels quando está no seu mapa; -1 quando está em outro. `onde`: região (ou mapa) em que ele está.
+export type PartyTuple = [string, string, number, number, number, number, number, string];
+export interface PartyInfo { leader: string; m: PartyTuple[] }
+// Cliente → servidor. invite: pelo nome; kick: só quem lidera; who: lista de quem está online.
+export type PartyRequest = { action: 'invite'; name: string } | { action: 'accept' | 'decline' | 'leave' | 'who' } | { action: 'kick'; id: string };
+// Servidor → cliente: convite recebido (ou que expirou/foi respondido: invite null) e a lista de quem está online.
+export interface OnlineEntry { name: string; level: number; where: string; party: boolean; mine: boolean }
+export type PartyMsg = { invite: { from: string; ttl: number } | null } | { who: OnlineEntry[] };
+export const INVITE_TTL = 60000;
 // Modo do servidor e quantos segundos faltam para você poder desligar o seu PvP.
 export interface PvpInfo { mode: PvpMode; lock: number }

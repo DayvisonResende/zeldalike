@@ -58,11 +58,11 @@ regrow:
   block: 2m                 # bloco empurrado volta ao lugar (quando não tem ninguém perto)
 
 # ── Inimigos ──────────────────────────────────────────
-# hp: golpes de espada para derrubar · damage: vida que tiram do jogador ao encostar · xp: ganho de quem derruba
+# hp: vida (a espada tira 10: geleca com 20 cai em 2 golpes) · damage: vida que tiram do jogador ao encostar · xp: ganho de quem derruba
 # drops: chance de 0 a 1 de cada item (1 unidade), ou { chance, min, max } para sortear a quantidade
 enemies:
   slime:
-    hp: 2
+    hp: 20
     respawn: 2m
     damage: 10
     xp: 5
@@ -72,7 +72,7 @@ enemies:
       heart: 0.2
       mana: 0.1
   beetle:
-    hp: 3
+    hp: 30
     respawn: 4m
     damage: 20
     xp: 12
@@ -83,7 +83,7 @@ enemies:
       mana: 0.15
       bomb: 0.2
   bat:                      # morcego: voa por cima de água e arbustos; no Tiled, "quando: noite" faz ele só aparecer à noite
-    hp: 1
+    hp: 10
     respawn: 1m
     damage: 8
     xp: 4
@@ -91,12 +91,12 @@ enemies:
       gold: { chance: 0.6, min: 1, max: 2 }
       mana: 0.15
   chicken:                  # galinha: inofensiva e imortal (a vingança fica em fun)
-    hp: 1
+    hp: 10
     respawn: 1m
     damage: 0
     xp: 0
   king:                     # Rei Geleca, o chefão da caverna (classe king no Tiled)
-    hp: 40
+    hp: 400
     respawn: 15m
     damage: 25              # por onda de choque ao cair de um pulo (e por encostar)
     xp: 250                 # para cada um que bateu nele, não só para quem deu o último golpe
@@ -119,14 +119,36 @@ fun:
   swarmDamage: 4            # vida por bicada
 
 # ── Magias (cajados e grimório) ───────────────────────
-# mana: quanto gasta; damage: golpes num monstro; pvp: vida tirada de um jogador; radius em pixels (16 = um tile)
+# mana: quanto gasta; damage: vida tirada de um monstro; pvp: vida tirada de um jogador; radius em pixels (16 = um tile)
 magic:
-  fire:    { mana: 6,  damage: 2, pvp: 12 }                 # Cajado de Fogo: bola de fogo
-  blast:   { mana: 15, damage: 3, pvp: 22, radius: 28 }     # ...segurada: explosão
+  fire:    { mana: 6,  damage: 20, pvp: 12 }                 # Cajado de Fogo: bola de fogo
+  blast:   { mana: 15, damage: 30, pvp: 22, radius: 28 }     # ...segurada: explosão
   heal:    { mana: 10, amount: 15, radius: 40 }             # Cajado de Luz: cura quem estiver perto
   bigHeal: { mana: 20, amount: 30, radius: 56 }             # ...segurada: cura maior e empurra monstros
-  shadow:  { mana: 8,  damage: 1, pvp: 8,  drain: 5,  slow: 3s }    # Grimório Sombrio: deixa lento e rouba vida
-  curse:   { mana: 18, damage: 2, pvp: 14, drain: 10, slow: 6s }    # ...segurada: maldição
+  shadow:  { mana: 8,  damage: 10, pvp: 8,  drain: 5,  slow: 3s }    # Grimório Sombrio: deixa lento e rouba vida
+  curse:   { mana: 18, damage: 20, pvp: 14, drain: 10, slow: 6s }    # ...segurada: maldição
+
+# ── Armas ─────────────────────────────────────────────
+# Vida que cada golpe tira de um monstro (para jogadores, veja pvp.damage)
+weapons:
+  sword: 10                 # golpe de espada (e a ponta da espada em riste)
+  spin: 20                  # giro carregado
+  dash: 20                  # dash com a espada
+  arrow: 10                 # flecha
+  thrown: 20                # arbusto, pedra, pote ou jogador arremessado
+  bomb: 30                  # explosão
+
+# Atributos que cada arma dá enquanto estiver no botão A ou C (somam os dois botões). Todos opcionais:
+#   attack: dano a mais na espada (golpe, giro, dash) e na flecha · magic: dano a mais nas magias e cura a mais
+#   attackSpeed: % mais rápido para golpear, atirar, conjurar e carregar (até 50) · defense: 100 = metade do dano recebido
+#   hp, mp: vida e mana máximas a mais · hpRegen, mpRegen: por segundo, a mais
+# Exemplo: firestaff: { magic: 5, mp: 10 }
+gear:
+  sword: {}
+  bow: {}
+  firestaff: {}
+  lightstaff: {}
+  darktome: {}
 
 # ── Lojas ─────────────────────────────────────────────
 # O NPC vira lojista com a propriedade "loja" no Tiled (o id daqui). Preços em ouro.
@@ -192,7 +214,12 @@ pvp:
     arrow: 10
     thrown: 20
     bomb: 30
+  factor: 0.5               # quanto dos atributos vale entre jogadores: 0,5 = metade do ataque, do poder mágico e da defesa
   announceKills: true       # "Fulano derrubou Beltrano" no chat de todos
+
+party:
+  maxSize: 4                # jogadores por grupo
+  xpRange: 320              # pixels: XP de monstro dividido igualmente com quem do grupo estiver até aqui (a tela tem 256)
 
 # ── Progressão e itens ────────────────────────────────
 rates:

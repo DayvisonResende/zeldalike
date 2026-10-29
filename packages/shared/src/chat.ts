@@ -1,6 +1,6 @@
 // Chat. "local" chega a quem está perto (e vira balão sobre a cabeça), "global" a todo o servidor,
-// "system" são avisos do próprio servidor (alguém entrou, saiu...).
-export type ChatChannel = 'local' | 'global';
+// "party" ao seu grupo, "system" são avisos do próprio servidor (alguém entrou, saiu...).
+export type ChatChannel = 'local' | 'global' | 'party';
 export interface ChatRequest { text: string; ch: ChatChannel }
 export interface ChatMsg { ch: ChatChannel | 'system'; text: string; from?: string; name?: string }
 
@@ -13,5 +13,5 @@ export function cleanChat(raw: unknown, max: number): string | null {
 export function decodeChatRequest(m: unknown, max: number): ChatRequest | null {
   if (!m || typeof m !== 'object') return null;
   const r = m as Record<string, unknown>, text = cleanChat(r.text, max);
-  return text ? { text, ch: r.ch === 'global' ? 'global' : 'local' } : null;
+  return text ? { text, ch: r.ch === 'global' || r.ch === 'party' ? r.ch : 'local' } : null;
 }

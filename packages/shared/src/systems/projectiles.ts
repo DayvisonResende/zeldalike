@@ -25,7 +25,7 @@ export function updateThrown(w: World) {
     if (blocksShot(c)) { shatter(w, o.x - o.vx, o.y - o.vy, o.type, o.z); o.dead = true; continue; }
     for (const e of w.enemies) {
       if (!e.dying && o.z < 24 && Math.abs(e.x - o.x) < e.hw + 6 && Math.abs(e.y - o.y) < e.hh + 7) {
-        damage(w, e, 2, o.x - o.vx * 3, o.y - o.vy * 3, w.players.get(o.owner)); shatter(w, o.x, o.y, o.type, o.z); o.dead = true; break;
+        damage(w, e, w.rules.weapons.thrown, o.x - o.vx * 3, o.y - o.vy * 3, w.players.get(o.owner)); shatter(w, o.x, o.y, o.type, o.z); o.dead = true; break;
       }
     }
     if (o.dead) continue;
@@ -72,7 +72,7 @@ export function updateArrows(w: World) {
     // inimigo ainda atordoado do último golpe não segura a flecha: ela passa direto
     for (const e of w.enemies) {
       if (!e.dying && e.hurtT === 0 && Math.abs(e.x - tx) < e.hw + 2 && Math.abs(e.y - ty) < e.hh + 5) {
-        damage(w, e, 1, a.x - a.vx * 2, a.y - a.vy * 2, w.players.get(a.owner)); a.dead = true; break;
+        { const by = w.players.get(a.owner); damage(w, e, w.rules.weapons.arrow + (by?.stats.attack ?? 0), a.x - a.vx * 2, a.y - a.vy * 2, by); } a.dead = true; break;
       }
     }
     // jogador fora do PvP não segura a flecha: ela passa por ele

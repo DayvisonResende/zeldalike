@@ -20,11 +20,14 @@ export class LocalSession implements Session {
   }
   mark(x: number, y: number) { this.myMark = { id: this.player.id, name: this.player.name, x, y, until: Date.now() + MARK_TTL }; }
   clearMark() { this.myMark = null; }
+  gearRules() { const r = this.world.rules; return { weapons: r.weapons, magic: r.magic, gear: r.gear }; }
+  party() { return null; }   // offline não tem grupo
+  partyRequest() { }
   // Sozinho no mundo: a mensagem só volta para você.
   chat(req: ChatRequest) { const text = cleanChat(req.text, 120); if (text) this.onChat?.({ ch: req.ch, text, from: this.player.id, name: this.player.name }); }
   inventory(): Inventory {
     const p = this.player, next = xpToNext(this.world, p.level);
-    return { bag: p.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: isFinite(next) ? next : -1, gear: p.gear };
+    return { bag: p.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: isFinite(next) ? next : -1, gear: p.gear, stats: p.stats, maxHp: p.maxHp, maxMp: p.maxMp };
   }
   private itemResult(r: ItemResult) { if (!r.ok) this.onChat?.({ ch: 'system', text: r.reason }); }
   useItem(slot: number) { this.itemResult(useItem(this.world, this.player, slot)); }

@@ -38,14 +38,14 @@ export function parseConfig(text: string, map?: MapData, others: MapData[] = [])
 export function loadConfig(file: string, map?: MapData, others: MapData[] = []) { return parseConfig(fs.readFileSync(file, 'utf8'), map, others); }
 
 export function toRules(cfg: Config): Rules {
-  const { mode, safeZones, toggleCooldown, combatLock, damage } = cfg.pvp;
+  const { mode, safeZones, toggleCooldown, combatLock, damage, factor } = cfg.pvp;
   const enemy = (e: Config['enemies']['slime']) => ({
     ...e, drops: Object.entries(e.drops).map(([item, d]) => typeof d === 'number' ? { item: item as LootId, chance: d, min: 1, max: 1 } : { item: item as LootId, ...d })
   });
   return {
     regrow: cfg.regrow, enemies: { slime: enemy(cfg.enemies.slime), beetle: enemy(cfg.enemies.beetle), bat: enemy(cfg.enemies.bat), chicken: enemy(cfg.enemies.chicken), king: enemy(cfg.enemies.king) }, player: cfg.player,
     daynight: { cycle: cfg.daynight.cycle, start: cfg.daynight.start / 24 }, fun: cfg.fun, events: cfg.events, shops: cfg.shops, magic: cfg.magic,
-    pvp: { mode, safeZones, toggleCooldown, combatLock, damage }, rates: cfg.rates, leveling: cfg.leveling, inventory: cfg.inventory, loot: cfg.loot
+    pvp: { mode, safeZones, toggleCooldown, combatLock, damage, factor }, rates: cfg.rates, leveling: cfg.leveling, inventory: cfg.inventory, loot: cfg.loot, party: cfg.party, weapons: cfg.weapons, gear: cfg.gear
   };
 }
 

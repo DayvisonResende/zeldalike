@@ -38,7 +38,7 @@ function heal(w: World, p: Player, big: boolean) {
   const h = big ? w.rules.magic.bigHeal : w.rules.magic.heal;
   for (const o of w.players.values()) {
     if (o.state === 'dead' || Math.hypot(o.x - p.x, o.y - p.y) > h.radius) continue;
-    const n = Math.min(h.amount, o.maxHp - o.hp);
+    const n = Math.min(h.amount + p.stats.magic, o.maxHp - o.hp);
     if (n > 0) { o.hp += n; w.emit({ t: 'gain', to: o.id, x: o.x, y: o.y - 8, text: `+${Math.round(n)} vida` }); }
     burst(w, o.x, o.y - 8, 'heal', 8, { s: 0.9, z: 10, up: 1.6 });
   }
@@ -88,8 +88,8 @@ export const slowed = (w: World, x: { slowUntil?: number }) => (x.slowUntil ?? 0
 function shadowHit(w: World, s: Spell, caster: Player | undefined, target: Enemy | Player, isPlayer: boolean) {
   const m = s.big ? w.rules.magic.curse : w.rules.magic.shadow;
   target.slowUntil = w.tick + ticks(m.slow);
-  if (isPlayer) harmPlayer(w, caster!, target as Player, 'sword', m.pvp);
-  else damage(w, target as Enemy, m.damage, s.x - s.vx * 3, s.y - s.vy * 3, caster);
+  if (isPlayer) harmPlayer(w, caster!, target as Player, 'sword', m.pvp, caster!.stats.magic);
+  else damage(w, target as Enemy, m.damage + (caster?.stats.magic ?? 0), s.x - s.vx * 3, s.y - s.vy * 3, caster);
   if (caster && caster.state !== 'dead') {
     const n = Math.min(m.drain, caster.maxHp - caster.hp);
     if (n > 0) { caster.hp += n; w.emit({ t: 'gain', to: caster.id, x: caster.x, y: caster.y - 8, text: `+${Math.round(n)} vida` }); }
@@ -102,8 +102,8 @@ function explode(w: World, s: Spell, caster: Player | undefined) {
   for (let ty = Math.floor((s.y - b.radius) / TS); ty <= Math.floor((s.y + 6 + b.radius) / TS); ty++)
     for (let tx = Math.floor((s.x - b.radius) / TS); tx <= Math.floor((s.x + b.radius) / TS); tx++)
       if (Math.hypot(tx * TS + 8 - s.x, ty * TS + 8 - s.y - 6) <= b.radius + 6) scorch(w, tx, ty);
-  for (const e of w.enemies) if (!e.dying && Math.hypot(e.x - s.x, e.y - s.y) < b.radius + e.hw) damage(w, e, b.damage, s.x, s.y, caster);
-  if (caster) for (const v of w.players.values()) if (Math.hypot(v.x - s.x, v.y - s.y) < b.radius + v.hw && canHarm(w, caster, v)) harmPlayer(w, caster, v, 'bomb', b.pvp);
+  for (const e of w.enemies) if (!e.dying && Math.hypot(e.x - s.x, e.y - s.y) < b.radius + e.hw) damage(w, e, b.damage + (caster?.stats.magic ?? 0), s.x, s.y, caster);
+  if (caster) for (const v of w.players.values()) if (Math.hypot(v.x - s.x, v.y - s.y) < b.radius + v.hw && canHarm(w, caster, v)) harmPlayer(w, caster, v, 'bomb', b.pvp, caster.stats.magic);
   burst(w, s.x, s.y, 'fire', 24, { s: 2, z: 4, up: 1.6 }); sfx(w, 'boom', s);
   for (const p of w.players.values()) { const d = Math.hypot(p.x - s.x, p.y - s.y); if (d < 90) w.emit({ t: 'shake', to: p.id, n: d < b.radius * 2 ? 8 : 4 }); }
 }
@@ -121,7 +121,7 @@ export function updateSpells(w: World) {
     s.dead = true;
     if (s.kind === 'shadow') shadowHit(w, s, caster, (e ?? v)!, !e);
     else if (s.big) explode(w, s, caster);
-    else { if (e) damage(w, e, w.rules.magic.fire.damage, s.x - s.vx * 3, s.y - s.vy * 3, caster); else harmPlayer(w, caster!, v!, 'sword', w.rules.magic.fire.pvp); explode(w, s, caster); }
+    else { if (e) damage(w, e, w.rules.magic.fire.damage + (caster?.stats.magic ?? 0), s.x - s.vx * 3, s.y - s.vy * 3, caster); else harmPlayer(w, caster!, v!, 'sword', w.rules.magic.fire.pvp, caster!.stats.magic); explode(w, s, caster); }
   }
   w.spells = w.spells.filter(s => !s.dead);
 }

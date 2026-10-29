@@ -5,7 +5,7 @@ import type { World } from '../world';
 import { inSafeZone } from './pvp';
 import { isNight } from './daynight';
 import { dropLoot } from './loot';
-import { gainXp } from './progress';
+import { shareXp } from './progress';
 import { onInvaderDead } from './invasion';
 import { onKingDead } from './boss';
 
@@ -20,7 +20,7 @@ export function createEnemy(w: World, type: EnemyType, tx: number, ty: number, s
 export function onEnemyDead(w: World, e: Enemy) {
   const killer = e.lastHitBy ? w.players.get(e.lastHitBy) : undefined;
   if (e.type === 'king') onKingDead(w, e);
-  else { if (killer) gainXp(w, killer, w.rules.enemies[e.type].xp); dropLoot(w, e, killer); }
+  else { if (killer) shareXp(w, killer, w.rules.enemies[e.type].xp); dropLoot(w, e, killer); }
   if (e.invader) onInvaderDead(w, killer?.id);
   const s = w.spawns[e.spawn];
   if (s) { s.alive = null; s.at = w.tick + ticks(w.rules.enemies[e.type].respawn); }

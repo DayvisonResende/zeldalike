@@ -52,7 +52,7 @@ export function explode(w: World, x: number, y: number, ownerId: string) {
       else continue;
       burst(w, tx * TS + 8, ty * TS + 8, c === 'X' || c === 'Y' ? 'rock' : 'leaf', 10, { s: 1.6, z: 6 });
     }
-  for (const e of w.enemies) if (!e.dying && Math.hypot(e.x - x, e.y - y) < BLAST + e.hw) damage(w, e, 3, x, y, owner);
+  for (const e of w.enemies) if (!e.dying && Math.hypot(e.x - x, e.y - y) < BLAST + e.hw) damage(w, e, w.rules.weapons.bomb, x, y, owner);
   for (const p of w.players.values()) {
     const d = Math.hypot(p.x - x, p.y - y);
     if (d < 120) w.emit({ t: 'shake', to: p.id, n: d < BLAST * 2 ? 12 : 5 });

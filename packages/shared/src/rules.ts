@@ -1,6 +1,8 @@
 import type { PvpAttack, PvpMode } from './systems/pvp';
 import type { LootId } from './items';
 import type { ShopRule } from './systems/shop';
+import type { Stats } from './systems/stats';
+import type { GearId } from './gear';
 
 export type EnemyType = 'slime' | 'beetle' | 'bat' | 'chicken' | 'king';
 
@@ -42,7 +44,11 @@ export interface Rules {
     toggleCooldown: number;               // depois de ligar, só desliga após esse tempo
     combatLock: number;                   // depois de uma briga, não desliga por esse tempo
     damage: Record<PvpAttack, number>;
+    factor: number;                       // quanto do ataque, do poder mágico e da defesa vale entre jogadores (0 = nada, 1 = tudo)
   };
+  party: { maxSize: number; xpRange: number };
+  weapons: Record<PvpAttack, number>;
+  gear: Partial<Record<GearId, Partial<Stats>>>;   // atributos que cada arma dá enquanto estiver no A ou no C   // dano em monstros, em pontos de vida, de cada golpe (a ponta da espada em riste conta como sword)   // grupo: tamanho máximo; XP dividido com quem estiver até xpRange (px) de quem derrubou
 }
 // Um item da tabela de drop: chance de 0 a 1 e quantidade sorteada entre min e max.
 export interface DropRule { item: LootId; chance: number; min: number; max: number }
@@ -50,11 +56,11 @@ export interface DropRule { item: LootId; chance: number; min: number; max: numb
 export const DEFAULT_RULES: Rules = {
   regrow: { bush: 180, tallGrass: 60, rock: 300, secret: 300, torch: 90, block: 120 },
   enemies: {
-    slime: { hp: 2, respawn: 120, damage: 10, xp: 5, drops: [{ item: 'gold', chance: 0.8, min: 1, max: 3 }, { item: 'jelly', chance: 0.5, min: 1, max: 1 }, { item: 'heart', chance: 0.2, min: 1, max: 1 }, { item: 'mana', chance: 0.1, min: 1, max: 1 }] },
-    beetle: { hp: 3, respawn: 240, damage: 20, xp: 12, drops: [{ item: 'gold', chance: 0.9, min: 2, max: 6 }, { item: 'shell', chance: 0.4, min: 1, max: 1 }, { item: 'heart', chance: 0.25, min: 1, max: 1 }, { item: 'mana', chance: 0.15, min: 1, max: 1 }] },
-    bat: { hp: 1, respawn: 60, damage: 8, xp: 4, drops: [{ item: 'gold', chance: 0.6, min: 1, max: 2 }, { item: 'mana', chance: 0.15, min: 1, max: 1 }] },
-    chicken: { hp: 1, respawn: 60, damage: 0, xp: 0, drops: [] },
-    king: { hp: 40, respawn: 900, damage: 25, xp: 250, drops: [{ item: 'gold', chance: 1, min: 30, max: 60 }, { item: 'jelly', chance: 1, min: 3, max: 5 }, { item: 'heart', chance: 1, min: 2, max: 2 }, { item: 'bomb', chance: 0.5, min: 2, max: 4 }] }
+    slime: { hp: 20, respawn: 120, damage: 10, xp: 5, drops: [{ item: 'gold', chance: 0.8, min: 1, max: 3 }, { item: 'jelly', chance: 0.5, min: 1, max: 1 }, { item: 'heart', chance: 0.2, min: 1, max: 1 }, { item: 'mana', chance: 0.1, min: 1, max: 1 }] },
+    beetle: { hp: 30, respawn: 240, damage: 20, xp: 12, drops: [{ item: 'gold', chance: 0.9, min: 2, max: 6 }, { item: 'shell', chance: 0.4, min: 1, max: 1 }, { item: 'heart', chance: 0.25, min: 1, max: 1 }, { item: 'mana', chance: 0.15, min: 1, max: 1 }] },
+    bat: { hp: 10, respawn: 60, damage: 8, xp: 4, drops: [{ item: 'gold', chance: 0.6, min: 1, max: 2 }, { item: 'mana', chance: 0.15, min: 1, max: 1 }] },
+    chicken: { hp: 10, respawn: 60, damage: 0, xp: 0, drops: [] },
+    king: { hp: 400, respawn: 900, damage: 25, xp: 250, drops: [{ item: 'gold', chance: 1, min: 30, max: 60 }, { item: 'jelly', chance: 1, min: 3, max: 5 }, { item: 'heart', chance: 1, min: 2, max: 2 }, { item: 'bomb', chance: 0.5, min: 2, max: 4 }] }
   },
   rates: { xp: 1, drop: 1, gold: 1 },
   leveling: { maxLevel: 50, base: 50, exponent: 1.5, hpPerLevel: 2, manaPerLevel: 1 },
@@ -63,12 +69,15 @@ export const DEFAULT_RULES: Rules = {
   daynight: { cycle: 1440, start: 0.33 },
   fun: { liftPlayers: true, struggle: 10, chickenAnger: 5, swarmSize: 8, swarmTime: 10, swarmDamage: 4 },
   magic: {
-    fire: { mana: 6, damage: 2, pvp: 12 }, blast: { mana: 15, damage: 3, pvp: 22, radius: 28 },
+    fire: { mana: 6, damage: 20, pvp: 12 }, blast: { mana: 15, damage: 30, pvp: 22, radius: 28 },
     heal: { mana: 10, amount: 15, radius: 40 }, bigHeal: { mana: 20, amount: 30, radius: 56 },
-    shadow: { mana: 8, damage: 1, pvp: 8, drain: 5, slow: 3 }, curse: { mana: 18, damage: 2, pvp: 14, drain: 10, slow: 6 }
+    shadow: { mana: 8, damage: 10, pvp: 8, drain: 5, slow: 3 }, curse: { mana: 18, damage: 20, pvp: 14, drain: 10, slow: 6 }
   },
   shops: {},
   events: { invasion: { every: 0, warning: 30, duration: 180, count: 20, zone: 'clareira', reward: { xp: 40, gold: 20 } } },
   player: { maxHp: 100, maxMana: 50, hpRegen: 2, manaRegen: 3, regenDelay: 5, respawnPoint: '', respawnDelay: 5, invulnerableAfterRespawn: 3, revive: 1.5 },
-  pvp: { mode: 'optional', safeZones: [], toggleCooldown: 300, combatLock: 30, damage: { sword: 15, spin: 25, dash: 20, arrow: 10, thrown: 20, bomb: 30 } }
+  pvp: { mode: 'optional', safeZones: [], toggleCooldown: 300, combatLock: 30, damage: { sword: 15, spin: 25, dash: 20, arrow: 10, thrown: 20, bomb: 30 }, factor: 0.5 },
+  party: { maxSize: 4, xpRange: 320 },
+  weapons: { sword: 10, spin: 20, dash: 20, arrow: 10, thrown: 20, bomb: 30 },
+  gear: {}
 };

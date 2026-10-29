@@ -45,7 +45,7 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 - [x] Comandos de administrador no chat: `/anunciar`, `/expulsar`, `/invasao` (começar agora), `/dar` (item).
 - [x] Moderação básica: filtro de palavrões (desligável), silenciar um jogador.
 - [x] Também: `/silenciar` e `/dessilenciar`, `/backup`, `/quem`, `/ajuda` e `/ignorar` (pessoal, no jogo).
-- [ ] Pôr o seu usuário em `admins` no `config.yaml` do servidor e testar os comandos com os amigos.
+- [x] Pôr o seu usuário em `admins` no `config.yaml` do servidor e testar os comandos (testados no servidor).
 - HTTPS com Caddy: fica para o fim (decisão de 2026-10-28).
 
 ## Sprint 3: itens
@@ -71,21 +71,34 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
       No mundo, alfinete; fora da tela, seta na borda.
 - [x] Levantar amigo caído: segurar o botão de Ação ao lado por 1,5 s levanta com metade da vida; a contagem para enquanto
       alguém levanta. Decidido: continua 5 s caído (mais tensão).
-- [ ] Primeiros minutos guiados: missão curta do Velho Tomé (andar, atacar, pegar item, falar com a Rosa).
+- Primeiros minutos guiados (missão do Velho Tomé): adiado para depois do mapa novo (decisão de 2026-10-28).
 
 ## Sprint 5: grupo
 
-- [ ] Convidar para um grupo, sair do grupo.
-- [ ] Vida dos amigos no HUD e seta na borda da tela apontando para cada um.
-- [ ] XP e loot divididos no grupo.
-- [ ] Lista de amigos online e em que região.
+- [x] Convidar para um grupo, sair do grupo (aba Grupo no menu, tecla G, aviso com Aceitar/Recusar e comandos no chat).
+      Decidido: até 4 por grupo, alterável em `party.maxSize` no `config.yaml`. Quem convidou lidera e pode tirar alguém.
+- [x] Vida dos amigos no HUD e seta verde na borda da tela apontando para cada um (nome verde, pontos verdes no mapa).
+- [x] XP dividido igualmente entre quem do grupo está perto (`party.xpRange`). Decidido: loot continua livre, como antes.
+- [x] Lista de quem está online e em que região (aba Grupo), com "Convidar".
+- [x] Também: chat só do grupo (`Tab` até "Grupo" ou `/p`), sem fogo amigo no grupo, marcador do mapa só para o grupo.
+- [ ] Testar com a galera (3 ou 4 no grupo, um em outro mapa, alguém caindo da conexão).
 
 ## Sprint 6: atributos
 
-- [ ] Dano em pontos em vez de golpes (vida dos monstros e dano das armas em números, mantendo a sensação de hoje).
-- [ ] Atributos: ataque, defesa, poder mágico, velocidade de ataque, vida, mana, regenerações e os demais de `docs/OFICINA.md`.
-- [ ] Ficha "Atributos" no menu; números no item; diferença em verde e vermelho ao equipar.
-- [ ] Atributos nas armas atuais; fator de PvP no config.
+- [x] Dano em pontos em vez de golpes: vida dos monstros ×10 (geleca 20, besouro 30, morcego 10, Rei 400), dano de cada
+      ataque na seção `weapons` do `config.yaml` (espada 10, giro 20, dash 20, flecha 10, arremesso 20, bomba 30) e das
+      magias em `magic`. O jogo continua igual (geleca em 2 golpes); um teste garante isso.
+- Decidido (2026-10-28): sem números de dano saltando na tela e barra de vida só nos chefes (para não poluir o visual);
+  o nível continua dando só vida e mana.
+- [x] Atributos: ataque, poder mágico, velocidade de ataque (até 50%), defesa (100 = metade do dano), vida, mana e
+      regenerações. Vêm do que está nos botões A e C (seção `gear` do `config.yaml`, zerada: o jogo continua igual);
+      o servidor calcula e manda ao cliente. Os demais de `docs/OFICINA.md` (crítico, roubo de vida…) ficam para depois.
+- [x] Ficha "Atributos" no menu; números das armas no inventário; diferença em verde e vermelho ao escolher uma arma
+      (o que muda se for para o A ou para o C). O servidor manda os números ao entrar e quando o config muda.
+- Decidido (2026-10-28): as armas atuais ficam com os atributos zerados; os números aparecem nos itens novos, a partir da Oficina.
+- [x] Fator de PvP no config (`pvp.factor`, começa em 0,5): entre jogadores vale metade do ataque, do poder mágico e da
+      defesa, para item bom ajudar sem decidir a briga sozinho.
+- [ ] Testar com a galera: subir com o `config.yaml` novo (vida dos monstros ×10) e conferir que o jogo continua igual.
 
 ## Sprint 7: Oficina (base e itens)
 
@@ -109,5 +122,6 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 
 ## Depois (sem data)
 
-Notificações no app Android, horta e fazenda, troca entre jogadores, construtores de NPCs, monstros e magias, receitas,
+Primeiros minutos guiados (missão curta do Velho Tomé: andar, atacar, pegar item, falar com a Rosa), quando o mapa novo
+estiver pronto. Notificações no app Android, horta e fazenda, troca entre jogadores, construtores de NPCs, monstros e magias, receitas,
 missões, minijogos, clima, música por região, eventos de temporada, acessibilidade.

@@ -13,11 +13,14 @@ export interface CommandContext {
   kick(id: string, reason: string): void;
   mute(id: string, minutes: number): void;
   unmute(id: string): boolean;
+  party(action: 'invite' | 'accept' | 'decline' | 'leave' | 'show', arg: string): void;
   startInvasion(): boolean;
   backup(): Promise<string>;
 }
 
-const PUBLIC = ['/ajuda — esta lista', '/quem — quem está online e onde', '/ignorar nome — esconde as mensagens de alguém, só para você (/designorar, /ignorados)'];
+const PUBLIC = ['/ajuda — esta lista', '/quem — quem está online e onde', '/ignorar nome — esconde as mensagens de alguém, só para você (/designorar, /ignorados)',
+  '/grupo — quem está no seu grupo', '/convidar nome — chama para o grupo', '/aceitar e /recusar — respondem a um convite', '/sairdogrupo', '/p texto — fala só com o grupo'];
+const PARTY = { grupo: 'show', convidar: 'invite', aceitar: 'accept', recusar: 'decline', sairdogrupo: 'leave' } as const;
 const ADMIN = [
   '/anunciar texto — aviso para todo o servidor',
   '/expulsar nome [motivo] — tira do servidor (pode voltar)',
@@ -49,6 +52,12 @@ export async function runCommand(ctx: CommandContext, text: string) {
   if (cmd === 'quem') {
     const all = ctx.online();
     ctx.reply(`Online (${all.length}): ` + all.map(f => `${f.p.name} (${where(f)})`).join(', '));
+    return;
+  }
+  if (cmd in PARTY) {
+    const action = PARTY[cmd as keyof typeof PARTY];
+    if (action === 'invite' && !a[0]) { ctx.reply('Use: /convidar nome'); return; }
+    ctx.party(action, a.join(' '));
     return;
   }
   const known = ['anunciar', 'expulsar', 'silenciar', 'dessilenciar', 'invasao', 'dar', 'backup'];

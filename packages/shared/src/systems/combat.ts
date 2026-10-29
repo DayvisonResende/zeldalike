@@ -42,7 +42,7 @@ export function swordHits(w: World, p: Player) {
     cutAt(w, x, y, p.id);
     for (const e of w.enemies) {
       if (e.dying || p.hit.has(e.id)) continue;
-      if (hitsEnemy(e, x, y)) { p.hit.add(e.id); damage(w, e, p.state === 'spin' ? 2 : 1, p.x, p.y, p); }
+      if (hitsEnemy(e, x, y)) { p.hit.add(e.id); damage(w, e, w.rules.weapons[p.state === 'spin' ? 'spin' : 'sword'] + p.stats.attack, p.x, p.y, p); }
     }
     for (const o of w.players.values()) {
       if (o === p || p.hit.has(o.id) || !hitsBody(o, x, y)) continue;
@@ -54,7 +54,7 @@ export function swordHits(w: World, p: Player) {
 export function pokeTip(w: World, p: Player) {
   const s = swordPose(p); if (!s) return;
   const [x, y] = along(s, 1);
-  for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, 1, p.x, p.y, p);
+  for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, w.rules.weapons.sword + p.stats.attack, p.x, p.y, p);
   for (const o of w.players.values()) if (o !== p && hitsBody(o, x, y)) harmPlayer(w, p, o, 'sword');
 }
 export function dashHits(w: World, p: Player) {
@@ -62,7 +62,7 @@ export function dashHits(w: World, p: Player) {
   for (const f of [0.6, 1.0]) {
     const [x, y] = along(s, f);
     cutAt(w, x, y, p.id);
-    for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, 2, p.x, p.y, p);
+    for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, w.rules.weapons.dash + p.stats.attack, p.x, p.y, p);
     for (const o of w.players.values()) if (o !== p && hitsBody(o, x, y)) harmPlayer(w, p, o, 'dash');
   }
 }

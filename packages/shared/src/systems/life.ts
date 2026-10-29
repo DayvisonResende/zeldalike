@@ -4,14 +4,14 @@ import { blockedAt } from '../world/collision';
 import type { World } from '../world';
 import { burst, sfx } from './fx';
 import { dropCarried } from './throwing';
-import { maxStats } from './progress';
+import { afterDefense, refreshStats } from './stats';
 
 /* ---------- Vida, mana, morte e renascimento ---------- */
 
-// Dano em um jogador: empurra, derruba o que estiver no colo e, zerando a vida, derruba o jogador.
+// Dano em um jogador (by: outro jogador, no PvP): empurra, derruba o que estiver no colo e, zerando a vida, derruba o jogador.
 export function damagePlayer(w: World, p: Player, n: number, from: { x: number; y: number }, by?: Player) {
   if (p.state === 'dead' || p.inv > 0) return;
-  p.hp = Math.max(0, p.hp - n); p.hurtAt = w.tick; p.fish = null;
+  p.hp = Math.max(0, p.hp - afterDefense(p, n, by ? w.rules.pvp.factor : 1)); p.hurtAt = w.tick; p.fish = null;   // de jogador: defesa × pvp.factor
   if (p.carry) dropCarried(w, p);
   if (p.hp === 0) { die(w, p); if (by) { p.killer = by.name; w.emit({ t: 'kill', by: by.id, victim: p.id }); } return; }
   const a = Math.atan2(p.y - from.y, p.x - from.x);
@@ -65,8 +65,7 @@ function revive(w: World, p: Player, by: Player) {
 export function updateLife(w: World) {
   const r = w.rules.player;
   for (const p of w.players.values()) {
-    const m = maxStats(w, p.level);
-    p.maxHp = m.hp; p.maxMp = m.mp;
+    refreshStats(w, p);
     if (p.state === 'dead') {
       const helper = r.revive > 0 ? reviver(w, p) : null;
       if (helper) {
@@ -79,8 +78,8 @@ export function updateLife(w: World) {
       if (w.home) respawn(w, p); else { p.t = 1e9; w.emit({ t: 'gohome', id: p.id }); }   // o servidor leva para o mapa principal
       continue;
     }
-    if (w.tick - p.hurtAt >= ticks(r.regenDelay)) p.hp = Math.min(p.maxHp, p.hp + r.hpRegen / TICK_RATE);
-    p.mp = Math.min(p.maxMp, p.mp + r.manaRegen / TICK_RATE);
+    if (w.tick - p.hurtAt >= ticks(r.regenDelay)) p.hp = Math.min(p.maxHp, p.hp + (r.hpRegen + p.stats.hpRegen) / TICK_RATE);
+    p.mp = Math.min(p.maxMp, p.mp + (r.manaRegen + p.stats.mpRegen) / TICK_RATE);
     p.hp = Math.min(p.hp, p.maxHp);
   }
 }

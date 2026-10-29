@@ -1,4 +1,6 @@
-import { ITEMS, NAME_MAX, cleanName, type ItemId, type ProfileRequest, type PvpInfo } from '@vale/shared';
+import { ITEMS, NAME_MAX, cleanName, type GearRules, type ItemId, type ProfileRequest, type PvpInfo } from '@vale/shared';
+import type { Inventory } from '../session/types';
+import { renderSheet } from './sheet';
 import { buildSwatches, drawPreview, markSwatches } from './swatches';
 import type { NameMode, PadSize, Settings } from './settings';
 
@@ -13,9 +15,10 @@ export interface MenuHooks {
   online: boolean;                 // online o nome é o do personagem (fixo)
   switchCharacter(): void;
   signOut(): void;
+  sheet(): { inv: Inventory | null; rules: GearRules | null };   // para a aba Atributos
   records(): Promise<{ item: string; size: number; character: string }[] | null>;
 }
-type Tab = 'char' | 'opts' | 'keys' | 'records';
+export type Tab = 'char' | 'stats' | 'party' | 'opts' | 'keys' | 'records';
 
 // Menu sobre a tela do jogo (Esc). O mundo continua rodando enquanto ele está aberto.
 export class Menu {
@@ -60,7 +63,8 @@ export class Menu {
 
   get open() { return !this.el.hidden; }
   toggle() { if (this.open) this.close(); else this.show(); }
-  show() {
+  show(tab?: Tab) {
+    if (tab) this.current = tab;
     const p = this.hooks.profile();
     this.draft = { name: p.name, look: { ...p.look } };
     this.nameInput.value = p.name;
@@ -72,6 +76,7 @@ export class Menu {
     this.el.hidden = false;
     this.tab(this.current, true);
   }
+  get tabNow() { return this.current; }
   close() { if (!this.open) return; this.el.hidden = true; this.hooks.closed(); }
 
   // Reflete as opções atuais (elas também mudam pelas teclas M e P).
@@ -91,6 +96,7 @@ export class Menu {
   tick() {
     if (!this.open) return;
     this.pvpStatus();
+    if (this.current === 'stats') { const s = this.hooks.sheet(); renderSheet(s.inv, s.rules); }
     if (++this.spin % 50 === 0) this.dir = (this.dir + 1) % 4;
     const order = [0, 3, 1, 2] as const;   // de frente, direita, de costas, esquerda
     drawPreview(this.preview, this.draft.look, order[this.dir], (this.spin >> 3) % 3);

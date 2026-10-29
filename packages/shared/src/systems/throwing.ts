@@ -82,7 +82,7 @@ function fly(w: World, p: Player) {
   if (!wall) { p.x = nx; p.y = ny; }
   const by = p.throwBy ? w.players.get(p.throwBy) : undefined;
   const hit = p.z < 12 && w.enemies.find(e => !e.dying && Math.abs(e.x - p.x) < e.hw + 5 && Math.abs(e.y - p.y) < e.hh + 6);
-  if (hit) { damage(w, hit, 2, p.x - p.kx * 3, p.y - p.ky * 3, by); burst(w, p.x, p.y, 'spark', 8, { s: 1.2, z: 6 }); }
+  if (hit) { damage(w, hit, w.rules.weapons.thrown, p.x - p.kx * 3, p.y - p.ky * 3, by); burst(w, p.x, p.y, 'spark', 8, { s: 1.2, z: 6 }); }
   if (wall || hit || p.z <= 0) {
     p.state = 'hurt'; p.t = 10; p.z = 0; p.kx = p.ky = 0; p.inv = Math.max(p.inv, 30);
     land(w, p, p.x, p.y);

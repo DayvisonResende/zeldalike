@@ -1,6 +1,6 @@
 import type { PlayerView } from '@vale/shared';
 import { ITEM_ICON } from '../render/sprites';
-import type { Inventory } from '../session/types';
+import type { Inventory, PartyState } from '../session/types';
 
 const nameEl = document.getElementById('roomname')!;
 let nameTimer = 0;
@@ -105,4 +105,23 @@ export function updateHud(me: PlayerView | undefined, inv: Inventory | null = nu
   // selo ao lado das barras: zona segura (verde) ou PvP ativo (vermelho)
   const b = me.safe ? 'safe' : me.pvpActive ? 'pvp' : '';
   if (badge.dataset.kind !== b) { badge.dataset.kind = b; badge.hidden = !b; badge.textContent = b === 'safe' ? 'Zona segura' : 'PvP ligado'; }
+}
+
+/* ---------- Grupo: nome, vida e onde está cada um, embaixo das suas barras ---------- */
+const partyEl = document.getElementById('partyHud')!;
+let partyKey = '';
+export function updateParty(party: PartyState | null, meId: string) {
+  const others = party?.members.filter(m => m.id !== meId) ?? [];
+  const key = others.map(m => [m.id, m.name, m.hp, m.dead, m.at ? '' : m.where, m.id === party?.leader].join('|')).join(';');
+  if (key === partyKey) return;
+  partyKey = key; partyEl.hidden = !others.length;
+  partyEl.replaceChildren(...others.map(m => {
+    const row = document.createElement('div'), bar = document.createElement('div');
+    row.className = 'pm'; row.dataset.dead = String(m.dead);
+    bar.className = 'bar'; bar.style.setProperty('--pct', m.hp + '%');
+    bar.setAttribute('role', 'meter'); bar.setAttribute('aria-label', `Vida de ${m.name}`); bar.setAttribute('aria-valuenow', String(m.hp)); bar.setAttribute('aria-valuemax', '100');
+    row.append(Object.assign(document.createElement('b'), { textContent: (m.id === party!.leader ? '★ ' : '') + m.name }), bar);
+    if (m.dead || !m.at) row.append(Object.assign(document.createElement('small'), { textContent: m.dead ? 'caído!' : m.where }));   // longe: em outro mapa
+    return row;
+  }));
 }

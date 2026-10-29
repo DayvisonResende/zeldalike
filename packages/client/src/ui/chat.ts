@@ -2,9 +2,10 @@ import type { ChatChannel, ChatMsg, ChatRequest } from '@vale/shared';
 
 const FADE_MS = 10000;   // linhas somem do histórico depois disso (voltam com o chat aberto)
 const MAX_LINES = 60;
-const CH_LABEL: Record<ChatChannel, string> = { local: 'Perto', global: 'Todos' };
+const CH_LABEL: Record<ChatChannel, string> = { local: 'Perto', global: 'Todos', party: 'Grupo' };
+const CH_HINT: Record<ChatChannel, string> = { local: 'Falar com quem está perto…', global: 'Falar com todo o servidor…', party: 'Falar com o seu grupo…' };
 
-export interface ChatHooks { send(req: ChatRequest): void; closed(): void }
+export interface ChatHooks { send(req: ChatRequest): void; closed(): void; inParty(): boolean }
 
 // Histórico no canto e caixa de texto. Enter abre e envia, Esc fecha, Tab troca o canal.
 export class ChatBox {
@@ -23,6 +24,7 @@ export class ChatBox {
   }
   get open() { return !this.bar.hidden; }
   show() {
+    if (this.ch === 'party' && !this.hooks.inParty()) this.setChannel('local');   // o grupo acabou
     this.bar.hidden = false; this.log.classList.add('open');
     this.log.scrollTop = this.log.scrollHeight;
     this.input.focus();
@@ -35,7 +37,7 @@ export class ChatBox {
   add(m: ChatMsg, mine: boolean) {
     const line = document.createElement('div');
     line.className = 'line ' + m.ch + (mine ? ' mine' : '');
-    if (m.ch === 'global') line.append(Object.assign(document.createElement('span'), { className: 'tag', textContent: '[Todos] ' }));
+    if (m.ch === 'global' || m.ch === 'party') line.append(Object.assign(document.createElement('span'), { className: 'tag', textContent: m.ch === 'global' ? '[Todos] ' : '[Grupo] ' }));
     if (m.name) line.append(Object.assign(document.createElement('b'), { textContent: m.name + ': ' }));
     line.append(document.createTextNode(m.text));   // sempre texto puro: ninguém injeta HTML pelo chat
     this.log.append(line);
@@ -45,16 +47,17 @@ export class ChatBox {
   }
   private send() {
     let text = this.input.value, ch = this.ch;
-    const cmd = text.match(/^\/(t|todos|g)\s+/i);   // "/t mensagem" manda para todos
-    if (cmd) { text = text.slice(cmd[0].length); ch = 'global'; }
+    const cmd = text.match(/^\/(t|todos|g|p)\s+/i);   // "/t mensagem" manda para todos; "/p mensagem", para o grupo
+    if (cmd) { text = text.slice(cmd[0].length); ch = cmd[1].toLowerCase() === 'p' ? 'party' : 'global'; }
     if (text.trim()) this.hooks.send({ text, ch });
     this.hide();
   }
-  private toggleChannel() { this.setChannel(this.ch === 'local' ? 'global' : 'local'); }
+  // Perto → Todos → Grupo (só se estiver em um) → Perto
+  private toggleChannel() { this.setChannel(this.ch === 'local' ? 'global' : this.ch === 'global' && this.hooks.inParty() ? 'party' : 'local'); }
   private setChannel(ch: ChatChannel) {
     this.ch = ch;
     this.chBtn.textContent = CH_LABEL[ch]; this.chBtn.dataset.ch = ch;
     this.chBtn.setAttribute('aria-label', `Canal: ${CH_LABEL[ch]} (Tab troca)`);
-    this.input.placeholder = ch === 'local' ? 'Falar com quem está perto…' : 'Falar com todo o servidor…';
+    this.input.placeholder = CH_HINT[ch];
   }
 }

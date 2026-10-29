@@ -3,14 +3,14 @@ import { PX, dot, label, mapImage, meArrow, pin, seenAt } from '../render/mapima
 import type { MapState } from '../session/types';
 
 export interface WorldMapHooks {
-  view(): { map: WorldMap; me: PlayerView | undefined; state: MapState; profiles: ReadonlyMap<string, Profile>; meId: string } | null;
+  view(): { map: WorldMap; me: PlayerView | undefined; state: MapState; profiles: ReadonlyMap<string, Profile>; meId: string; party: ReadonlySet<string> } | null;
   mark(x: number, y: number): void; clearMark(): void; closed(): void;
 }
 type Ctx = CanvasRenderingContext2D;
 
 // Desenha o mapa (já com a névoa) e o que importa por cima, em pixels do mapa (1 tile = PX).
 function drawOverlay(x: Ctx, v: NonNullable<ReturnType<WorldMapHooks['view']>>, tick: number) {
-  const { map, me, state, profiles, meId } = v, s = PX / 16;   // de pixels do mundo para pixels do mapa
+  const { map, me, state, profiles, meId, party } = v, s = PX / 16;   // de pixels do mundo para pixels do mapa
   for (const r of map.data.regions) {
     const cx = (r.x + r.w / 2) * PX, cy = (r.y + r.h / 2) * PX, seen = seenAt(map, state, (r.x + r.w / 2) * 16, (r.y + r.h / 2) * 16);
     if (state.safe.includes(r.id) && seen) {
@@ -30,9 +30,10 @@ function drawOverlay(x: Ctx, v: NonNullable<ReturnType<WorldMapHooks['view']>>, 
     if (n.shop) { dot(x, n.x * PX + PX / 2, n.y * PX + PX / 2, 3, '#ffd94f'); label(x, '$', n.x * PX + PX / 2, n.y * PX + PX / 2 + 0.5, 8, '#1b1226'); }
     else dot(x, n.x * PX + PX / 2, n.y * PX + PX / 2, 2, '#f6f2fc');
   }
-  for (const o of state.roster) {
-    dot(x, o.x * PX + PX / 2, o.y * PX + PX / 2, 2.5, '#7ac8ff');
-    const name = profiles.get(o.id)?.name; if (name) label(x, name, o.x * PX + PX / 2, o.y * PX - 4, 8, '#cfe8ff');
+  for (const o of state.roster) {   // do seu grupo: em verde
+    const mine = party.has(o.id);
+    dot(x, o.x * PX + PX / 2, o.y * PX + PX / 2, mine ? 3 : 2.5, mine ? '#7be08a' : '#7ac8ff');
+    const name = profiles.get(o.id)?.name; if (name) label(x, name, o.x * PX + PX / 2, o.y * PX - 4, 8, mine ? '#c8f5b8' : '#cfe8ff');
   }
   for (const k of state.marks) { pin(x, k.x * s, k.y * s, 1.1); label(x, k.id === meId ? 'Você marcou' : k.name, k.x * s, k.y * s - 16, 8, '#ffd1cc'); }
   if (me) meArrow(x, me.x * s, me.y * s, me.dir, (tick >> 4) & 1 ? 1.2 : 1);   // pulsa para achar você rápido
@@ -88,7 +89,7 @@ export class Minimap {
     x.fillStyle = '#0e0c22'; x.fillRect(0, 0, this.cv.width, this.cv.height);
     x.drawImage(img, sx, sy, VIEW_W * PX, VIEW_H * PX, 0, 0, this.cv.width, this.cv.height);
     const at = (px: number, py: number): [number, number] => [(px / 16 * PX - sx) * k, (py / 16 * PX - sy) * k];
-    for (const o of state.roster) { const [ox, oy] = at(o.x * 16 + 8, o.y * 16 + 8); if (ox >= 0 && oy >= 0 && ox < this.cv.width && oy < this.cv.height) dot(x, ox, oy, 1.5, '#7ac8ff'); }
+    for (const o of state.roster) { const [ox, oy] = at(o.x * 16 + 8, o.y * 16 + 8); if (ox >= 0 && oy >= 0 && ox < this.cv.width && oy < this.cv.height) dot(x, ox, oy, 1.5, v.party.has(o.id) ? '#7be08a' : '#7ac8ff'); }
     for (const m of state.marks) {
       const [mx, my] = at(m.x, m.y);
       pin(x, Math.max(4, Math.min(this.cv.width - 4, mx)), Math.max(9, Math.min(this.cv.height - 1, my)), 0.6);

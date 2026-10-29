@@ -20,7 +20,8 @@ import { updateFishBar } from './ui/fishbar';
 import { Dialog } from './ui/dialog';
 import { ShopPanel } from './ui/shop';
 import { Minimap, WorldMapPanel } from './ui/worldmap';
-import { showRegion, updateBoss, updateClock, updateHud, updateRaid } from './ui/hud';
+import { showRegion, updateBoss, updateClock, updateHud, updateParty, updateRaid } from './ui/hud';
+import { PartyPanel } from './ui/party';
 import { Menu } from './ui/menu';
 import { NameTags } from './ui/nametags';
 import { updatePad } from './ui/pad';
@@ -66,6 +67,7 @@ async function enterWorld(c: CharacterSummary) {
   net.onWelcome = motd => { if (motd) startHint.textContent = motd; };
   await net.connect(SERVER, { token: api.token!, characterId: c.id });
   session = net; bindChat(net);
+  net.onParty = m => partyPanel.receive(m);
   net.onMapChange = () => { stage.classList.remove('fade'); void stage.offsetWidth; stage.classList.add('fade'); };
   net.onLeave = code => connectionLost(code);
   playing = c;
@@ -181,6 +183,7 @@ const menu = new Menu({
   closed: () => refocus(),
   get online() { return !OFFLINE; },
   switchCharacter, signOut,
+  sheet: () => ({ inv: session.inventory(), rules: session.gearRules() }),
   records: async () => OFFLINE ? null : api.records()
 });
 const nameTags = new NameTags(document.getElementById('names')!);
@@ -200,7 +203,7 @@ function sendChat(req: ChatRequest) {
   else say(ignored.delete(key) ? `Você voltou a ver as mensagens de ${name}.` : `Você não estava ignorando ${name}.`);
   saveIgnored(ignored);
 }
-const chat = new ChatBox({ send: sendChat, closed: refocus });
+const chat = new ChatBox({ send: sendChat, closed: refocus, inParty: () => !!session.party() });
 const bindChat = (s: Session) => { s.onChat = m => {
   if (m.name && ignored.has(m.name.toLowerCase())) return;
   const mine = m.from !== undefined && m.from === session.me()?.id; chat.add(m, mine); if (m.ch === 'local' && m.from) nameTags.say(m.from, m.text);
@@ -217,18 +220,25 @@ function togglePvp() {
 }
 /* ---------- Inventário (I), atalhos 1 e 2 ---------- */
 const floaters = new Floaters(document.getElementById('floaters')!);
-const bag = new BagPanel({ inventory: () => session.inventory(), use: s => session.useItem(s), drop: s => session.dropItem(s), equip: (g, s) => session.equip(g, s), closed: refocus });
+const bag = new BagPanel({ inventory: () => session.inventory(), rules: () => session.gearRules(), use: s => session.useItem(s), drop: s => session.dropItem(s), equip: (g, s) => session.equip(g, s), closed: refocus });
 const shop = new ShopPanel({ inventory: () => session.inventory(), deal: (a, s, item, n) => session.shop(a, s, item, n), closed: refocus });
 // Mapa do mundo (M) e minimapa: o que a sessão sabe do mapa atual.
 let profilesNow: ReadonlyMap<string, Profile> = new Map();   // nomes de quem está online (da cena do quadro)
+let partyIds: ReadonlySet<string> = new Set();               // quem está no seu grupo (você não)
 const mapView = () => {
   const me = session.me(); if (!ready) return null;
-  return { map: session.map, me, state: session.mapState(), profiles: profilesNow, meId: me?.id ?? '' };
+  return { map: session.map, me, state: session.mapState(), profiles: profilesNow, meId: me?.id ?? '', party: partyIds };
 };
 const worldMap = new WorldMapPanel({ view: mapView, mark: (x, y) => session.mark(x, y), clearMark: () => session.clearMark(), closed: refocus });
 const minimap = new Minimap(() => toggleMap());
 function toggleMap() { if (!started || menu.open || chat.open || shop.open || bag.open) return; worldMap.toggle(); }
 document.getElementById('mapBtn')!.addEventListener('click', () => toggleMap());
+// Grupo (G): abre o menu direto na aba Grupo.
+const partyPanel = new PartyPanel({
+  party: () => session.party(), meId: () => session.me()?.id ?? '', send: r => session.partyRequest(r),
+  online: !OFFLINE, active: () => menu.open && menu.tabNow === 'party'
+});
+function openParty() { if (!started || chat.open || bag.open || shop.open || worldMap.open) return; if (menu.open) menu.close(); else menu.show('party'); }
 function toggleBag() { if (!started || menu.open || chat.open) return; bag.toggle(); }
 function quickUse(n: 1 | 2 | 3) {
   const inv = session.inventory(); if (!inv) return;
@@ -236,7 +246,7 @@ function quickUse(n: 1 | 2 | 3) {
   if (slot < 0) { const me = session.me(); if (me) floaters.add(me.x, me.y, n === 1 ? 'Sem corações' : n === 2 ? 'Sem poções' : 'Sem bombas', 'notice'); return; }
   session.useItem(slot);
 }
-const hooks = { started: () => started, start: begin, toggleMap, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
+const hooks = { started: () => started, start: begin, toggleMap, openParty, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
 const input = new Input(stage, cv, hooks);
 bindTouch(input, hooks, () => settings.vibrate);
 const fsCorner = document.getElementById('fsCorner')!;
@@ -345,13 +355,23 @@ function frame(now: number) {
   updateFishBar(session.me());
   if (!dialog.open) talking = null;
   const marks = ready ? session.mapState().marks : [];
-  render(ctx, scene, { me: session.me(), cam, particles, lock, marks, showPaths: settings.paths, reticle, shake, tick, talking });
-  nameTags.update(scene, cam, settings.names, settings.bubbles);
+  // grupo: quem é, vida no HUD e onde está quem é do seu mapa (na tela, a posição desenhada; longe, a do servidor)
+  const party = session.party(), meId = me?.id ?? '';
+  partyIds = new Set(party?.members.filter(m => m.id !== meId).map(m => m.id));
+  const friends = (party?.members ?? []).flatMap(m => {
+    if (m.id === meId || !m.at) return [];
+    const p = scene.players.find(q => q.id === m.id);
+    return [{ x: p?.x ?? m.at.x, y: p?.y ?? m.at.y, dead: m.dead }];
+  });
+  render(ctx, scene, { me: session.me(), cam, particles, lock, marks, friends, showPaths: settings.paths, reticle, shake, tick, talking });
+  nameTags.update(scene, cam, settings.names, settings.bubbles, partyIds);
   floaters.update(cam);
   bag.render(); shop.render();
   worldMap.render(tick);
   minimap.render(started && !account.open && !worldMap.open ? mapView() : null, settings.minimap, tick);
   updateHud(session.status === 'connecting' ? undefined : session.me(), session.inventory(), id => profilesNow.get(id)?.name);
+  updateParty(session.status === 'connecting' ? null : party, meId);
+  partyPanel.render(menu.open);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);

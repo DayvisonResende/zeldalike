@@ -13,6 +13,7 @@ import { gearIn, type GearId, type GearSlot } from '../gear';
 import { cast, manaCost } from './magic';
 import { pushAgainst } from './blocks';
 import { SWEEP_HOLD, pickAll } from './loot';
+import { attackStep } from './stats';
 
 export function faceAim(p: Player) { p.aim = p.input.aim ?? FACE[p.dir]; p.dir = angDir(p.aim); }
 function startSwing(w: World, p: Player) { faceAim(p); p.state = 'swing'; p.t = 0; p.hit.clear(); sfx(w, 'swing', p, p.id); }
@@ -86,7 +87,7 @@ export function updatePlayer(w: World, p: Player) {
   if (p.inv > 0) p.inv--;
   const ix = (inp.right ? 1 : 0) - (inp.left ? 1 : 0), iy = (inp.down ? 1 : 0) - (inp.up ? 1 : 0);
   const tap = (b: Button) => (inp.tap & BUTTON[b]) !== 0;
-  let speed = (p.slowUntil > w.tick ? 0.6 : 1) * 1.35, turn = true;
+  let speed = (p.slowUntil > w.tick ? 0.6 : 1) * 1.35, turn = true, t0: number;   // t0: tempo antes do passo (velocidade de ataque anda em frações)
   switch (p.state) {
     case 'dead': case 'flying': return;   // voando: quem manda é o arremesso (ver throwing)
     case 'held': struggle(w, p); return;
@@ -94,13 +95,13 @@ export function updatePlayer(w: World, p: Player) {
     case 'hurt': p.t--; move(w.map, p, p.kx, p.ky); p.kx *= 0.86; p.ky *= 0.86; if (p.t <= 0) p.state = p.carry ? 'carry' : 'walk'; return;
     case 'lift': if (++p.t >= 12) p.state = 'carry'; return;
     case 'throw': if (--p.t <= 0) p.state = 'walk'; return;
-    case 'swing': p.t++; swordHits(w, p); if (p.t >= SWING) { if (inp[p.useBtn] && p.using === 'sword') { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; } return;
+    case 'swing': p.t += attackStep(p); swordHits(w, p); if (p.t >= SWING) { if (inp[p.useBtn] && p.using === 'sword') { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; } return;
     case 'cast':   // ergue o cajado, solta a magia; segurando o botão (e com mana) começa a carregar a forte
-      p.t++; if (p.t <= CAST_AT - 2 && inp.aim !== null) faceAim(p);
-      if (p.t === CAST_AT) cast(w, p);
+      t0 = p.t; p.t += attackStep(p); if (p.t <= CAST_AT - 2 && inp.aim !== null) faceAim(p);
+      if (t0 < CAST_AT && p.t >= CAST_AT) cast(w, p);
       if (p.t >= CAST_END) { if (!p.big && inp[p.useBtn] && p.mp >= manaCost(w, p.using!, true)) { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; }
       return;
-    case 'spin': p.t++; swordHits(w, p); if (p.t >= SPIN) p.state = 'walk'; return;
+    case 'spin': p.t += attackStep(p); swordHits(w, p); if (p.t >= SPIN) p.state = 'walk'; return;
     case 'dashprep':
       if (!inp.d) { p.state = 'walk'; return; }
       p.t++; p.step = ((p.t >> 2) % 2) + 1;
@@ -114,7 +115,7 @@ export function updatePlayer(w: World, p: Player) {
       if (p.t <= 0) { p.z = 0; p.state = p.carry ? 'carry' : 'walk'; }
       return;
     case 'hop': updateHop(w, p); return;
-    case 'bow': p.t++; if (p.t <= 7 && inp.aim !== null) faceAim(p); if (p.t === 7) fireArrow(w, p); if (p.t >= 17) p.state = 'walk'; return;
+    case 'bow': t0 = p.t; p.t += attackStep(p); if (p.t <= 7 && inp.aim !== null) faceAim(p); if (t0 < 7 && p.t >= 7) fireArrow(w, p); if (p.t >= 17) p.state = 'walk'; return;
     case 'charge':
       if (!inp[p.useBtn]) {
         if (p.charged && p.using === 'sword') { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); }
@@ -122,7 +123,8 @@ export function updatePlayer(w: World, p: Player) {
         else p.state = 'walk';
         p.charged = false; return;
       }
-      if (++p.charge === 40) { p.charged = true; sfx(w, 'charge', p, p.id); }
+      t0 = p.charge; p.charge += attackStep(p);
+      if (t0 < 40 && p.charge >= 40) { p.charged = true; sfx(w, 'charge', p, p.id); }
       if (inp.aim !== null) faceAim(p);
       if (p.using === 'sword') pokeTip(w, p);
       speed = 0.75; turn = false; break;

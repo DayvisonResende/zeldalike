@@ -6,9 +6,9 @@ const MAP: Record<string, Key> = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyF: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
 };
-export interface InputHooks { started(): boolean; start(): void; toggleMap(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void }
+export interface InputHooks { started(): boolean; start(): void; toggleMap(): void; openParty(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void }
 // Cliques e teclas dentro do menu são do menu, não do jogo.
-export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap';
+export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap, .invite';
 const inMenu = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(UI_SELECTOR);
 const typing = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('input, textarea, select');
 
@@ -30,6 +30,7 @@ export class Input {
       if ((e.code === 'Space' || e.code === 'Enter') && (e.target as Element).closest?.('button')) return;   // botões da página continuam funcionando
       if (e.code === 'Enter' || e.code === 'NumpadEnter') { if (!e.repeat) { e.preventDefault(); if (hooks.started()) hooks.openChat(); else hooks.start(); } return; }
       if (e.code === 'KeyM') { if (!e.repeat && hooks.started()) hooks.toggleMap(); return; }
+      if (e.code === 'KeyG') { if (!e.repeat && hooks.started()) hooks.openParty(); return; }
       if (e.code === 'KeyP') { if (!e.repeat) hooks.togglePaths(); return; }
       if (e.code === 'KeyV') { if (!e.repeat && hooks.started()) hooks.togglePvp(); return; }
       if (e.code === 'KeyI') { if (!e.repeat && hooks.started()) hooks.toggleBag(); return; }

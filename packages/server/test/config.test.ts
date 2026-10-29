@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import { describe, expect, it } from 'vitest';
-import type { MapData } from '@vale/shared';
+import { DEFAULT_RULES, type MapData } from '@vale/shared';
 import { parseConfig, toRules } from '../src/config/load';
 import vale from '../../shared/test/fixtures';
 
@@ -18,6 +18,18 @@ describe('config.yaml', () => {
     expect(r.regrow.bush).toBe(180);
     expect(r.enemies.beetle.respawn).toBe(240);
     expect(parseConfig(text.replace('combatLock: 30s', 'combatLock: 1500ms'), map).pvp.combatLock).toBe(1.5);
+  });
+  it('dano em pontos mantém o jogo de antes: golpes de espada para derrubar cada monstro', () => {
+    const r = toRules(parseConfig(text, map)), hits = (t: 'slime' | 'beetle' | 'bat' | 'king', n = r.weapons.sword) => Math.ceil(r.enemies[t].hp / n);
+    expect([hits('slime'), hits('beetle'), hits('bat'), hits('king')]).toEqual([2, 3, 1, 40]);
+    expect([hits('slime', r.weapons.spin), hits('beetle', r.weapons.bomb), hits('slime', r.magic.fire.damage)]).toEqual([1, 1, 1]);
+    expect(r.weapons).toEqual(DEFAULT_RULES.weapons);   // sem a seção weapons no config, vale o mesmo
+  });
+  it('atributos das armas: o que faltar é 0; velocidade de ataque até 50; chave errada é erro', () => {
+    const r = toRules(parseConfig(text.replace('  firestaff: {}', '  firestaff: { magic: 5, mp: 10 }'), map));
+    expect(r.gear.firestaff).toEqual({ magic: 5, mp: 10 });
+    expect(() => parseConfig(text.replace('  sword: {}', '  sword: { attackSpeed: 80 }'), map)).toThrow(/gear\.sword\.attackSpeed/);
+    expect(() => parseConfig(text.replace('  sword: {}', '  sword: { atack: 5 }'), map)).toThrow(/gear\.sword/);
   });
   it('aponta o campo e a linha do erro', () => {
     expect(() => parseConfig(text.replace('bush: 3m', 'bush: tres'), map)).toThrow(/regrow\.bush \(linha \d+\)/);

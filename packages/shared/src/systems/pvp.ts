@@ -18,13 +18,17 @@ export function pvpActive(w: World, p: Player) {
   if (mode === 'off' || p.state === 'dead' || inSafeZone(w, p.x, p.y)) return false;
   return mode === 'open' || p.pvp;
 }
-export const canHarm = (w: World, a: Player, v: Player) => a !== v && v.state !== 'dead' && pvpActive(w, a) && pvpActive(w, v);
+// Do mesmo grupo nunca se ferem, mesmo com PvP.
+const PHYSICAL: PvpAttack[] = ['sword', 'spin', 'dash', 'arrow'];
+export const canHarm = (w: World, a: Player, v: Player) => a !== v && v.state !== 'dead' && !(a.party && a.party === v.party) && pvpActive(w, a) && pvpActive(w, v);
 
 // Golpe de um jogador em outro. Retorna true se acertou (para o golpe não acertar o mesmo duas vezes).
-export function harmPlayer(w: World, a: Player, v: Player, attack: PvpAttack, amount = w.rules.pvp.damage[attack]) {
+// `bonus`: ataque (espada e flecha) ou poder mágico (magias) de quem bate; entre jogadores vale × pvp.factor
+// (a defesa de quem apanha também, ver damagePlayer).
+export function harmPlayer(w: World, a: Player, v: Player, attack: PvpAttack, amount = w.rules.pvp.damage[attack], bonus = PHYSICAL.includes(attack) ? a.stats.attack : 0) {
   if (!canHarm(w, a, v) || v.inv > 0) return false;
   a.combatAt = v.combatAt = w.tick;
-  damagePlayer(w, v, amount, a, a);
+  damagePlayer(w, v, Math.max(0, amount + bonus * w.rules.pvp.factor), a, a);
   return true;
 }
 

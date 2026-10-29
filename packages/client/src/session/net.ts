@@ -1,10 +1,10 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG, World, applyOwnState, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
-  type ChatMsg, type ChatRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
+  type ChatMsg, type ChatRequest, type GearRules, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
-import type { Inventory, MapState, Mark, Scene, Session, Status } from './types';
+import type { Inventory, MapState, Mark, PartyState, Scene, Session, Status } from './types';
 
 const OVERLAY_TICKS = 90;   // quanto tempo um corte previsto espera a confirmação do servidor
 
@@ -31,6 +31,9 @@ export class NetSession implements Session {
   private openChests = new Set<string>();
   onWelcome?: (motd: string) => void;
   onChat?: (m: ChatMsg) => void;
+  onParty?: (m: PartyMsg) => void;
+  private partyNow: PartyState | null = null;
+  private rulesNow: GearRules | null = null;
   onLeave?: (code: number) => void;
   onMapChange?: () => void;
   leave() { return this.room?.leave(); }
@@ -57,6 +60,8 @@ export class NetSession implements Session {
     room.onMessage(MSG.chat, (m: ChatMsg) => this.onChat?.(m));
     room.onMessage(MSG.profile, (m: ProfileMsg) => { if ('gone' in m) this.profiles.delete(m.id); else this.profiles.set(m.id, m); });
     room.onMessage(MSG.mark, (m: MarkMsg) => this.onMark(m));
+    room.onMessage(MSG.party, (m: PartyMsg) => this.onParty?.(m));
+    room.onMessage(MSG.rules, (m: GearRules) => { this.rulesNow = m; });
     room.onDrop(() => { this.status = 'reconnecting'; });
     room.onReconnect(() => { this.status = 'online'; });
     room.onLeave(code => { this.status = 'offline'; this.onLeave?.(code); });
@@ -113,6 +118,7 @@ export class NetSession implements Session {
     if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
     this.interp.push(toFrame(s));
     this.pvpInfo = s.pvp; this.xpNext = s.xpNext; this.day = s.day; this.invasion = s.iv ?? null;
+    this.partyNow = s.g ? { leader: s.g.leader, members: s.g.m.map(([id, name, level, hp, dead, x, y, where]) => ({ id, name, level, hp, dead: dead === 1, at: x < 0 ? null : { x, y }, where })) } : null;
     if (s.r) this.roster = s.r.map(([id, x, y]) => ({ id, x, y }));
     if (s.bag) this.bag = s.bag;
     if (s.ch) this.openChests = new Set(s.ch);
@@ -150,9 +156,12 @@ export class NetSession implements Session {
   }
 
   pvp() { return this.pvpInfo; }
+  party() { return this.partyNow; }
+  gearRules() { return this.rulesNow; }
+  partyRequest(req: PartyRequest) { if (this.status === 'online') this.room?.send(MSG.party, req); }
   inventory(): Inventory | null {
     const p = this.player; if (!p) return null;
-    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext, gear: p.gear };
+    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext, gear: p.gear, stats: p.stats, maxHp: p.maxHp, maxMp: p.maxMp };
   }
   useItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'use', slot }); }
   dropItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'drop', slot }); }

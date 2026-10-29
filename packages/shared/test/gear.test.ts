@@ -8,7 +8,7 @@ function field(): MapData {
     tiles: ['T'.repeat(20), ...Array(6).fill(row), 'T'.repeat(20)], enemies: [{ type: 'slime', x: 9, y: 4 }], signs: {} };
 }
 function setup(slime = true) {
-  const w = new World(field(), { ...DEFAULT_RULES, player: { ...DEFAULT_RULES.player, hpRegen: 0, manaRegen: 0 }, enemies: { ...DEFAULT_RULES.enemies, slime: { ...DEFAULT_RULES.enemies.slime, hp: 10 } } });
+  const w = new World(field(), { ...DEFAULT_RULES, player: { ...DEFAULT_RULES.player, hpRegen: 0, manaRegen: 0 }, enemies: { ...DEFAULT_RULES.enemies, slime: { ...DEFAULT_RULES.enemies.slime, hp: 100 } } });
   const a = w.addPlayer('a', 'Ana', 5 * 16 + 8, 4 * 16 + 8); a.dir = 3; a.aim = 0;
   const e = w.enemies[0];
   if (!slime) e.dead = true;
@@ -45,7 +45,7 @@ describe('magias', () => {
     press('a'); step({}, 8);
     expect(a.mp).toBe(a.maxMp - w.rules.magic.fire.mana);
     step({}, 30);
-    expect(e.hp).toBe(10 - w.rules.magic.fire.damage);
+    expect(e.hp).toBe(100 - w.rules.magic.fire.damage);
   });
   it('sem mana o cajado vira bastão (golpe de perto)', () => {
     const { a, press } = setup();
@@ -56,14 +56,14 @@ describe('magias', () => {
   it('segurar e soltar solta a explosão (mais mana, mais dano)', () => {
     const { w, a, e, step, press } = setup();
     a.bag[0] = { id: 'firestaff', n: 1 }; equipGear(a, 'firestaff', 'a'); a.mp = a.maxMp = 100;
-    e.hp = 99;
+    e.hp = 999;
     press('a', 60);                           // magia rápida, depois carrega
     expect(a.state).toBe('charge'); expect(a.charged).toBe(true);
     const mp = a.mp;
     step({}, 10);                             // solta: magia forte
     expect(a.mp).toBe(mp - w.rules.magic.blast.mana);
     step({}, 40);
-    expect(e.hp).toBeLessThanOrEqual(99 - w.rules.magic.fire.damage - w.rules.magic.blast.damage);
+    expect(e.hp).toBeLessThanOrEqual(999 - w.rules.magic.fire.damage - w.rules.magic.blast.damage);
   });
   it('Cajado de Luz cura você e quem está perto, mas não quem está longe', () => {
     const { w, a, step, press } = setup(false);
@@ -79,7 +79,7 @@ describe('magias', () => {
     a.hp = 50;
     a.bag[0] = { id: 'darktome', n: 1 }; equipGear(a, 'darktome', 'a');
     press('a'); step({}, 40);
-    expect(e.hp).toBe(10 - w.rules.magic.shadow.damage);
+    expect(e.hp).toBe(100 - w.rules.magic.shadow.damage);
     expect(e.slowUntil! > w.tick).toBe(true);
     expect(a.hp).toBe(50 + w.rules.magic.shadow.drain);
   });

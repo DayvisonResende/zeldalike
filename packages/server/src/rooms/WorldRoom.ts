@@ -1,8 +1,8 @@
 import { Room, ServerError, type Client } from 'colyseus';
 import {
-  ITEMS, LOOT_IDS, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
+  INVITE_TTL, ITEMS, LOOT_IDS, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState, refreshStats,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
-  type ChatMsg, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
+  type ChatMsg, type GearRules, type OnlineEntry, type PartyMsg, type PartyTuple, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { toRules } from '../config/load';
 import { configPath, getConfig, onConfig } from '../config/store';
@@ -13,6 +13,7 @@ import type { Config } from '../config/schema';
 import { getMaps, startMap } from '../map';
 import { eventFor, inView } from './interest';
 import { onlineCharacters } from '../auth/routes';
+import { Parties, type LeaveResult } from './parties';
 import { accountForToken } from '../auth/sessions';
 import { getCharacter, saveCharacters, type CharacterRow, type CharacterState } from '../persistence/characters';
 import { getDb } from '../persistence/db';
@@ -30,6 +31,7 @@ interface Seat {
 }
 interface Auth { accountId: number; username: string; character: CharacterRow }
 const profileOf = (p: Player): Profile => ({ id: p.id, name: p.name, look: { ...p.look } });
+const whereOf = (w: World, p: Player) => w.map.regionAt(p.x, p.y)?.name ?? w.map.data.name;
 const fmtWait = (s: number) => s >= 60 ? `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
 
 // Uma sala só para o jogo inteiro: ela nunca fecha, mesmo vazia. Dentro dela, um mundo (World) por mapa.
@@ -42,6 +44,8 @@ export class WorldRoom extends Room {
   private muted = new Map<number, number>();   // personagem → até quando está sem chat (ms)
   private marks = new Map<string, { map: string; name: string; x: number; y: number; until: number }>();   // marcador de cada um
   private markAt = new Map<string, number>();   // último marcador de cada um (no máximo um por segundo)
+  private parties = new Parties();
+  private partyAt = new Map<string, number>();   // último pedido de grupo de cada um (contra spam)
   private events = new Map<string, GameEvent[]>();   // eventos de cada mundo desde o último snapshot
   private ticks = 0;
   private night: boolean | null = null;   // para anunciar quando anoitece e quando amanhece
@@ -69,6 +73,7 @@ export class WorldRoom extends Room {
     this.onMessage(MSG.item, (client, msg) => this.onItem(client, msg));
     this.onMessage(MSG.shop, (client, msg) => this.onShop(client, msg));
     this.onMessage(MSG.mark, (client, msg) => this.onMark(client, msg));
+    this.onMessage(MSG.party, (client, msg) => this.onParty(client, msg));
     this.setFixedTimestep(() => this.step(), TICK_RATE);
     this.scheduleSave();
   }
@@ -77,7 +82,10 @@ export class WorldRoom extends Room {
     if (this.saveTimer) this.scheduleSave();
     this.maxClients = c.server.maxPlayers;
     this.sendEvery = Math.max(1, Math.round(TICK_RATE / c.network.sendRate));
+    for (const s of this.seats.values()) s.client.send(MSG.rules, this.gearRules());   // números das armas mudaram
   }
+  // Números das armas para o cliente mostrar (dano, mana, atributos de cada uma).
+  private gearRules(): GearRules { const r = this.world.rules; return { weapons: r.weapons, magic: r.magic, gear: r.gear }; }
   // Jogador e o mundo em que ele está.
   private find(id: string) {
     const seat = this.seats.get(id), w = seat && this.worlds.get(seat.map), p = w?.players.get(id);
@@ -96,8 +104,9 @@ export class WorldRoom extends Room {
   onJoin(client: Client, _options: unknown, auth: Auth) {
     const c = auth.character;
     // O mesmo personagem entrou de outro lugar: a sessão antiga sai, e o estado dela (mais novo que o do banco) continua.
-    let resume: CharacterState | null = null;
+    let resume: CharacterState | null = null, oldId = '';
     for (const [id, seat] of this.seats) if (seat.charId === c.id) {
+      oldId = id;
       const old = this.find(id);
       if (old) { resume = this.stateOf(old.p, old.seat.map); old.w.removePlayer(id); }
       seat.kicked = true; this.seats.delete(id);
@@ -108,8 +117,8 @@ export class WorldRoom extends Room {
     const p = w.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
     p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear;
     for (const [id, b64] of Object.entries(s.explored)) { const o = this.worlds.get(id); if (o) p.explored[id] = base64ToBits(b64, exploredSize(o.map.cols, o.map.rows)); }
-    const m = maxStats(w, p.level); p.maxHp = m.hp; p.maxMp = m.mp;
-    p.hp = Math.min(s.hp, m.hp); p.mp = Math.min(s.mp, m.mp);
+    p.hp = s.hp; p.mp = s.mp; refreshStats(w, p);   // máximos pelo nível e pelo equipamento (corta o que passar)
+    if (oldId) p.party = this.parties.rename(oldId, client.sessionId)?.id ?? null;   // entrou de novo: continua no grupo
     onlineCharacters.add(c.id);
     this.seats.set(client.sessionId, { client, charId: c.id, map: s.map, bagSent: -1, chestsSent: '', queue: [], ack: 0, profileAt: 0, chatTokens: getConfig().chat.burst, chatAt: Date.now(), username: auth.username });
     this.broadcastProfile(profileOf(p), client);
@@ -134,11 +143,13 @@ export class WorldRoom extends Room {
     onlineCharacters.delete(seat.charId);
     if (f) await this.save([[seat, f.p]]);
     if (f && getConfig().chat.announceJoins) this.sendChat({ ch: 'system', text: `${f.p.name} saiu` }, client);
+    if (f) this.afterLeave(client.sessionId, f.p.name, this.parties.drop(client.sessionId), 'saiu do jogo');
+    this.partyAt.delete(client.sessionId);
     f?.w.removePlayer(client.sessionId);
     this.seats.delete(client.sessionId);
     this.broadcastProfile({ id: client.sessionId, gone: true });
     const mark = this.marks.get(client.sessionId);
-    if (mark) { this.marks.delete(client.sessionId); this.sendToMap(mark.map, { id: client.sessionId, clear: true }); }
+    if (mark) { this.marks.delete(client.sessionId); this.sendMark(mark.map, { id: client.sessionId, clear: true }); }
     this.markAt.delete(client.sessionId);
   }
   async onDispose() { this.unsub?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
@@ -172,7 +183,7 @@ export class WorldRoom extends Room {
     const r = w.rules.player, m = maxStats(w, c.level);
     const ok = c.x !== null && c.y !== null && w.map.inBounds(Math.floor(c.x / 16), Math.floor(c.y / 16)) && !blockedAt(w.map, c.x, c.y, 5, 4);
     const at = ok ? { x: c.x!, y: c.y! } : map === startMap() ? respawnPos(w, r.respawnPoint) : w.map.data.spawn;
-    const hp = c.hp === null || c.hp <= 0 ? m.hp : Math.min(c.hp, m.hp);
+    const hp = c.hp === null || c.hp <= 0 ? m.hp : c.hp;   // o máximo (com o bônus do equipamento) corta ao entrar
     let bag, gear, chests: Record<string, number> = {};
     try { gear = JSON.parse(c.gear ?? '{}'); } catch { gear = {}; }
     try { bag = JSON.parse(c.items); } catch { bag = []; }
@@ -187,7 +198,7 @@ export class WorldRoom extends Room {
     } catch { }
     const explored: Record<string, string> = {};
     try { for (const [k, v] of Object.entries(JSON.parse(c.explored ?? '{}'))) if (typeof v === 'string' && this.worlds.has(k)) explored[k] = v; } catch { }
-    return { map, ...at, chests, chestLoot, explored, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
+    return { map, ...at, chests, chestLoot, explored, hp, mp: c.mp === null ? m.mp : c.mp, look: { cloak: c.cloak, hair: c.hair },
       level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack), gear: parseGear(gear) };
   }
   // Quem sai caído volta no ponto de renascimento do mapa principal, com a vida cheia.
@@ -222,9 +233,10 @@ export class WorldRoom extends Room {
       map: { ...w.map.data, enemies: [] }, at: me ? { x: me.x, y: me.y } : w.map.data.spawn,
       profiles: [...this.worlds.values()].flatMap(o => [...o.players.values()].map(profileOf)),
       explored: me ? bitsToBase64(exploredOf(w, me)) : '', safe: getConfig().pvp.safeZones,
-      marks: [...this.marks].filter(([, m]) => m.map === w.id && m.until > Date.now()).map(([id, m]) => ({ id, name: m.name, x: m.x, y: m.y, ttl: m.until - Date.now() }))
+      marks: [...this.marks].filter(([id, m]) => m.map === w.id && m.until > Date.now() && this.seesMark(id, client.sessionId)).map(([id, m]) => ({ id, name: m.name, x: m.x, y: m.y, ttl: m.until - Date.now() }))
     };
     client.send(MSG.welcome, msg);
+    client.send(MSG.rules, this.gearRules());
   }
   private broadcastProfile(msg: ProfileMsg, except?: Client) {
     for (const seat of this.seats.values()) if (seat.client !== except) seat.client.send(MSG.profile, msg);
@@ -253,6 +265,12 @@ export class WorldRoom extends Room {
     const text = cfg.filter ? filterChat(req.text, cfg.blockedWords) : req.text;
     const msg: ChatMsg = { ch: req.ch, text, from: p.id, name: p.name };
     if (req.ch === 'global') { this.sendChat(msg); return; }
+    if (req.ch === 'party') {
+      const g = this.parties.of(client.sessionId);
+      if (!g) { reply('Você não está em um grupo. Convide alguém em Menu → Grupo.'); return; }
+      for (const id of g.members) this.seats.get(id)?.client.send(MSG.chat, msg);
+      return;
+    }
     for (const [id, s] of this.seats) {   // "Perto": só quem está no mesmo mapa e no alcance (inclui quem falou)
       const o = s.map === seat.map ? f.w.players.get(id) : undefined;
       if (o && Math.hypot(o.x - p.x, o.y - p.y) <= cfg.localRange) s.client.send(MSG.chat, msg);
@@ -265,15 +283,26 @@ export class WorldRoom extends Room {
     const now = Date.now();
     if (now - (this.markAt.get(client.sessionId) ?? 0) < 1000) return;
     this.markAt.set(client.sessionId, now);
-    if (m.clear) { if (this.marks.delete(client.sessionId)) this.sendToMap(f.seat.map, { id: client.sessionId, clear: true }); return; }
+    if (m.clear) { if (this.marks.delete(client.sessionId)) this.sendMark(f.seat.map, { id: client.sessionId, clear: true }); return; }
     const x = Number(m.x), y = Number(m.y);
     if (!Number.isFinite(x) || !Number.isFinite(y) || x < 0 || y < 0 || x >= f.w.map.width || y >= f.w.map.height) return;
     const old = this.marks.get(client.sessionId);
-    if (old && old.map !== f.seat.map) this.sendToMap(old.map, { id: client.sessionId, clear: true });
+    if (old && old.map !== f.seat.map) this.sendMark(old.map, { id: client.sessionId, clear: true });
     this.marks.set(client.sessionId, { map: f.seat.map, name: f.p.name, x: Math.round(x), y: Math.round(y), until: now + MARK_TTL });
-    this.sendToMap(f.seat.map, { id: client.sessionId, name: f.p.name, x: Math.round(x), y: Math.round(y), ttl: MARK_TTL });
+    this.sendMark(f.seat.map, { id: client.sessionId, name: f.p.name, x: Math.round(x), y: Math.round(y), ttl: MARK_TTL });
   }
-  private sendToMap(map: string, msg: MarkMsg) { for (const s of this.seats.values()) if (s.map === map) s.client.send(MSG.mark, msg); }
+  // Marcador de quem está em grupo: só o grupo vê. Sem grupo: todos no mapa.
+  private seesMark(owner: string, viewer: string) { const g = this.parties.of(owner); return !g || g === this.parties.of(viewer); }
+  private sendMark(map: string, msg: MarkMsg) {
+    for (const [id, s] of this.seats) if (s.map === map && ('clear' in msg || this.seesMark(msg.id, id))) s.client.send(MSG.mark, msg);
+  }
+  // O grupo mudou: reenvia a cada um, nesses mapas, os marcadores que agora vê (e tira os que deixou de ver).
+  private refreshMarks(maps: Set<string>) {
+    const now = Date.now();
+    for (const [viewer, s] of this.seats) if (maps.has(s.map))
+      for (const [id, m] of this.marks) if (m.map === s.map && m.until > now)
+        s.client.send(MSG.mark, (this.seesMark(id, viewer) ? { id, name: m.name, x: m.x, y: m.y, ttl: m.until - now } : { id, clear: true }) satisfies MarkMsg);
+  }
   // O que os comandos do chat podem fazer, para quem digitou (`id`).
   private commandContext(id: string, reply: (text: string) => void): CommandContext {
     const found = (sid: string): Found | null => { const f = this.find(sid); return f ? { p: f.p, w: f.w, id: sid } : null; };
@@ -289,6 +318,7 @@ export class WorldRoom extends Room {
         // como "entrou em outro lugar": salva, tira do mundo e só então desconecta (sem guardar o lugar para ele voltar)
         const k = this.find(sid); if (!k) return;
         const { seat: s, w, p } = k;
+        this.afterLeave(sid, p.name, this.parties.drop(sid), 'saiu do jogo');
         s.kicked = true; this.seats.delete(sid); onlineCharacters.delete(s.charId);
         void this.save([[s, p]]);
         w.removePlayer(sid);
@@ -303,9 +333,114 @@ export class WorldRoom extends Room {
         s.client.send(MSG.chat, { ch: 'system', text: `Você está sem chat por ${minutes} min.` } satisfies ChatMsg);
       },
       unmute: sid => { const s = this.seats.get(sid); return !!s && this.muted.delete(s.charId); },
+      party: (action, arg) => this.partyAction(id, action, arg, reply),
       startInvasion: () => startInvasion(this.world),
       backup: () => { const b = getConfig().database.backup; return backupNow(getDb(), configPath(b.dir), b.keep); }
     };
+  }
+  /* ---------- Grupo ---------- */
+  // Pedido da tela de grupo (Menu → Grupo). Os comandos do chat (/convidar, /aceitar...) caem no mesmo lugar.
+  private onParty(client: Client, raw: unknown) {
+    const m = raw as { action?: unknown; name?: unknown; id?: unknown } | null, now = Date.now();
+    if (!m || !this.find(client.sessionId) || now - (this.partyAt.get(client.sessionId) ?? 0) < 250) return;
+    this.partyAt.set(client.sessionId, now);
+    const reply = (text: string) => client.send(MSG.chat, { ch: 'system', text } satisfies ChatMsg);
+    if (m.action === 'who') client.send(MSG.party, { who: this.onlineList(client.sessionId) } satisfies PartyMsg);
+    else if (m.action === 'invite' && typeof m.name === 'string') this.partyAction(client.sessionId, 'invite', m.name, reply);
+    else if (m.action === 'kick' && typeof m.id === 'string') this.partyAction(client.sessionId, 'kick', m.id, reply);
+    else if (m.action === 'accept' || m.action === 'decline' || m.action === 'leave') this.partyAction(client.sessionId, m.action, '', reply);
+  }
+  private partyAction(id: string, action: 'invite' | 'accept' | 'decline' | 'leave' | 'kick' | 'show', arg: string, reply: (text: string) => void) {
+    const me = this.find(id); if (!me) return;
+    const max = getConfig().party.maxSize, name = me.p.name;
+    const tell = (to: string, msg: PartyMsg) => this.seats.get(to)?.client.send(MSG.party, msg);
+    switch (action) {
+      case 'show': {
+        const g = this.parties.of(id);
+        if (!g) { reply('Você não está em um grupo. /convidar nome chama alguém (ou Menu → Grupo).'); return; }
+        reply(`Seu grupo (${g.members.length}/${max}): ` + g.members.map(m => { const f = this.find(m); return f ? `${f.p.name}${m === g.leader ? ' (lidera)' : ''} em ${whereOf(f.w, f.p)}` : '?'; }).join(', '));
+        return;
+      }
+      case 'invite': {
+        const t = [...this.seats.keys()].map(s => this.find(s)).find(f => f && f.p.name.toLowerCase() === arg.trim().toLowerCase());
+        if (!t) { reply(`Ninguém online com o nome "${arg.trim()}".`); return; }
+        const r = this.parties.invite(id, t.p.id, max);
+        if (r === 'self') reply('Você não pode convidar a si mesmo.');
+        else if (r === 'already') reply(`${t.p.name} já está em um grupo.`);
+        else if (r === 'full') reply(`O grupo está cheio (no máximo ${max}).`);
+        else if (r === 'notLeader') reply('Só quem lidera o grupo pode convidar.');
+        else {
+          reply(`Convite enviado para ${t.p.name}.`);
+          tell(t.p.id, { invite: { from: name, ttl: INVITE_TTL } });
+          t.seat.client.send(MSG.chat, { ch: 'system', text: `${name} te convidou para o grupo. Aceite no aviso, em Menu → Grupo ou com /aceitar.` } satisfies ChatMsg);
+        }
+        return;
+      }
+      case 'accept': {
+        tell(id, { invite: null });
+        const r = this.parties.accept(id, max, s => !!this.find(s));
+        if ('error' in r) {
+          reply(r.error === 'none' ? 'Você não tem convite para grupo (ou ele venceu).' : r.error === 'gone' ? 'Quem te convidou saiu do jogo.' : r.error === 'full' ? 'O grupo já está cheio.' : 'Você já está em um grupo.');
+          return;
+        }
+        this.syncParty(r.party.members);
+        this.tellParty(r.party.members, r.party.members.length === 2 ? `Grupo formado: ${this.find(r.from)?.p.name} e ${name}.` : `${name} entrou no grupo.`);
+        return;
+      }
+      case 'decline': {
+        tell(id, { invite: null });
+        const from = this.parties.decline(id);
+        if (from) this.seats.get(from)?.client.send(MSG.chat, { ch: 'system', text: `${name} recusou o convite para o grupo.` } satisfies ChatMsg);
+        return;
+      }
+      case 'leave': {
+        const r = this.parties.leave(id);
+        if (!r) { reply('Você não está em um grupo.'); return; }
+        reply('Você saiu do grupo.');
+        this.afterLeave(id, name, r, 'saiu do grupo');
+        return;
+      }
+      case 'kick': {
+        const g = this.parties.of(id);
+        if (!g || g.leader !== id) { reply('Só quem lidera o grupo pode tirar alguém.'); return; }
+        if (arg === id || !g.members.includes(arg)) return;
+        const t = this.find(arg);
+        t?.seat.client.send(MSG.chat, { ch: 'system', text: 'Você foi tirado do grupo.' } satisfies ChatMsg);
+        this.afterLeave(arg, t?.p.name ?? '?', this.parties.leave(arg), 'foi tirado do grupo');
+        return;
+      }
+    }
+  }
+  // Depois que alguém saiu: atualiza os jogadores e os marcadores, e avisa quem ficou.
+  private afterLeave(id: string, name: string, r: LeaveResult | null, what: string) {
+    if (!r) return;
+    this.syncParty([id, ...r.party.members, ...r.dissolved]);
+    this.tellParty(r.party.members, `${name} ${what}.` + (r.leader ? ` ${this.find(r.leader)?.p.name} agora lidera o grupo.` : ''));
+    this.tellParty(r.dissolved, `${name} ${what}. O grupo acabou.`);
+  }
+  // O grupo no mundo de cada um (XP dividido, sem se ferir) e os marcadores que cada um vê.
+  private syncParty(ids: string[]) {
+    const maps = new Set<string>();
+    for (const id of ids) { const f = this.find(id); if (f) { f.p.party = this.parties.of(id)?.id ?? null; maps.add(f.seat.map); } }
+    this.refreshMarks(maps);
+  }
+  private tellParty(ids: string[], text: string) { for (const id of ids) this.seats.get(id)?.client.send(MSG.chat, { ch: 'system', text } satisfies ChatMsg); }
+  // Quem está online (menos você), onde está e se já tem grupo: a lista da tela de grupo.
+  private onlineList(me: string): OnlineEntry[] {
+    const g = this.parties.of(me);
+    return [...this.seats.keys()].filter(id => id !== me).flatMap(id => {
+      const f = this.find(id), o = this.parties.of(id);
+      return f ? [{ name: f.p.name, level: f.p.level, where: whereOf(f.w, f.p), party: !!o, mine: !!g && o === g }] : [];
+    }).sort((a, b) => a.name.localeCompare(b.name));
+  }
+  // Seu grupo no snapshot: vida, nível e onde cada um está (posição só de quem está no seu mapa).
+  private partyInfo(id: string, map: string) {
+    const g = this.parties.of(id); if (!g) return undefined;
+    return { leader: g.leader, m: g.members.flatMap((m): PartyTuple[] => {
+      const f = this.find(m); if (!f) return [];
+      const same = f.seat.map === map, p = f.p;
+      return [[m, p.name, p.level, p.maxHp > 0 ? Math.ceil(p.hp / p.maxHp * 100) : 0, p.state === 'dead' ? 1 : 0, same ? Math.round(p.x) : -1, same ? Math.round(p.y) : -1, whereOf(f.w, p)]];
+    }) };
   }
   // Ligar/desligar o PvP (só no modo optional, respeitando cooldown e combat lock).
   private onPvp(client: Client, raw: unknown) {
@@ -417,6 +552,7 @@ export class WorldRoom extends Room {
       const inv = this.world.invasion;
       if (inv) msg.iv = [inv.phase === 'warn' ? -1 : remaining(this.world), Math.max(0, Math.ceil((inv.until - this.world.tick) / TICK_RATE))];
       if (w.tick % 40 < this.sendEvery) msg.r = [...w.players.values()].filter(o => o.id !== id && o.state !== 'dead').map(o => [o.id, Math.floor(o.x / 16), Math.floor(o.y / 16)]);
+      msg.g = this.partyInfo(id, seat.map);
       if (seat.bagSent !== me.bagVersion) { msg.bag = me.bag; seat.bagSent = me.bagVersion; }
       const ch = openChests(w, me), mark = ch.join(';') || '-';   // muda ao abrir e quando um baú enche de novo ('' = nunca enviado)
       if (mark !== seat.chestsSent) { msg.ch = ch; seat.chestsSent = mark; }

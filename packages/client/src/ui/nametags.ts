@@ -17,7 +17,7 @@ export class NameTags {
     b.until = performance.now() + Math.min(10000, 4000 + text.length * 60);
   }
 
-  update(scene: Scene, cam: Camera, mode: NameMode, showBubbles: boolean) {
+  update(scene: Scene, cam: Camera, mode: NameMode, showBubbles: boolean, party: ReadonlySet<string> = new Set()) {
     const seen = new Set<string>(), now = performance.now();
     for (const [id, b] of this.bubbles) if (now > b.until || !showBubbles) { b.el.remove(); this.bubbles.delete(id); }
     for (const p of scene.players) {
@@ -33,6 +33,7 @@ export class NameTags {
       if (el.textContent !== name) el.textContent = name;
       el.classList.toggle('me', mine);
       el.classList.toggle('pvp', p.pvpActive);
+      el.classList.toggle('party', !mine && party.has(p.id));
       el.style.left = (x / VIEW_W * 100) + '%'; el.style.top = (y / VIEW_H * 100) + '%';
       seen.add(p.id);
     }

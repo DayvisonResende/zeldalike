@@ -1,14 +1,16 @@
-import { GEAR, GEAR_NAME, ITEMS, gearIn, owns, type GearId, type GearSlot, type ItemId, type Slot } from '@vale/shared';
+import { GEAR, GEAR_NAME, ITEMS, formatStat, gearIn, gearLines, owns, statDiff, type GearId, type GearRules, type GearSlot, type ItemId, type Slot } from '@vale/shared';
 import { ITEM_ICON } from '../render/sprites';
 import type { Inventory } from '../session/types';
 
-export interface BagHooks { inventory(): Inventory | null; use(slot: number): void; drop(slot: number): void; equip(gear: GearId, slot: GearSlot): void; closed(): void }
+export interface BagHooks { inventory(): Inventory | null; rules(): GearRules | null; use(slot: number): void; drop(slot: number): void; equip(gear: GearId, slot: GearSlot): void; closed(): void }
 
 // Painel do inventário (I): grade de espaços, detalhe do item escolhido, usar e largar.
 export class BagPanel {
   private el = document.getElementById('bag')!;
   private grid = document.getElementById('bagGrid')!;
   private info = document.getElementById('bagInfo')!;
+  private lines = document.getElementById('bagLines')!;
+  private gearStats = document.getElementById('gearStats')!;
   private useBtn = document.getElementById('bagUse') as HTMLButtonElement;
   private dropBtn = document.getElementById('bagDrop') as HTMLButtonElement;
   private equipC = document.getElementById('bagEquipC') as HTMLButtonElement;
@@ -36,7 +38,8 @@ export class BagPanel {
   render() {
     if (!this.open) return;
     const inv = this.hooks.inventory(); if (!inv) return;
-    const key = JSON.stringify([inv.bag, inv.gold, inv.gear, this.sel]);
+    const rules = this.hooks.rules();
+    const key = JSON.stringify([inv.bag, inv.gold, inv.gear, this.sel, rules]);
     if (key === this.shown) return;
     this.shown = key;
     document.getElementById('bagGold')!.textContent = `${inv.gold} de ouro`;
@@ -51,9 +54,32 @@ export class BagPanel {
       this.gearBtn[slot].setAttribute('aria-label', `Botão ${slot.toUpperCase()}: ${GEAR_NAME[g]}. Trocar`);
     }
     const gear = !!cur && !!ITEMS[cur.id].gear;
+    this.gearInfo(inv, rules, gear ? cur!.id as GearId : null);
     this.useBtn.textContent = gear ? 'Equipar no A' : 'Usar'; this.equipC.hidden = !gear;
     this.useBtn.disabled = !cur || (!gear && !ITEMS[cur.id].heal && !ITEMS[cur.id].mana);
     this.dropBtn.disabled = !cur;
+  }
+  // O que cada botão faz agora e, com uma arma escolhida, o que ela faz e o que muda ao equipar (verde melhora, vermelho piora).
+  private gearInfo(inv: Inventory, rules: GearRules | null, g: GearId | null) {
+    const a = gearIn(inv, 'a'), c = gearIn(inv, 'c'), li = (text: string, cls = '') => Object.assign(document.createElement('li'), { textContent: text, className: cls });
+    this.gearStats.replaceChildren(...([['A', a], ['C', c]] as const).map(([k, id]) => {
+      const d = document.createElement('div');
+      d.append(Object.assign(document.createElement('b'), { textContent: `${k}: ${GEAR_NAME[id]} ` }), document.createTextNode(rules ? gearLines(rules, id).join(' · ') : ''));
+      return d;
+    }));
+    this.lines.hidden = !g || !rules;
+    if (!g || !rules) { this.lines.replaceChildren(); return; }
+    const out = gearLines(rules, g).map(t => li(t));
+    for (const slot of ['a', 'c'] as const) {
+      const other = slot === 'a' ? c : a, now = gearIn(inv, slot);
+      if (g === now) { out.push(li(`Já está no ${slot.toUpperCase()}.`, 'cmp')); continue; }
+      const diff = g === other ? [] : statDiff(rules, [a, c], [g, other]);   // já no outro botão: os dois trocam, nada muda
+      const line = li(`No ${slot.toUpperCase()} (no lugar de ${GEAR_NAME[now]}): `, 'cmp');
+      if (!diff.length) line.append('atributos iguais');
+      diff.forEach((d, i) => line.append(Object.assign(document.createElement('span'), { className: d.v > 0 ? 'up' : 'down', textContent: (i ? ', ' : '') + formatStat(d.k, d.v) })));
+      out.push(line);
+    }
+    this.lines.replaceChildren(...out);
   }
   private selGear(): GearId | null {
     const s = this.hooks.inventory()?.bag[this.sel];

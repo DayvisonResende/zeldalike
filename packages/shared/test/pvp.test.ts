@@ -98,3 +98,30 @@ describe('quem derrubou quem', () => {
     expect(b.hp).toBe(100 - DEFAULT_RULES.pvp.damage.arrow);
   });
 });
+
+describe('atributos no PvP (pvp.factor)', () => {
+  // espada: +20 de ataque; cajado de fogo: +100 de defesa (só Beto tem); fator 0,5
+  function armed(defended: boolean) {
+    const { w, a, b } = duel('open');
+    w.rules = { ...w.rules, gear: { sword: { attack: 20 }, firestaff: { defense: 100 } } };
+    if (defended) { b.bag[0] = { id: 'firestaff', n: 1 }; b.gear = { a: 'sword', c: 'firestaff' }; }
+    w.step();
+    return { w, a, b };
+  }
+  it('ataque vale metade entre jogadores: 15 da espada + 20 × 0,5', () => {
+    const { w, a, b } = armed(false);
+    swing(w, a);
+    expect(b.hp).toBe(75);
+  });
+  it('defesa também vale metade: 100 de defesa conta como 50', () => {
+    const { w, a, b } = armed(true);
+    swing(w, a);
+    expect(b.hp).toBeCloseTo(100 - 25 * 100 / 150, 5);
+  });
+  it('fator 0: no PvP os atributos não contam', () => {
+    const { w, a, b } = armed(true);
+    w.rules = { ...w.rules, pvp: { ...w.rules.pvp, factor: 0 } };
+    swing(w, a);
+    expect(b.hp).toBe(85);
+  });
+});

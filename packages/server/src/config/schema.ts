@@ -1,4 +1,4 @@
-import { ITEM_IDS, LOOT_IDS, type ItemId, type LootId } from '@vale/shared';
+import { GEAR, ITEM_IDS, LOOT_IDS, MAX_ATTACK_SPEED, type GearId, type ItemId, type LootId } from '@vale/shared';
 import { z } from 'zod';
 
 const UNIT = { ms: 0.001, s: 1, m: 60, h: 3600 } as const;
@@ -23,6 +23,11 @@ const rate = z.number().nonnegative();
 // Loja: "heart: 15" = preço em ouro. buy: o que ela vende; sell: o que ela compra de você.
 const prices = z.partialRecord(z.enum(ITEM_IDS as [ItemId, ...ItemId[]]), z.number().int().positive()).default({});
 const shop = z.strictObject({ buy: prices, sell: prices });
+// Atributos de um equipamento: ataque, poder mágico, velocidade de ataque (%), defesa, vida, mana e regenerações (por segundo).
+const statBonus = z.strictObject({
+  attack: z.number(), magic: z.number(), attackSpeed: z.number().min(0).max(MAX_ATTACK_SPEED), defense: z.number().min(0),
+  hp: z.number(), mp: z.number(), hpRegen: z.number(), mpRegen: z.number()
+}).partial();
 
 // strictObject recusa chaves desconhecidas: um "tallgras" digitado errado vira erro, não silêncio.
 export const configSchema = z.strictObject({
@@ -105,7 +110,14 @@ export const configSchema = z.strictObject({
     combatLock: duration,
     safeZones: z.array(z.string()),
     damage: z.strictObject({ sword: rate, spin: rate, dash: rate, arrow: rate, thrown: rate, bomb: rate }),
+    factor: z.number().min(0).max(1).default(0.5),   // quanto dos atributos vale entre jogadores
     announceKills: z.boolean()
-  })
+  }),
+  // grupo: tamanho máximo; o XP de um monstro é dividido igualmente com quem do grupo estiver até xpRange pixels
+  // dano em monstros, em pontos de vida: espada, giro carregado, dash, flecha, objeto arremessado, bomba
+  weapons: z.strictObject({ sword: rate, spin: rate, dash: rate, arrow: rate, thrown: rate, bomb: rate }).default({ sword: 10, spin: 20, dash: 20, arrow: 10, thrown: 20, bomb: 30 }),
+  // atributos que cada arma dá enquanto estiver no botão A ou C (todos opcionais; o que faltar é 0)
+  gear: z.strictObject(Object.fromEntries(GEAR.map(g => [g, statBonus])) as Record<GearId, typeof statBonus>).partial().default({}),
+  party: z.strictObject({ maxSize: z.number().int().min(2).max(20), xpRange: z.number().positive() }).default({ maxSize: 4, xpRange: 320 })
 });
 export type Config = z.output<typeof configSchema>;

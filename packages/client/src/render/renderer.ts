@@ -9,7 +9,7 @@ import { pin } from './mapimage';
 
 type Ctx = CanvasRenderingContext2D;
 // talking: "x,y" do NPC que está conversando com você (ele se vira para você).
-export interface View { marks?: readonly { id: string; x: number; y: number }[]; lock?: { x: number; y: number } | null; talking?: string | null; me: PlayerView | undefined; cam: Camera; particles: Particles; showPaths: boolean; reticle: { x: number; y: number } | null; shake: number; tick: number }
+export interface View { marks?: readonly { id: string; x: number; y: number }[]; friends?: readonly { x: number; y: number; dead: boolean }[]; lock?: { x: number; y: number } | null; talking?: string | null; me: PlayerView | undefined; cam: Camera; particles: Particles; showPaths: boolean; reticle: { x: number; y: number } | null; shake: number; tick: number }
 
 function drawShadow(ctx: Ctx, x: number, y: number) { ctx.drawImage(SHADOW, Math.round(x - 7), Math.round(y - 3)); }
 function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
@@ -238,16 +238,21 @@ function drawPaths(ctx: Ctx, w: Scene, v: View) {
     } else { ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(e.x, e.y, 96, 0, Math.PI * 2); ctx.stroke(); }
   }
 }
-// Marcador "venham aqui!": alfinete no lugar; fora da tela, uma seta na borda apontando para ele.
 const REVIVE_TICKS = 90;   // 1,5 s, o padrão do config (player.revive): só para a barrinha
+// Marcador "venham aqui!": alfinete no lugar; fora da tela, uma seta vermelha na borda apontando para ele.
 function drawMark(ctx: Ctx, x: number, y: number) {
+  if (!edgeArrow(ctx, x, y, '#e0453b')) pin(ctx, Math.round(x), Math.round(y), 0.8);
+}
+// Ponto (na tela) fora da tela: seta na borda apontando para ele. Devolve false se o ponto está à vista.
+function edgeArrow(ctx: Ctx, x: number, y: number, color: string) {
   const M = 10;
-  if (x >= M && x <= VIEW_W - M && y >= 18 && y <= VIEW_H - 4) { pin(ctx, Math.round(x), Math.round(y), 0.8); return; }
+  if (x >= M && x <= VIEW_W - M && y >= 18 && y <= VIEW_H - 4) return false;
   const cx = VIEW_W / 2, cy = VIEW_H / 2, a = Math.atan2(y - cy, x - cx);
   const k = Math.min((VIEW_W / 2 - M) / Math.abs(Math.cos(a) || 1e-6), (VIEW_H / 2 - M) / Math.abs(Math.sin(a) || 1e-6));
   const ex = cx + Math.cos(a) * k, ey = cy + Math.sin(a) * k, ca = Math.cos(a), sa = Math.sin(a);
   const tri = (s: number, c: string) => { ctx.fillStyle = c; ctx.beginPath(); ctx.moveTo(ex + ca * (5 + s), ey + sa * (5 + s)); ctx.lineTo(ex - sa * (4 + s) - ca * (2 + s), ey + ca * (4 + s) - sa * (2 + s)); ctx.lineTo(ex + sa * (4 + s) - ca * (2 + s), ey - ca * (4 + s) - sa * (2 + s)); ctx.fill(); };
-  tri(1.5, '#1b1226'); tri(0, '#e0453b');
+  tri(1.5, '#1b1226'); tri(0, color);
+  return true;
 }
 // Setinha amarela (com contorno) apontando para o item que o botão de Ação pega.
 function drawPickArrow(ctx: Ctx, x: number, y: number) {
@@ -342,6 +347,8 @@ export function render(ctx: Ctx, w: Scene, v: View) {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   drawLight(ctx, w, cx - sx, cy - sy, v.tick);
   if (v.reticle) drawReticle(ctx, v.reticle);
+  // amigos do grupo longe: seta verde na borda (caído: pisca em vermelho)
+  for (const f of v.friends ?? []) edgeArrow(ctx, f.x - cx + sx, f.y - 10 - cy + sy, f.dead && (v.tick >> 4) & 1 ? '#ff6b5b' : '#7be08a');
   for (const m of v.marks ?? []) drawMark(ctx, m.x - cx + sx, m.y - cy + sy);
 }
 
