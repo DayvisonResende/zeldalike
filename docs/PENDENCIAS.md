@@ -83,9 +83,11 @@ snapshots, eventos como ataque e acerto) e o do servidor (tempo dos passos, envi
 - [x] `npm run clock:check` no home lab: relógio padrão com mediana de 30,9 ms (207 de 240 passos atrasados); com 1 ms,
       16,3 ms (8 de 240).
 - [x] Gravação com o relógio de 1 ms (2026-10-29 19:16): melhorou (pior intervalo de envio 65 ms, laço atrasado 12 ms em
-      vez de 22), mas ainda um passo de ~32 ms por segundo. Provável: janela do servidor minimizada; o Windows 11 ignora
-      o relógio de 1 ms de programas escondidos. O servidor agora pede para ficar fora da economia de energia
-      (`SetProcessInformation`, em `src/timer.ts`); o `clock:check` mede também com a janela minimizada.
+      vez de 22), mas ainda um passo de ~32 ms por segundo. Não era a janela minimizada (o `clock:check` com ela
+      minimizada deu 16,1 ms, nenhum atrasado): era o laço do Colyseus (`setFixedTimestep`), que dispara a cada 16 ms
+      inteiros e acumula a diferença para 16,67; de vez em quando um disparo fica sem passo e o seguinte faz dois.
+      Reproduzido em Linux (pior espera ~32,6 ms quase todo segundo). Trocado por um laço próprio que mira o horário de
+      cada passo (`startLoop` no `WorldRoom`): pior espera ~17,8 ms, 60 passos por segundo.
       No celular: 43 fps de mediana com a opção em 60 (até 59); código por quadro 6,5 ms.
 - [ ] Gravar de novo com o servidor atualizado e a janela minimizada.
 

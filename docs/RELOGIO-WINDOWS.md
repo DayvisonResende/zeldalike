@@ -71,9 +71,7 @@ npm run clock:check
 ```
 
 Ele mede o ritmo do relógio três vezes: como o Windows vem, com o relógio de 1 ms e, por fim, **com a janela
-minimizada** (quando ele pedir, minimize a janela e volte depois de uns 15 segundos). A última é a que importa: o
-servidor costuma ficar com a janela escondida, e o Windows 11 economiza energia com programas assim, ignorando o
-relógio de 1 ms. O servidor pede para ficar fora dessa economia; a linha `[relógio]` diz se o Windows aceitou.
+minimizada** (quando ele pedir, minimize a janela e volte depois de uns 15 segundos), que é como o servidor costuma ficar.
 O laço do jogo precisa de um passo a cada 16,7 ms. Algo assim mostra que funcionou:
 
 ```
@@ -83,8 +81,7 @@ Com a janela minimizada: mediana 16.7 ms · 90% até 17.2 ms · pior 19.0 ms · 
 ```
 
 - **A segunda e a terceira linhas com mediana perto de 16,7 ms e quase nenhum passo atrasado:** funcionou.
-- **Só a terceira linha ruim:** o Windows não aceitou tirar o servidor da economia de energia; me mande a linha
-  `[relógio]`.
+- **Só a terceira linha ruim:** o Windows está desacelerando o servidor quando a janela some; me avise.
 - **As duas linhas iguais e ruins:** o relógio não ligou; veja a linha `[relógio]` que aparece entre elas.
 - **A primeira linha já boa:** este Windows já estava com o relógio preciso (algum programa aberto, como o Chrome,
   pode ter pedido). O servidor pede de novo ao ligar, então continua valendo mesmo se esse programa fechar.
@@ -101,6 +98,13 @@ Com a janela minimizada: mediana 16.7 ms · 90% até 17.2 ms · pior 19.0 ms · 
 | `intervaloEnvioMax` (servidor) | 70–80 ms | perto de 50 ms |
 | `gap` (celular, entre pacotes) | ~123 ms | menor (a rede ainda soma um pouco) |
 | `delay` (celular, atraso da cena) | ~190–230 ms | menor |
+
+## O laço do jogo
+
+Mesmo com o relógio bom, o laço que vinha do Colyseus (`setFixedTimestep`) fazia um passo de ~32 ms quase todo
+segundo: ele dispara a cada 16 ms inteiros e acumula a diferença para 16,67, e de vez em quando um disparo fica sem
+passo e o seguinte faz dois. O servidor agora usa um laço próprio que mira o horário de cada passo
+(`startLoop` em `packages/server/src/rooms/WorldRoom.ts`): pior espera de ~18 ms. Isso vale em qualquer sistema.
 
 ## Se algo der errado
 

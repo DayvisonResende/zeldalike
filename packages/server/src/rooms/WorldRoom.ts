@@ -85,7 +85,7 @@ export class WorldRoom extends Room {
     this.onMessage(MSG.mark, (client, msg) => this.onMark(client, msg));
     this.onMessage(MSG.party, (client, msg) => this.onParty(client, msg));
     this.onMessage(MSG.telemetry, (client, msg) => this.onTelemetry(client, msg));
-    this.setFixedTimestep(() => this.step(), TICK_RATE);
+    this.startLoop();
     this.scheduleSave();
   }
   private apply(c: Config) {
@@ -164,7 +164,7 @@ export class WorldRoom extends Room {
     if (mark) { this.marks.delete(client.sessionId); this.sendMark(mark.map, { id: client.sessionId, clear: true }); }
     this.markAt.delete(client.sessionId);
   }
-  async onDispose() { this.unsub?.(); this.unsubItems?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
+  async onDispose() { clearTimeout(this.loopTimer); this.unsub?.(); this.unsubItems?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
 
   /* ---------- Trocar de mapa ---------- */
   // Leva o jogador (com tudo que ele tem) para outro mundo e manda o mapa novo para o cliente.
@@ -576,6 +576,23 @@ export class WorldRoom extends Room {
     }
   }
 
+  /* Laço do jogo: 60 passos por segundo, cada um mirando o seu horário (setTimeout até o próximo). O laço do Colyseus
+     (setFixedTimestep) dispara a cada 16 ms inteiros e acumula a diferença para 16,67: quase todo segundo um disparo
+     ficava sem passo e o seguinte fazia dois, uma espera de ~32 ms que atrasava o envio da vez (medido no /debug e
+     reproduzido em Linux). Atrasou demais (servidor travou): não corre atrás de tudo, recomeça do agora. */
+  private loopTimer?: NodeJS.Timeout;
+  private startLoop() {
+    const stepMs = 1000 / TICK_RATE;
+    let next = performance.now() + stepMs;
+    const run = () => {
+      const now = performance.now();
+      let n = 0;
+      while (now >= next - 1 && n < 5) { this.step(); next += stepMs; n++; }   // até 1 ms adiantado conta (o relógio é em ms inteiros)
+      if (n === 5) next = now + stepMs;
+      this.loopTimer = setTimeout(run, Math.max(0, next - performance.now()));
+    };
+    this.loopTimer = setTimeout(run, stepMs);
+  }
   private stepAt = 0;
   private step() {
     const t0 = performance.now(), gap = this.stepAt ? t0 - this.stepAt : 0;

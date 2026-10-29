@@ -1,7 +1,7 @@
 // Confere o relógio do servidor: npm run clock:check
 // Mede, por alguns segundos, de quanto em quanto tempo um setInterval de 16,7 ms (o do laço do jogo) dispara de
 // verdade. Primeiro como o sistema vem; depois com o relógio de 1 ms (src/timer.ts, só no Windows com o koffi);
-// por fim com a janela minimizada, que é como o servidor costuma ficar (o Windows 11 economiza energia com ela escondida).
+// por fim com a janela minimizada, que é como o servidor costuma ficar.
 import { preciseTimers } from '../../server/src/timer';
 
 const STEP = 1000 / 60, SECONDS = 4;
