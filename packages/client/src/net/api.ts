@@ -19,6 +19,7 @@ export class Api {
     if (!res.ok) throw new ApiError(res.status, data.error ?? 'Erro no servidor.');
     return data as T;
   }
+  request = <T>(path: string, method = 'GET', body?: unknown) => this.call<T>(path, method, body);   // outras rotas (a Oficina)
   register = (username: string, password: string) => this.call<AuthResult>('/register', 'POST', { username, password });
   login = (username: string, password: string) => this.call<AuthResult>('/login', 'POST', { username, password });
   logout = () => this.call<void>('/logout', 'POST', {});

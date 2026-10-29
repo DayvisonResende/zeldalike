@@ -1,32 +1,46 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ConfigError, loadConfig, watchConfig } from './config/load';
-import { configPath, getConfig, setConfig, setConfigDir } from './config/store';
+import { configPath, getConfig, setConfig, setConfigFile } from './config/store';
 import { startServer } from './app';
 import { openDatabase, setDb } from './persistence/db';
 import { purgeSessions } from './persistence/accounts';
 import { scheduleBackups } from './persistence/backup';
 import { MapError, type MapData } from '@vale/shared';
 import { checkPortals, loadMap, setMaps } from './map';
+import { ITEMS_DIR, ItemsError, getCatalog, loadItems, setCatalog, watchItems } from './content/items';
+import { oficinaEnabled } from './oficina/routes';
 
 // CONFIG=arquivo.yaml troca a configuração (por exemplo, uma de produção ou de teste).
 const CONFIG_FILE = process.env.CONFIG ? path.resolve(process.env.CONFIG) : fileURLToPath(new URL('../config.yaml', import.meta.url));
-setConfigDir(path.dirname(CONFIG_FILE));
+setConfigFile(CONFIG_FILE);
 
-// Config primeiro (diz quais são os mapas), depois os mapas e os portais entre eles, depois a config de novo, agora conferindo as regiões.
-let WORLD_MAP!: MapData, OTHERS: MapData[] = [];
+// Itens primeiro (o config e os mapas citam itens), depois o config (diz quais são os mapas), depois os mapas e os portais
+// entre eles, depois o config de novo, agora conferindo as regiões.
+let WORLD_MAP!: MapData, OTHERS: MapData[] = [], MAP_FILES: string[] = [];
 try {
+  setCatalog(loadItems());
+  console.log(`[itens] ${Object.keys(getCatalog()).length} em ${ITEMS_DIR}`);
   const world = loadConfig(CONFIG_FILE).world, maps: Record<string, MapData> = {};
   for (const [id, file] of Object.entries(world.maps)) {
     const full = path.resolve(path.dirname(CONFIG_FILE), file);
-    maps[id] = loadMap(full);
+    maps[id] = loadMap(full); MAP_FILES.push(full);
     console.log(`[mapa] ${id}: ${full}`);
   }
   checkPortals(maps);
   setMaps(maps, world.start);
   WORLD_MAP = maps[world.start]; OTHERS = Object.entries(maps).filter(([id]) => id !== world.start).map(([, m]) => m);
   setConfig(loadConfig(CONFIG_FILE, WORLD_MAP, OTHERS));
-} catch (e) { console.error(e instanceof ConfigError || e instanceof MapError ? e.message : e); process.exit(1); }
+} catch (e) { console.error(e instanceof ConfigError || e instanceof MapError || e instanceof ItemsError ? e.message : e); process.exit(1); }
+
+// Itens mudaram (Oficina ou à mão): só valem se o config e os mapas continuarem certos com eles (um item usado numa
+// loja, num drop ou num baú não pode sumir). Senão, fica o catálogo anterior.
+watchItems(ITEMS_DIR, c => {
+  const old = getCatalog();
+  setCatalog(c);
+  try { for (const f of MAP_FILES) loadMap(f, false); loadConfig(CONFIG_FILE, WORLD_MAP, OTHERS); console.log(`[itens] recarregados: ${Object.keys(c).length}`); }
+  catch (e) { setCatalog(old); console.error('[itens] mudança ignorada, mantendo os anteriores: algo ainda usa um item que sumiu.\n' + (e as Error).message); }
+}, e => console.error('[itens] mudança ignorada, mantendo os anteriores.\n' + e.message));
 
 watchConfig(CONFIG_FILE, WORLD_MAP, OTHERS,
   c => { setConfig(c); console.log('[config] recarregada'); },
@@ -48,3 +62,4 @@ console.log(`[vale] mundo "${WORLD_MAP.name}" no ar: ${WORLD_MAP.cols}x${WORLD_M
 console.log(hasClient
   ? `[vale] jogo em http://localhost:${port} (versão compilada; para editar com recarga automática use npm run dev → http://localhost:5173)`
   : `[vale] a página do jogo ainda não foi compilada: rode "npm start" (compila e sobe tudo) ou "npm run dev" (http://localhost:5173)`);
+if (oficinaEnabled()) console.log(`[oficina] ligada (grava em content/): http://localhost:5173/oficina.html no npm run dev${hasClient ? `, ou http://localhost:${port}/oficina` : ''}`);

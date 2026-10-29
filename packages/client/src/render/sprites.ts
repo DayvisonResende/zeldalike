@@ -241,29 +241,16 @@ function glyph(rows: string[], col: string) { const g = G(rows[0].length, rows.l
 export const BANG = glyph(['11', '11', '11', '00', '11'], '#ffe66b');
 export const QUES = glyph(['111', '001', '011', '000', '010'], '#ffffff');
 
-/* ---------- Itens (8x8): no chão e no inventário ---------- */
+/* ---------- Ícone do ouro (8x8 + contorno) ---------- */
 function icon(rows: string[], pal: Record<string, string>) {
   const g = G(rows[0].length, rows.length);
   rows.forEach((r, j) => [...r].forEach((ch, i) => { if (pal[ch]) g[j][i] = pal[ch]; }));
   return bake(g);
 }
-export const ITEM_ICON: Record<string, HTMLCanvasElement> = {
-  heart: icon(['.rr..rr.', 'rwrrrrrr', 'rwrrrrrr', 'rrrrrrrd', '.rrrrrd.', '..rrrd..', '...rd...'], { r: '#e2574c', w: '#ffd2c8', d: '#a8342c' }),
-  mana: icon(['...cc...', '...gg...', '..gbbg..', '.gbwbbg.', '.gbbbbg.', '.gbbbdg.', '..gddg..'], { c: '#8a5a36', g: '#cfe8ff', b: '#4b7fd9', w: '#bcd6ff', d: '#2f55a8' }),
-  jelly: icon(['........', '...pp...', '..pwpp..', '.pwpppp.', '.pppppd.', 'pppppddd'], { p: '#b65cd8', w: '#e4a6f3', d: '#7a3496' }),
-  shell: icon(['..bbbb..', '.bwbbbb.', 'bwbbbbbd', 'bbbbbbbd', '.bbbbdd.', '..bddd..'], { b: '#4d62b2', w: '#a2b4f0', d: '#2b3577' }),
-  lambari: icon(['........', '.ss...s.', 'swsssss.', 'sssssss.', '.ss...s.'], { s: '#b8c4d4', w: '#ffffff' }),
-  tilapia: icon(['........', '.gg....g', 'gwgggggg', 'ggggdggg', '.gg....g'], { g: '#6f8f6a', w: '#e6f0dc', d: '#3f5a3c' }),
-  trout: icon(['..yy....', '.yyyy..y', 'ywyyyyyy', 'yyyoyyyy', '.yyyy..y', '..yy....'], { y: '#f0c44a', w: '#fff3b0', o: '#d9822b' }),
-  moonfish: icon(['...bb...', '.bbbbb.b', 'bwbbbbbb', 'bbbbbbbb', '.bbbbb.b', '...bb...'], { b: '#9fb8ff', w: '#ffffff' }),
-  blindfish: icon(['........', '.pp...p.', 'pppppppp', 'pppppp..', '.pp...p.'], { p: '#f2c6d6' }),
-  boot: icon(['.bbb....', '.bbb....', '.bbb....', '.bbbbbb.', 'dddddddd'], { b: '#7a4a2a', d: '#3e2416' }),
-  bomb: icon(['....oo..', '...o....', '.bbbb...', 'bwbbbb..', 'bbbbbb..', 'bbbbbb..', '.bbbb...'], { b: '#2d2a3a', w: '#7a7690', o: '#d9822b' }),
-  firestaff: icon(['......oy', '.....bo.', '....b...', '...b....', '..b.....', '.b......', 'b.......'], { b: '#8a5a33', o: '#e8642c', y: '#ffd35a' }),
-  lightstaff: icon(['......wy', '.....bw.', '....b...', '...b....', '..b.....', '.b......', 'b.......'], { b: '#c9a46a', w: '#fffbe6', y: '#9fe7ff' }),
-  darktome: icon(['.pppppp.', 'pPPPPPpd', 'pPwwPPpd', 'pPPPPPpd', 'pPPwwPpd', 'pPPPPPpd', '.dddddd.'], { p: '#4a2a6a', P: '#7f4aa8', w: '#c79bf0', d: '#24142f' }),
-  gold: icon(['..yyyy..', '.yywwyy.', 'yywyyyyo', 'yyyyyyyo', 'yyyyyyoo', '.yyyyoo.', '..oooo..'], { y: '#f5c542', w: '#fff3b0', o: '#b8862a' })
-};
+// Ouro não é item (vai para o contador): o ícone dele continua aqui. Os dos itens vêm de content/items/ (ver icons.ts).
+// Chave de masmorra: argola, haste e dentes. Vai para o contador do grupo, não para a mochila.
+export const KEY_ICON = icon(['.yyy....', 'y...y...', 'y...y...', '.yyy....', '..y.....', '..yyy...', '..y.....', '..yy....'], { y: '#e9b44c' });
+export const GOLD_ICON = icon(['..yyyy..', '.yywwyy.', 'yywyyyyo', 'yyyyyyyo', 'yyyyyyoo', '.yyyyoo.', '..oooo..'], { y: '#f5c542', w: '#fff3b0', o: '#b8862a' });
 
 /* ---------- Baú (14x12 + contorno): fechado e aberto (vazio para você) ---------- */
 function chestGrid(open: boolean) {

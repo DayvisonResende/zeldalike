@@ -1,5 +1,5 @@
-import { GEAR, GEAR_NAME, ITEMS, formatStat, gearIn, gearLines, owns, statDiff, type GearId, type GearRules, type GearSlot, type ItemId, type Slot } from '@vale/shared';
-import { ITEM_ICON } from '../render/sprites';
+import { gearName, ownedGear, ITEMS, formatStat, gearIn, gearLines, statDiff, type GearId, type GearRules, type GearSlot, type ItemId, type Slot } from '@vale/shared';
+import { iconsVersion, itemIcon } from '../render/icons';
 import type { Inventory } from '../session/types';
 
 export interface BagHooks { inventory(): Inventory | null; rules(): GearRules | null; use(slot: number): void; drop(slot: number): void; equip(gear: GearId, slot: GearSlot): void; closed(): void }
@@ -24,7 +24,7 @@ export class BagPanel {
     // A: / C: no topo alternam entre o que você tem e não está no outro botão (espada e arco sempre)
     for (const slot of ['a', 'c'] as const) this.gearBtn[slot].addEventListener('click', () => {
       const inv = this.hooks.inventory(); if (!inv) return;
-      const other = gearIn(inv, slot === 'a' ? 'c' : 'a'), mine = GEAR.filter(g => owns(inv, g) && g !== other), cur = gearIn(inv, slot);
+      const other = gearIn(inv, slot === 'a' ? 'c' : 'a'), mine = ownedGear(inv).filter(g => g !== other), cur = gearIn(inv, slot);
       this.hooks.equip(mine[(mine.indexOf(cur) + 1) % mine.length], slot);
     });
     this.dropBtn.addEventListener('click', () => { if (this.sel >= 0) this.hooks.drop(this.sel); });
@@ -39,7 +39,7 @@ export class BagPanel {
     if (!this.open) return;
     const inv = this.hooks.inventory(); if (!inv) return;
     const rules = this.hooks.rules();
-    const key = JSON.stringify([inv.bag, inv.gold, inv.gear, this.sel, rules]);
+    const key = JSON.stringify([inv.bag, inv.gold, inv.gear, this.sel, rules, iconsVersion()]);
     if (key === this.shown) return;
     this.shown = key;
     document.getElementById('bagGold')!.textContent = `${inv.gold} de ouro`;
@@ -50,8 +50,8 @@ export class BagPanel {
     if (!cur) { this.sel = -1; this.info.textContent = 'Escolha um item.'; }
     else { const d = ITEMS[cur.id]; this.info.textContent = `${d.name}${cur.n > 1 ? ' ×' + cur.n : ''} — ${d.desc}`; }
     for (const slot of ['a', 'c'] as const) {
-      const g = gearIn(inv, slot); this.gearBtn[slot].textContent = `${slot.toUpperCase()}: ${GEAR_NAME[g]} ⟳`;
-      this.gearBtn[slot].setAttribute('aria-label', `Botão ${slot.toUpperCase()}: ${GEAR_NAME[g]}. Trocar`);
+      const g = gearIn(inv, slot); this.gearBtn[slot].textContent = `${slot.toUpperCase()}: ${gearName(g)} ⟳`;
+      this.gearBtn[slot].setAttribute('aria-label', `Botão ${slot.toUpperCase()}: ${gearName(g)}. Trocar`);
     }
     const gear = !!cur && !!ITEMS[cur.id].gear;
     this.gearInfo(inv, rules, gear ? cur!.id as GearId : null);
@@ -64,7 +64,7 @@ export class BagPanel {
     const a = gearIn(inv, 'a'), c = gearIn(inv, 'c'), li = (text: string, cls = '') => Object.assign(document.createElement('li'), { textContent: text, className: cls });
     this.gearStats.replaceChildren(...([['A', a], ['C', c]] as const).map(([k, id]) => {
       const d = document.createElement('div');
-      d.append(Object.assign(document.createElement('b'), { textContent: `${k}: ${GEAR_NAME[id]} ` }), document.createTextNode(rules ? gearLines(rules, id).join(' · ') : ''));
+      d.append(Object.assign(document.createElement('b'), { textContent: `${k}: ${gearName(id)} ` }), document.createTextNode(rules ? gearLines(rules, id).join(' · ') : ''));
       return d;
     }));
     this.lines.hidden = !g || !rules;
@@ -74,7 +74,7 @@ export class BagPanel {
       const other = slot === 'a' ? c : a, now = gearIn(inv, slot);
       if (g === now) { out.push(li(`Já está no ${slot.toUpperCase()}.`, 'cmp')); continue; }
       const diff = g === other ? [] : statDiff(rules, [a, c], [g, other]);   // já no outro botão: os dois trocam, nada muda
-      const line = li(`No ${slot.toUpperCase()} (no lugar de ${GEAR_NAME[now]}): `, 'cmp');
+      const line = li(`No ${slot.toUpperCase()} (no lugar de ${gearName(now)}): `, 'cmp');
       if (!diff.length) line.append('atributos iguais');
       diff.forEach((d, i) => line.append(Object.assign(document.createElement('span'), { className: d.v > 0 ? 'up' : 'down', textContent: (i ? ', ' : '') + formatStat(d.k, d.v) })));
       out.push(line);
@@ -91,7 +91,7 @@ export class BagPanel {
     b.setAttribute('role', 'option'); b.setAttribute('aria-selected', String(i === this.sel));
     b.setAttribute('aria-label', s ? `${ITEMS[s.id].name}, ${s.n}` : 'Vazio');
     if (s) {
-      const cv = document.createElement('canvas'), icon = ITEM_ICON[s.id];
+      const cv = document.createElement('canvas'), icon = itemIcon(s.id);
       cv.width = icon.width; cv.height = icon.height; cv.getContext('2d')!.drawImage(icon, 0, 0);
       b.append(cv);
       if (ITEMS[s.id].gear) { const inv = this.hooks.inventory(); for (const k of ['a', 'c'] as const) if (inv && gearIn(inv, k) === (s.id as ItemId as GearId)) b.append(Object.assign(document.createElement('i'), { className: 'eq', textContent: k.toUpperCase() })); }

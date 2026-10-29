@@ -10,6 +10,8 @@ export interface Scene {
   dark: boolean;   // mapa sempre escuro (caverna)
   invasion: [number, number] | null;   // [gelecas restantes (-1 = aviso), segundos] enquanto houver invasão
   profiles: ReadonlyMap<string, Profile>;   // nome e aparência de cada jogador
+  keys: number | null;                      // masmorra: chaves do grupo (null fora de masmorra)
+  fragments: { x: number; y: number }[];    // fragmentos de vida deste mapa que você ainda não achou (tiles)
   flow: DistMap | null;
 }
 // O que o mapa do mundo e o minimapa mostram: o que você já viu, as zonas seguras, os marcadores e onde está cada um.

@@ -84,7 +84,7 @@
     17,
     17,
     17,
-    17,
+    19,
     17,
     17,
     17,
@@ -848,6 +848,29 @@
        "value": "caverna"
       }
      ]
+    },
+    {
+     "id": 21,
+     "name": "",
+     "type": "portal",
+     "rotation": 0,
+     "visible": true,
+     "width": 16,
+     "height": 16,
+     "x": 224,
+     "y": 16,
+     "properties": [
+      {
+       "name": "destino",
+       "type": "string",
+       "value": "masmorra"
+      },
+      {
+       "name": "chegada",
+       "type": "string",
+       "value": "entrada"
+      }
+     ]
     }
    ]
   },
@@ -884,6 +907,18 @@
      "point": true,
      "x": 232,
      "y": 290
+    },
+    {
+     "id": 22,
+     "name": "masmorra",
+     "type": "",
+     "rotation": 0,
+     "visible": true,
+     "width": 0,
+     "height": 0,
+     "point": true,
+     "x": 232,
+     "y": 42
     }
    ]
   },
@@ -1043,5 +1078,5 @@
   }
  ],
  "nextlayerid": 8,
- "nextobjectid": 21
+ "nextobjectid": 23
 }

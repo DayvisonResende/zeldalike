@@ -1,8 +1,10 @@
+import { gearColor, isStaff, kindOf } from '@vale/shared';
 import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, bobberOf, hash, sunlight, angDir, distAt, nextLower, swordPose, type EnemyView, type Look, type PlayerView, type SpellView, type SwordPose, type WorldMap } from '@vale/shared';
 import type { Camera } from '../camera';
 import type { Scene } from '../session/types';
 import type { Particles } from './particles';
-import { BANG, CHEST, ITEM_ICON, OBJ, bombFrame, QUES, SHADOW, batSprite, chickenSprite, kingSprite, beetleSprite, heroSprite, mk, slimeSprite } from './sprites';
+import { itemIcon } from './icons';
+import { BANG, CHEST, OBJ, bombFrame, QUES, SHADOW, batSprite, chickenSprite, kingSprite, beetleSprite, heroSprite, mk, slimeSprite } from './sprites';
 import { drawTiles, floorUnder } from './tiles';
 import { pickable } from '../pickup';
 import { pin } from './mapimage';
@@ -29,7 +31,8 @@ function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
   ctx.fillStyle = '#e9b44c';
   for (let k = -2; k <= 2; k++) ctx.fillRect(Math.round(s.ox + ca * 3 - sa * k), Math.round(s.oy + sa * 3 + ca * k), 1, 1);
   ctx.fillStyle = '#7a4a2a'; ctx.fillRect(X(1), Y(1), 1, 1); ctx.fillRect(X(2), Y(2), 1, 1);
-  for (let r = 4; r <= s.len; r++) { ctx.fillStyle = r >= s.len - 1 ? '#ffffff' : '#d6e0ef'; ctx.fillRect(X(r), Y(r), 1, 1); }
+  const blade = (p.using && kindOf(p.using) === 'sword' && gearColor(p.using)) || '#d6e0ef';   // espada da Oficina: lâmina na cor dela
+  for (let r = 4; r <= s.len; r++) { ctx.fillStyle = r >= s.len - 1 ? '#ffffff' : blade; ctx.fillRect(X(r), Y(r), 1, 1); }
   if (p.state === 'charge' && p.charged && (tick & 4)) {
     const tx = X(s.len + 1), ty = Y(s.len + 1);
     ctx.fillStyle = '#fff7d6'; ctx.fillRect(tx - 2, ty, 5, 1); ctx.fillRect(tx, ty - 2, 1, 5);
@@ -39,10 +42,10 @@ function drawSword(ctx: Ctx, p: PlayerView, s: SwordPose, tick: number) {
 // Cajado ou grimório na mão. Conjurando ou carregando, o cajado fica em pé ao lado do corpo (na mão do lado para onde
 // olha), sobe um pouco e inclina para a mira, com a pedra brilhando. Sem mana, vira bastão: bate como a espada.
 const GEM: Record<string, string> = { firestaff: '#f2862e', lightstaff: '#fffbe6', darktome: '#c79bf0' };
-const staffInHand = (p: PlayerView) => !!p.using && p.using in GEM && (p.state === 'cast' || p.state === 'charge' || p.state === 'swing');
+const staffInHand = (p: PlayerView) => !!p.using && isStaff(p.using) && (p.state === 'cast' || p.state === 'charge' || p.state === 'swing');
 const staffRaised = (p: PlayerView) => staffInHand(p) && p.state !== 'swing';
 function drawStaff(ctx: Ctx, p: PlayerView, tick: number) {
-  const g = p.using!, sw = p.state === 'swing' ? swordPose(p) : null;
+  const g = kindOf(p.using!), gem = gearColor(p.using!) ?? GEM[g], sw = p.state === 'swing' ? swordPose(p) : null;
   let ox: number, oy: number, ang: number, len: number;
   if (sw) { ox = p.x + Math.cos(p.aim) * 3; oy = p.y - 6 + Math.sin(p.aim) * 2; ang = sw.ang; len = Math.max(9, sw.len); }
   else {
@@ -64,9 +67,9 @@ function drawStaff(ctx: Ctx, p: PlayerView, tick: number) {
     ctx.fillStyle = '#1b1226'; ctx.fillRect(X(len) - 2, Y(len) - 2, 5, 5);
   }
   const tipX = g === 'darktome' ? X(len * 0.6) : X(len), tipY = g === 'darktome' ? Y(len * 0.6) - 5 : Y(len);
-  ctx.fillStyle = GEM[g]; ctx.fillRect(tipX - 1, tipY - 1, 3, 3);
+  ctx.fillStyle = gem; ctx.fillRect(tipX - 1, tipY - 1, 3, 3);
   const glow = p.state === 'cast' ? p.t >= 4 && p.t <= 9 : p.state === 'charge' && (p.charged ? (tick & 4) !== 0 : (tick & 16) !== 0);
-  if (glow) { ctx.fillStyle = '#ffffff'; ctx.fillRect(tipX - 3, tipY, 7, 1); ctx.fillRect(tipX, tipY - 3, 1, 7); ctx.fillStyle = GEM[g]; ctx.fillRect(tipX, tipY, 1, 1); }
+  if (glow) { ctx.fillStyle = '#ffffff'; ctx.fillRect(tipX - 3, tipY, 7, 1); ctx.fillRect(tipX, tipY - 3, 1, 7); ctx.fillStyle = gem; ctx.fillRect(tipX, tipY, 1, 1); }
 }
 // Magias voando: bola de fogo (laranja, maior quando carregada) e sombra (roxa, girando).
 function drawSpell(ctx: Ctx, s: SpellView, tick: number) {
@@ -100,10 +103,23 @@ function drawBow(ctx: Ctx, p: PlayerView) {
   const pts: [number, number][] = [];
   for (let k = -5; k <= 5; k++) { const f = (1 - (k / 5) * (k / 5)) * 3; pts.push([Math.round(bx + fx * f + qx * k), Math.round(by + fy * f + qy * k)]); }
   ctx.fillStyle = '#1b1226'; pts.forEach(([x, y]) => ctx.fillRect(x - 1, y - 1, 3, 3));
-  pts.forEach(([x, y], i) => { ctx.fillStyle = i === 5 ? '#e9b44c' : '#a8692f'; ctx.fillRect(x, y, 1, 1); });
+  const wood = (p.using && kindOf(p.using) === 'bow' && gearColor(p.using)) || '#a8692f';   // arco da Oficina: madeira na cor dele
+  pts.forEach(([x, y], i) => { ctx.fillStyle = i === 5 ? '#e9b44c' : wood; ctx.fillRect(x, y, 1, 1); });
   ctx.fillStyle = '#efe6d2';
   for (let k = -5; k <= 5; k++) { const back = pull * (1 - Math.abs(k) / 5); ctx.fillRect(Math.round(bx - fx * back + qx * k), Math.round(by - fy * back + qy * k), 1, 1); }
   if (p.t < 7) drawArrow(ctx, bx - fx * pull, by - fy * pull, p.aim);
+}
+// Gancho: elos de corrente da mão até a ponta, e a garra na ponta.
+function drawHook(ctx: Ctx, p: PlayerView) {
+  const h = p.hook!, ox = p.x, oy = p.y - 6, hx = h.x, hy = h.y, d = Math.hypot(hx - ox, hy - oy), n = Math.max(1, Math.floor(d / 3));
+  for (let k = 1; k < n; k++) {
+    const x = Math.round(ox + (hx - ox) * k / n), y = Math.round(oy + (hy - oy) * k / n);
+    ctx.fillStyle = '#1b1226'; ctx.fillRect(x - 1, y - 1, 3, 3); ctx.fillStyle = k & 1 ? '#8f929b' : '#c6c9d2'; ctx.fillRect(x, y, 1, 1);
+  }
+  const a = Math.atan2(hy - oy, hx - ox), ca = Math.cos(a), sa = Math.sin(a), x = Math.round(hx), y = Math.round(hy);
+  ctx.fillStyle = '#1b1226'; ctx.fillRect(x - 2, y - 2, 5, 5);
+  ctx.fillStyle = '#d6e0ef'; ctx.fillRect(x - 1, y - 1, 3, 3);
+  ctx.fillStyle = '#ffffff'; ctx.fillRect(Math.round(x + ca * 2 - sa * 2), Math.round(y + sa * 2 + ca * 2), 1, 1); ctx.fillRect(Math.round(x + ca * 2 + sa * 2), Math.round(y + sa * 2 - ca * 2), 1, 1);
 }
 // Caída: deitada de lado, um pouco apagada.
 function drawFallen(ctx: Ctx, p: PlayerView, look: Look) {
@@ -145,14 +161,15 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
   const s = swordPose(p);
   const spinning = p.state === 'held' || p.state === 'flying';   // no colo se debate; voando, gira
   const dir = spinning ? ([0, 3, 1, 2] as const)[(tick >> (p.state === 'flying' ? 2 : 3)) & 3] : p.state === 'spin' && s ? angDir(s.ang) : p.dir;
-  const bow = p.state === 'bow', staff = staffInHand(p);
+  const bow = p.state === 'bow' || !!p.hook, staff = staffInHand(p);   // gancho: mesma pose de mira do arco
   const pose = (p.state === 'lift' || p.state === 'carry' || spinning) ? 'lift' : (((s && !staffRaised(p)) || bow || (staff && !staffRaised(p))) ? 'atk' : 'n');
   const step = p.state === 'hurt' ? 0 : p.step;
   const px = Math.round(p.x), py = Math.round(p.y - p.z);
   const behind = s && Math.sin(s.ang) < -0.35, staffBehind = staff && (staffRaised(p) ? p.dir === 1 : Math.sin(p.aim) < -0.35);   // de costas, o cajado fica atrás
   if (s && behind && !staff) drawSword(ctx, p, s, tick);
   if (staffBehind) drawStaff(ctx, p, tick);
-  if (bow && Math.sin(p.aim) < -0.35) drawBow(ctx, p);
+  if (bow && !p.hook && Math.sin(p.aim) < -0.35) drawBow(ctx, p);
+  if (p.hook && Math.sin(p.aim) < -0.35) drawHook(ctx, p);
   if (!blink) {
     ctx.drawImage(heroSprite(dir, step, pose, look.cloak, look.hair), px - 9, py - 13);
     const tx = Math.floor(p.x / TS), ty = Math.floor((p.y + 2) / TS);
@@ -163,7 +180,8 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
   }
   if (s && !behind && !staff) drawSword(ctx, p, s, tick);
   if (staff && !staffBehind) drawStaff(ctx, p, tick);
-  if (bow && Math.sin(p.aim) >= -0.35) drawBow(ctx, p);
+  if (bow && !p.hook && Math.sin(p.aim) >= -0.35) drawBow(ctx, p);
+  if (p.hook && Math.sin(p.aim) >= -0.35) drawHook(ctx, p);
   if (p.carry && !spinning) {
     let cx = p.x, cy = p.y - p.z - 20 + (p.step ? ((p.walkT >> 3) & 1) : 0);
     if (p.state === 'lift' && p.liftFrom) {
@@ -176,7 +194,25 @@ function drawHero(ctx: Ctx, map: WorldMap, p: PlayerView, look: Look, tick: numb
   }
   if (!mine && p.hp < p.maxHp && !p.carry) drawLifeBar(ctx, p);
 }
+// Minichefe: o mesmo monstro, 1,5× maior (em volta dos pés), com olhos vermelhos piscando por cima.
 function drawEnemy(ctx: Ctx, e: EnemyView, tick: number) {
+  if (!e.mini) { drawEnemyBody(ctx, e, tick); return; }
+  ctx.save(); ctx.translate(e.x, e.y); ctx.scale(1.5, 1.5); ctx.translate(-e.x, -e.y);
+  drawEnemyBody(ctx, e, tick);
+  ctx.restore();
+  if ((tick >> 3) & 1) { ctx.fillStyle = '#ff3b30'; ctx.fillRect(Math.round(e.x - 4), Math.round(e.y - 12 - e.z * 1.5), 2, 1); ctx.fillRect(Math.round(e.x + 2), Math.round(e.y - 12 - e.z * 1.5), 2, 1); }
+}
+// Fragmento de vida no chão: um pedaço de coração flutuando, com um brilho girando em volta.
+function drawFragment(ctx: Ctx, f: { x: number; y: number }, tick: number) {
+  const x = f.x * TS + 8, y = f.y * TS + 9 + Math.round(Math.sin(tick / 18) * 1.5), ic = itemIcon('heart');
+  ctx.drawImage(SHADOW, x - 7, f.y * TS + 12, 14, 4);
+  ctx.save(); ctx.beginPath(); ctx.rect(x - 6, y - 12, 6, 12); ctx.clip();   // só a metade esquerda: é um pedaço
+  ctx.drawImage(ic, x - (ic.width >> 1), y - ic.height); ctx.restore();
+  ctx.fillStyle = '#1b1226'; ctx.fillRect(x, y - ic.height + 1, 1, ic.height - 2);
+  const a = tick / 14, sx = Math.round(x + Math.cos(a) * 7), sy = Math.round(y - 5 + Math.sin(a) * 4);
+  ctx.fillStyle = '#fff7d6'; ctx.fillRect(sx, sy - 1, 1, 3); ctx.fillRect(sx - 1, sy, 3, 1);
+}
+function drawEnemyBody(ctx: Ctx, e: EnemyView, tick: number) {
   const fl = e.hurtT > 0 && ((e.hurtT >> 1) & 1) === 1;
   if (e.slowed) for (let k = 0; k < 3; k++) {
     const a = tick / 8 + k * 2.1, top = e.type === 'king' ? 30 : 16;
@@ -310,6 +346,7 @@ export function render(ctx: Ctx, w: Scene, v: View) {
     drawShadow(ctx, x, y + 1);
     list.push({ y, d: () => ctx.drawImage(heroSprite(dir, 0, 'n', n.look.cloak, n.look.hair), x - 9, y - 13) });
   }
+  for (const f of w.fragments) if (near(f.x * TS + 8, f.y * TS + 8)) list.push({ y: f.y * TS + 12, d: () => drawFragment(ctx, f, v.tick) });
   for (const c of w.chests) {
     const x = c.x * TS, y = c.y * TS;
     if (near(x + 8, y + 8)) list.push({ y: y + 12, d: () => ctx.drawImage(c.open ? CHEST.open : CHEST.closed, x, y + 2) });
@@ -323,7 +360,8 @@ export function render(ctx: Ctx, w: Scene, v: View) {
     list.push({ y: d.y - 1, d: () => {
       ctx.globalAlpha = d.reserved ? 0.45 : 1;
       ctx.drawImage(SHADOW, Math.round(d.x - 7), Math.round(d.y - 2), 14, 4);
-      ctx.drawImage(ITEM_ICON[d.item], Math.round(d.x - 5), Math.round(d.y - 12 + bob));
+      const ic = itemIcon(d.item);   // centrado, com a base um pouco acima do chão
+      ctx.drawImage(ic, Math.round(d.x - (ic.width >> 1)), Math.round(d.y - 3 - ic.height + bob));
       ctx.globalAlpha = 1;
       if (d === target) drawPickArrow(ctx, d.x, d.y - 16 + bob - ((v.tick >> 4) & 1));
     } });

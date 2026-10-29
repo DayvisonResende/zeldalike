@@ -1,0 +1,7 @@
+{
+  "name": "Grimório Sombrio",
+  "desc": "Sombra que deixa o alvo lento e rouba vida. Segure e solte: maldição. Gasta mana.",
+  "gear": {
+    "like": "darktome"
+  }
+}

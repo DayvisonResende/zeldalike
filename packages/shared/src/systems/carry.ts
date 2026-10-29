@@ -12,6 +12,7 @@ import { liftBomb } from './bombs';
 import { liftPlayer } from './throwing';
 import { shopOffer } from './shop';
 import { pickNearest } from './loot';
+import { openDoor } from './dungeon';
 
 // Botão B: pega o item mais perto no chão; senão lê a placa à frente, abre o baú, fala, pesca ou levanta um arbusto/pedra.
 export function interact(w: World, p: Player) {
@@ -33,6 +34,7 @@ export function interact(w: World, p: Player) {
       sfx(w, 'sign', p); return true;
     }
     const c = w.map.tiles[ty][tx];
+    if (c === 'L') { openDoor(w, p, tx, ty); return true; }   // porta trancada: gasta uma chave do grupo
     if (c === 's') { const pages = w.map.sign(tx, ty); if (pages) { w.emit({ t: 'dialog', to: p.id, pages }); sfx(w, 'sign', p); return true; } }
     if (c === 'b' || c === 'r') {
       const cave = nearCave((x, y) => w.map.get(x, y), tx, ty);
@@ -58,7 +60,7 @@ export function contact(w: World) {
       if (e.dying || (e.z > 5 && !e.swarm)) continue;
       if (e.type === 'chicken' && e.swarm?.target !== p.id) continue;
       if (Math.abs(e.x - p.x) < p.hw + e.hw - 1 && Math.abs(e.y - p.y) < p.hh + e.hh + 1) {
-        damagePlayer(w, p, e.type === 'chicken' ? w.rules.fun.swarmDamage : w.rules.enemies[e.type].damage, e); break;
+        damagePlayer(w, p, e.type === 'chicken' ? w.rules.fun.swarmDamage : w.rules.enemies[e.type].damage * (e.mini ? 1.5 : 1), e); break;
       }
     }
   }

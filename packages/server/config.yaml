@@ -9,7 +9,9 @@ world:
   maps:                     # id: arquivo do Tiled (caminho relativo a este arquivo). Portais usam o id em "destino".
     vale: ../../content/maps/vale.tmj
     caverna: ../../content/maps/caverna.tmj
+    masmorra: ../../content/maps/masmorra.tmj
   start: vale               # mapa principal: onde se nasce, e onde renasce quem cai em qualquer mapa
+  instanced: [masmorra]     # masmorras: cada grupo (ou quem está sozinho) tem a própria cópia, que some 1 min depois de vazia
 
 server:
   port: 2567
@@ -71,6 +73,7 @@ enemies:
       jelly: 0.5
       heart: 0.2
       mana: 0.1
+      espada-curta: 0.01
   beetle:
     hp: 30
     respawn: 4m
@@ -161,6 +164,7 @@ shops:
       lightstaff: 120       # cajados e grimório: um de cada por pessoa
       firestaff: 120
       darktome: 150
+      espada-curta: 1
     sell:                   # o que ela compra de você (e quanto paga)
       jelly: 3
       shell: 6
@@ -170,6 +174,7 @@ shops:
       moonfish: 15
       trout: 25
       boot: 1
+      espada-curta: 1
 
 # ── Eventos do servidor ───────────────────────────────
 events:
@@ -198,6 +203,7 @@ player:
   respawnPoint: clareira    # id da região onde se renasce
   respawnDelay: 5s
   invulnerableAfterRespawn: 3s
+  fragment: 5               # vida máxima a mais por fragmento de vida achado
   revive: 1.5s              # segurar o botão de Ação ao lado de um amigo caído por esse tempo o levanta (0 = desligado);
                             # enquanto alguém está levantando, a contagem para renascer para
 

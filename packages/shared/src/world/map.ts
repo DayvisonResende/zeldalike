@@ -10,6 +10,9 @@ export interface Portal { x: number; y: number; w: number; h: number; to: string
 // Baú: posição em tiles, o que tem dentro e em quantos segundos enche de novo para quem abriu.
 export interface Chest { x: number; y: number; loot: DropRule[]; respawn: number }
 // NPC: personagem parado que conversa. Posição em tiles; `dir`: para onde olha (0 baixo, 1 cima, 2 esquerda, 3 direita).
+// Sala de masmorra (em tiles): quem entra com monstros vivos dentro fica trancado (as grades O fecham) até derrubar
+// todos; aí as grades abrem e cai a recompensa (`reward`: "chave" ou o id de um item).
+export interface Room { x: number; y: number; w: number; h: number; reward?: string }
 export interface Npc { x: number; y: number; name: string; pages: string[]; look: Look; dir: Dir; shop?: string }   // shop: id da loja (preços no config)
 export interface MapData {
   name: string; cols: number; rows: number;
@@ -20,7 +23,10 @@ export interface MapData {
   npcs?: Npc[];
   regions: Region[];
   tiles: string[];
-  enemies: { type: EnemyType; x: number; y: number; when?: 'day' | 'night' }[];   // em tiles; when: só de dia / só de noite
+  enemies: { type: EnemyType; x: number; y: number; when?: 'day' | 'night'; mini?: boolean }[];   // em tiles; when: só de dia / só de noite; mini: minichefe
+  keys?: { x: number; y: number }[];                      // chaves no chão (pixels): abrem portas trancadas (L)
+  rooms?: Room[];                                         // salas que trancam
+  fragments?: { x: number; y: number }[];                 // fragmentos de vida (tiles): cada um, uma vez por personagem
   dark?: boolean;                                         // sempre escuro (caverna): ignora a hora do dia
   signs: Record<string, string[]>;                        // "x,y" → páginas
 }

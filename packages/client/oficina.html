@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#0e0c22">
+  <link rel="icon" href="/icon-32.png" type="image/png">
+  <title>Oficina · Mossblade</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Pixelify+Sans:wght@400;600&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+</head>
+<body>
+<header class="top">
+  <img src="/logo.png" alt="Mossblade" class="logo" width="1098" height="288">
+  <strong>Oficina</strong>
+  <span class="who" id="who"></span>
+  <a href="#guia" class="link" id="guideLink">Como usar</a>
+  <a href="/" class="link">Voltar ao jogo</a>
+  <button type="button" class="link" id="logout" hidden>Sair</button>
+</header>
+
+<main id="app">
+  <form class="card login" id="login" hidden>
+    <h1>Entrar na Oficina</h1>
+    <p class="hint">Use a mesma conta do jogo. Só administradores (a lista <code>admins</code> do <code>config.yaml</code>) entram.</p>
+    <label class="field">Usuário<input id="user" autocomplete="username" required></label>
+    <label class="field">Senha<input id="pass" type="password" autocomplete="current-password" required></label>
+    <button class="primary" type="submit">Entrar</button>
+    <p class="error" id="loginError" role="alert"></p>
+    <p class="hint">Primeira vez? Leia o <a href="#guia">guia da Oficina</a>: do zero até o item no servidor.</p>
+  </form>
+
+  <article class="card guide" id="guide" hidden>
+    <a href="#" class="link back">← Voltar à Oficina</a>
+    <div id="guideBody"></div>
+    <a href="#" class="link back">← Voltar à Oficina</a>
+  </article>
+
+  <p class="card notice" id="blocked" hidden></p>
+
+  <div class="workspace" id="work" hidden>
+    <aside class="card list">
+      <div class="row"><h2>Itens <small id="count"></small></h2><button type="button" class="primary" id="newItem">+ Novo item</button></div>
+      <input type="search" id="filter" placeholder="Procurar…" aria-label="Procurar item">
+      <ul id="items" aria-label="Itens"></ul>
+    </aside>
+
+    <section class="card editor" aria-labelledby="editTitle">
+      <h2 id="editTitle">Novo item</h2>
+      <p class="hint">Primeira vez? Veja <a href="#guia">Como usar</a>: tipos, ícone, calculadora e como subir para o servidor.</p>
+      <form id="form" novalidate>
+        <div class="cols">
+          <label class="field">Nome<input id="name" maxlength="40" required></label>
+          <label class="field">Id<input id="id" maxlength="40" pattern="[a-z0-9-]+" spellcheck="false"><small id="idHint">Sai do nome. Depois de criado, nunca muda (o banco guarda o id).</small></label>
+        </div>
+        <label class="field">Descrição<textarea id="desc" maxlength="300" rows="3"></textarea></label>
+
+        <fieldset class="field">
+          <legend>Tipo</legend>
+          <div class="seg" id="kind">
+            <label><input type="radio" name="kind" value="use"><span>Consumível</span></label>
+            <label><input type="radio" name="kind" value="material"><span>Material</span></label>
+            <label><input type="radio" name="kind" value="gear"><span>Equipamento</span></label>
+          </div>
+          <small id="kindHint">Consumível: usar recupera vida ou mana. Material: só para guardar e vender. Equipamento: vai no botão A ou C.</small>
+        </fieldset>
+
+        <div class="cols" id="useFields">
+          <label class="field">Cura (vida)<input id="heal" type="number" min="0" max="1000" inputmode="numeric"></label>
+          <label class="field">Mana<input id="mana" type="number" min="0" max="1000" inputmode="numeric"></label>
+        </div>
+
+        <fieldset class="field gearbox" id="gearFields">
+          <legend>Equipamento</legend>
+          <div class="cols">
+            <label class="field">Comporta-se como
+              <select id="like">
+                <option value="sword">Espada (golpe, giro carregado, dash)</option>
+                <option value="bow">Arco (flechas)</option>
+                <option value="firestaff">Cajado de Fogo (bola de fogo, explosão)</option>
+                <option value="lightstaff">Cajado de Luz (cura em volta)</option>
+                <option value="darktome">Grimório Sombrio (sombra, maldição)</option>
+                <option value="hook">Gancho (puxa até pilares, atordoa)</option>
+              </select>
+              <small id="likeHint">Usa a animação e os golpes da arma escolhida.</small>
+            </label>
+            <label class="field" id="damageField">Dano por golpe<input id="damage" type="number" min="1" max="999" inputmode="numeric"><small id="damageHint">Vazio: o da arma de base.</small></label>
+          </div>
+          <div class="field">
+            <span>Atributos (enquanto estiver no A ou no C)</span>
+            <div class="stats" id="statInputs"></div>
+            <small>Vazio = 0. Velocidade de ataque em %, até 50. Entre jogadores, vale a metade (pvp.factor).</small>
+          </div>
+          <div class="field">
+            <span>Cor</span>
+            <div class="colorrow">
+              <label class="check"><input type="checkbox" id="useColor"><span>Cor própria</span></label>
+              <input type="color" id="color" value="#9fb8ff" aria-label="Cor da lâmina, da pedra ou da madeira">
+              <small id="colorHint">Espada: a lâmina. Cajado: a pedra. Arco: a madeira. Sem cor própria, fica como a arma de base.</small>
+            </div>
+          </div>
+        </fieldset>
+
+        <div class="field">
+          <span>Ícone</span>
+          <div class="iconrow">
+            <canvas id="iconBig" width="16" height="16" aria-label="Ícone em tamanho grande"></canvas>
+            <div class="iconside">
+              <label class="filebtn"><input type="file" id="iconFile" accept="image/png">Escolher PNG…</label>
+              <small>PNG de 16×16 com fundo transparente. A borda vazia some no jogo.</small>
+              <p class="error" id="iconError" role="alert"></p>
+            </div>
+          </div>
+        </div>
+
+        <div class="field">
+          <span>Como aparece no jogo</span>
+          <div class="preview">
+            <div class="slot"><canvas id="iconSlot" width="16" height="16"></canvas></div>
+            <p><b id="pvName">Nome</b> — <span id="pvDesc">descrição</span></p>
+          </div>
+          <ul class="pvlines" id="pvLines" hidden></ul>
+        </div>
+
+        <div class="field calc" id="calc" hidden>
+          <span>Calculadora de equilíbrio</span>
+          <ul id="calcLines"></ul>
+          <ul class="warn" id="calcWarn"></ul>
+          <small>Só a conta: no jogo, esquiva, empurrão e erro mudam tudo. Comparado com a arma inicial e com quem começa (nível 1).</small>
+        </div>
+
+        <div class="actions">
+          <button class="primary" type="submit" id="save">Criar item</button>
+          <span class="status" id="status" role="status"></span>
+        </div>
+        <ul class="error" id="formErrors" role="alert"></ul>
+      </form>
+    </section>
+
+    <section class="card uses" id="uses" aria-labelledby="usesTitle" hidden>
+      <h2 id="usesTitle">Onde aparece</h2>
+      <p class="hint">Grava no <code>config.yaml</code> (só as linhas deste item; o resto do arquivo fica igual). O servidor aplica na hora.</p>
+      <div class="field">
+        <span>Lojas</span>
+        <table class="grid"><thead><tr><th>Loja</th><th>Vende por</th><th>Compra por</th></tr></thead><tbody id="shopRows"></tbody></table>
+        <small>Em ouro. Vazio: a loja não vende (ou não compra) este item.</small>
+      </div>
+      <div class="field">
+        <span>Monstros que derrubam</span>
+        <table class="grid"><thead><tr><th>Monstro</th><th>Chance (%)</th><th>Mín.</th><th>Máx.</th></tr></thead><tbody id="dropRows"></tbody></table>
+        <small>Chance vazia: não cai. A quantidade é sorteada entre o mínimo e o máximo. O drop de cada monstro também passa por <code>rates.drop</code>.</small>
+      </div>
+      <div class="field">
+        <span>Baús</span>
+        <ul class="chestlist" id="chestRows"></ul>
+        <small>Baús ficam no mapa: no Tiled, a propriedade <code>conteudo</code> do baú.</small>
+      </div>
+      <div class="actions">
+        <button class="primary" type="button" id="saveUses">Salvar onde aparece</button>
+        <span class="status" id="usesStatus" role="status"></span>
+      </div>
+      <ul class="error" id="usesErrors" role="alert"></ul>
+    </section>
+  </div>
+</main>
+<script type="module" src="/src/oficina/main.ts"></script>
+</body>
+</html>

@@ -1,3 +1,4 @@
+import './render/icons';   // primeiro: registra os itens embutidos (o mapa abaixo cita itens nos baús)
 import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type ChatRequest, type GameEvent, type Profile, type ProfileRequest } from '@vale/shared';
 import valeTmj from '../../../content/maps/vale.tmj?raw';
 import valeTsj from '../../../content/maps/vale.tsj?raw';
@@ -20,7 +21,7 @@ import { updateFishBar } from './ui/fishbar';
 import { Dialog } from './ui/dialog';
 import { ShopPanel } from './ui/shop';
 import { Minimap, WorldMapPanel } from './ui/worldmap';
-import { showRegion, updateBoss, updateClock, updateHud, updateParty, updateRaid } from './ui/hud';
+import { showRegion, updateBoss, updateClock, updateHud, updateKeys, updateParty, updateRaid } from './ui/hud';
 import { PartyPanel } from './ui/party';
 import { Menu } from './ui/menu';
 import { NameTags } from './ui/nametags';
@@ -347,7 +348,7 @@ function frame(now: number) {
   profilesNow = scene.profiles;
   attachHeld(scene);
   updateLock(scene);
-  updateClock(scene.day, scene.dark); updateRaid(scene.invasion);
+  updateClock(scene.day, scene.dark); updateRaid(scene.invasion); updateKeys(scene.keys);
   if (titleShown() && ready && session.status === 'online' && session.me()) hideTitle();   // o mundo chegou: a cena de título sai
   const me = session.me();
   updatePad(me, session.inventory(), settings.padSize, scene.drops, scene.players);

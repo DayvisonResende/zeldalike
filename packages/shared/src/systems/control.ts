@@ -1,4 +1,4 @@
-import { FACE, SPIN, SWING, TS, angDir } from '../constants';
+import { BOW_END, BOW_SHOT, CAST_AT, CAST_END, FACE, SPIN, SWING, TS, angDir } from '../constants';
 import type { Player } from '../entities/player';
 import { BUTTON, type Button } from '../input';
 import { blockedAt, move } from '../world/collision';
@@ -9,22 +9,24 @@ import { burst, sfx } from './fx';
 import { fireArrow } from './projectiles';
 import { updateFishing } from './fishing';
 import { struggle, throwPlayer } from './throwing';
-import { gearIn, type GearId, type GearSlot } from '../gear';
+import { gearIn, kindOf, type GearId, type GearSlot } from '../gear';
 import { cast, manaCost } from './magic';
 import { pushAgainst } from './blocks';
 import { SWEEP_HOLD, pickAll } from './loot';
 import { attackStep } from './stats';
+import { startHook, updateHook } from './hook';
 
 export function faceAim(p: Player) { p.aim = p.input.aim ?? FACE[p.dir]; p.dir = angDir(p.aim); }
 function startSwing(w: World, p: Player) { faceAim(p); p.state = 'swing'; p.t = 0; p.hit.clear(); sfx(w, 'swing', p, p.id); }
 // Usa o que está no botão. Cajado sem mana para a magia rápida vira bastão: bate de perto como a espada (sem carregar).
 function useGear(w: World, p: Player, g: GearId, slot: GearSlot) {
   p.using = g; p.useBtn = slot; p.big = false;
-  if (g === 'bow') { faceAim(p); p.state = 'bow'; p.t = 0; return; }
-  if (g === 'sword' || p.mp < manaCost(w, g, false)) { startSwing(w, p); return; }
+  const k = kindOf(g);
+  if (k === 'bow') { faceAim(p); p.state = 'bow'; p.t = 0; return; }
+  if (k === 'hook') { faceAim(p); startHook(w, p); return; }
+  if (k === 'sword' || p.mp < manaCost(w, g, false)) { startSwing(w, p); return; }
   faceAim(p); p.state = 'cast'; p.t = 0;
 }
-const CAST_AT = 6, CAST_END = 14;
 
 /* ---------- Dash (Shift/Q) e pulo do barranco ---------- */
 function startDash(w: World, p: Player, ix: number, iy: number) {
@@ -95,7 +97,7 @@ export function updatePlayer(w: World, p: Player) {
     case 'hurt': p.t--; move(w.map, p, p.kx, p.ky); p.kx *= 0.86; p.ky *= 0.86; if (p.t <= 0) p.state = p.carry ? 'carry' : 'walk'; return;
     case 'lift': if (++p.t >= 12) p.state = 'carry'; return;
     case 'throw': if (--p.t <= 0) p.state = 'walk'; return;
-    case 'swing': p.t += attackStep(p); swordHits(w, p); if (p.t >= SWING) { if (inp[p.useBtn] && p.using === 'sword') { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; } return;
+    case 'swing': p.t += attackStep(p); swordHits(w, p); if (p.t >= SWING) { if (inp[p.useBtn] && p.using && kindOf(p.using) === 'sword') { p.state = 'charge'; p.charge = 0; p.charged = false; } else p.state = 'walk'; } return;
     case 'cast':   // ergue o cajado, solta a magia; segurando o botão (e com mana) começa a carregar a forte
       t0 = p.t; p.t += attackStep(p); if (p.t <= CAST_AT - 2 && inp.aim !== null) faceAim(p);
       if (t0 < CAST_AT && p.t >= CAST_AT) cast(w, p);
@@ -109,16 +111,17 @@ export function updatePlayer(w: World, p: Player) {
       if (p.t >= 20) startDash(w, p, ix, iy);
       return;
     case 'dash': updateDash(w, p, ix, iy); return;
+    case 'hook': updateHook(w, p); return;
     case 'bonk':
       p.t--; move(w.map, p, p.kx, p.ky); p.kx *= 0.88; p.ky *= 0.88;
       p.z = Math.max(0, Math.sin((1 - p.t / 26) * Math.PI) * 7);
       if (p.t <= 0) { p.z = 0; p.state = p.carry ? 'carry' : 'walk'; }
       return;
     case 'hop': updateHop(w, p); return;
-    case 'bow': t0 = p.t; p.t += attackStep(p); if (p.t <= 7 && inp.aim !== null) faceAim(p); if (t0 < 7 && p.t >= 7) fireArrow(w, p); if (p.t >= 17) p.state = 'walk'; return;
+    case 'bow': t0 = p.t; p.t += attackStep(p); if (p.t <= BOW_SHOT && inp.aim !== null) faceAim(p); if (t0 < BOW_SHOT && p.t >= BOW_SHOT) fireArrow(w, p); if (p.t >= BOW_END) p.state = 'walk'; return;
     case 'charge':
       if (!inp[p.useBtn]) {
-        if (p.charged && p.using === 'sword') { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); }
+        if (p.charged && p.using && kindOf(p.using) === 'sword') { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); }
         else if (p.charged) { p.state = 'cast'; p.t = 0; p.big = true; }   // solta a magia forte
         else p.state = 'walk';
         p.charged = false; return;
@@ -126,7 +129,7 @@ export function updatePlayer(w: World, p: Player) {
       t0 = p.charge; p.charge += attackStep(p);
       if (t0 < 40 && p.charge >= 40) { p.charged = true; sfx(w, 'charge', p, p.id); }
       if (inp.aim !== null) faceAim(p);
-      if (p.using === 'sword') pokeTip(w, p);
+      if (p.using && kindOf(p.using) === 'sword') pokeTip(w, p);
       speed = 0.75; turn = false; break;
     case 'carry':
       if (tap('a') || tap('b')) { if (p.carry === 'player') throwPlayer(w, p); else throwObj(w, p); return; }

@@ -1,0 +1,7 @@
+{
+  "name": "Cajado de Luz",
+  "desc": "Cura você e quem estiver perto. Segure e solte: cura maior que empurra monstros. Gasta mana.",
+  "gear": {
+    "like": "lightstaff"
+  }
+}

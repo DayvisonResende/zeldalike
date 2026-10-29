@@ -1,5 +1,5 @@
 import { ITEMS, type ItemId, type ShopOffer } from '@vale/shared';
-import { ITEM_ICON } from '../render/sprites';
+import { iconsVersion, itemIcon } from '../render/icons';
 import type { Inventory } from '../session/types';
 
 export type ShopAction = 'buy' | 'sell';
@@ -35,7 +35,7 @@ export class ShopPanel {
   render() {
     const o = this.offer, inv = this.hooks.inventory();
     if (!this.open || !o || !inv) return;
-    const key = JSON.stringify([inv.bag, inv.gold, this.tab]);
+    const key = JSON.stringify([inv.bag, inv.gold, this.tab, iconsVersion()]);
     if (key === this.shown) return;
     this.shown = key;
     document.getElementById('shopGold')!.textContent = `${inv.gold} de ouro`;
@@ -55,7 +55,7 @@ export class ShopPanel {
     }
   }
   private row(id: ItemId, price: string, have: number, buttons: [string, number, boolean][]) {
-    const li = document.createElement('li'), cv = document.createElement('canvas'), icon = ITEM_ICON[id];
+    const li = document.createElement('li'), cv = document.createElement('canvas'), icon = itemIcon(id);
     cv.width = icon.width; cv.height = icon.height; cv.getContext('2d')!.drawImage(icon, 0, 0);
     const info = document.createElement('span');
     info.append(Object.assign(document.createElement('b'), { textContent: ITEMS[id].name }), Object.assign(document.createElement('small'), { textContent: `${price} · você tem ${have}` }));

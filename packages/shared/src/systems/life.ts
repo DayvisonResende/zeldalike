@@ -11,7 +11,7 @@ import { afterDefense, refreshStats } from './stats';
 // Dano em um jogador (by: outro jogador, no PvP): empurra, derruba o que estiver no colo e, zerando a vida, derruba o jogador.
 export function damagePlayer(w: World, p: Player, n: number, from: { x: number; y: number }, by?: Player) {
   if (p.state === 'dead' || p.inv > 0) return;
-  p.hp = Math.max(0, p.hp - afterDefense(p, n, by ? w.rules.pvp.factor : 1)); p.hurtAt = w.tick; p.fish = null;   // de jogador: defesa × pvp.factor
+  p.hp = Math.max(0, p.hp - afterDefense(p, n, by ? w.rules.pvp.factor : 1)); p.hurtAt = w.tick; p.fish = null; p.hook = null; p.z = 0;   // de jogador: defesa × pvp.factor
   if (p.carry) dropCarried(w, p);
   if (p.hp === 0) { die(w, p); if (by) { p.killer = by.name; w.emit({ t: 'kill', by: by.id, victim: p.id }); } return; }
   const a = Math.atan2(p.y - from.y, p.x - from.x);

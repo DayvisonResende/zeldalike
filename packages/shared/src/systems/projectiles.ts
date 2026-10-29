@@ -6,9 +6,10 @@ import { damage } from './combat';
 import { canHarm, harmPlayer } from './pvp';
 import { explode } from './bombs';
 import { burst, sfx } from './fx';
+import { gearScale } from '../gear';
 
 export interface Thrown { id: number; owner: string; x: number; y: number; z: number; vx: number; vy: number; vz: number; type: Carryable; fuse?: number; dead?: boolean }
-export interface Arrow { id: number; owner: string; x: number; y: number; ang: number; vx: number; vy: number; stuck: number; life: number; dead?: boolean }
+export interface Arrow { id: number; owner: string; x: number; y: number; ang: number; vx: number; vy: number; stuck: number; life: number; dead?: boolean; k?: number }   // k: força do arco que atirou (1 = o de base)
 
 export function shatter(w: World, x: number, y: number, type: Carryable, z = 0) {
   if (type === 'bomb' || type === 'player') return;
@@ -57,7 +58,7 @@ function flyBomb(w: World, o: Thrown, c: string) {
 }
 export function fireArrow(w: World, p: Player) {
   const ca = Math.cos(p.aim), sa = Math.sin(p.aim);
-  w.arrows.push({ id: w.nextId++, owner: p.id, x: p.x + ca * 6, y: p.y + sa * 4, ang: p.aim, vx: ca * 4.6, vy: sa * 4.6, stuck: 0, life: 90 });
+  w.arrows.push({ id: w.nextId++, owner: p.id, x: p.x + ca * 6, y: p.y + sa * 4, ang: p.aim, vx: ca * 4.6, vy: sa * 4.6, stuck: 0, life: 90, k: gearScale(w, p.using ?? 'bow') });
   sfx(w, 'bow', p, p.id);
 }
 export function updateArrows(w: World) {
@@ -72,13 +73,13 @@ export function updateArrows(w: World) {
     // inimigo ainda atordoado do último golpe não segura a flecha: ela passa direto
     for (const e of w.enemies) {
       if (!e.dying && e.hurtT === 0 && Math.abs(e.x - tx) < e.hw + 2 && Math.abs(e.y - ty) < e.hh + 5) {
-        { const by = w.players.get(a.owner); damage(w, e, w.rules.weapons.arrow + (by?.stats.attack ?? 0), a.x - a.vx * 2, a.y - a.vy * 2, by); } a.dead = true; break;
+        { const by = w.players.get(a.owner); damage(w, e, Math.round(w.rules.weapons.arrow * (a.k ?? 1)) + (by?.stats.attack ?? 0), a.x - a.vx * 2, a.y - a.vy * 2, by); } a.dead = true; break;
       }
     }
     // jogador fora do PvP não segura a flecha: ela passa por ele
     const archer = w.players.get(a.owner);
     if (!a.dead && archer) for (const v of w.players.values()) {
-      if (Math.abs(v.x - tx) < v.hw + 2 && Math.abs(v.y - ty) < v.hh + 5 && canHarm(w, archer, v) && v.inv === 0) { harmPlayer(w, archer, v, 'arrow'); a.dead = true; break; }
+      if (Math.abs(v.x - tx) < v.hw + 2 && Math.abs(v.y - ty) < v.hh + 5 && canHarm(w, archer, v) && v.inv === 0) { harmPlayer(w, archer, v, 'arrow', w.rules.pvp.damage.arrow * (a.k ?? 1)); a.dead = true; break; }
     }
   }
   w.arrows = w.arrows.filter(a => !a.dead);

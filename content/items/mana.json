@@ -1,0 +1,5 @@
+{
+  "name": "Poção de mana",
+  "desc": "Recupera 20 de mana.",
+  "mana": 20
+}

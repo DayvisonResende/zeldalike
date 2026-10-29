@@ -1,7 +1,7 @@
 import { TS, ticks } from '../constants';
 import type { Enemy } from '../entities/enemy';
 import type { Player } from '../entities/player';
-import type { GearId } from '../gear';
+import { kindOf, type GearId } from '../gear';
 import { blocksShot, nearCave } from '../world/tiles';
 import { breakTile } from './regrowth';
 import type { World } from '../world';
@@ -18,19 +18,19 @@ const SPEED = { fire: 3, shadow: 2.4 }, LIFE = 55;
 
 // Custo da magia que esse cajado solta (rápida ou carregada).
 export function manaCost(w: World, g: GearId, big: boolean) {
-  const m = w.rules.magic;
-  if (g === 'firestaff') return big ? m.blast.mana : m.fire.mana;
-  if (g === 'lightstaff') return big ? m.bigHeal.mana : m.heal.mana;
-  if (g === 'darktome') return big ? m.curse.mana : m.shadow.mana;
+  const m = w.rules.magic, k = kindOf(g);
+  if (k === 'firestaff') return big ? m.blast.mana : m.fire.mana;
+  if (k === 'lightstaff') return big ? m.bigHeal.mana : m.heal.mana;
+  if (k === 'darktome') return big ? m.curse.mana : m.shadow.mana;
   return 0;
 }
 // Solta a magia do cajado em uso. Sem mana suficiente na hora, falha numa fumacinha.
 export function cast(w: World, p: Player) {
-  const g = p.using!, cost = manaCost(w, g, p.big);
+  const g = p.using!, k = kindOf(g), cost = manaCost(w, g, p.big);
   if (p.mp < cost) { burst(w, p.x, p.y - 10, 'dust', 4, { s: 0.6, z: 8 }, p.id); sfx(w, 'poof', p, p.id); return; }
   p.mp -= cost;
-  if (g === 'lightstaff') { heal(w, p, p.big); return; }
-  const kind: SpellKind = g === 'firestaff' ? 'fire' : 'shadow', ca = Math.cos(p.aim), sa = Math.sin(p.aim), sp = SPEED[kind] * (p.big ? 0.85 : 1);
+  if (k === 'lightstaff') { heal(w, p, p.big); return; }
+  const kind: SpellKind = k === 'firestaff' ? 'fire' : 'shadow', ca = Math.cos(p.aim), sa = Math.sin(p.aim), sp = SPEED[kind] * (p.big ? 0.85 : 1);
   w.spells.push({ id: w.nextId++, owner: p.id, kind, big: p.big, x: p.x + ca * 7, y: p.y - 6 + sa * 5, vx: ca * sp, vy: sa * sp, life: LIFE });
   sfx(w, kind, p, p.id);
 }

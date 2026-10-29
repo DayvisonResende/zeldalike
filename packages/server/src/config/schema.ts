@@ -1,4 +1,4 @@
-import { GEAR, ITEM_IDS, LOOT_IDS, MAX_ATTACK_SPEED, type GearId, type ItemId, type LootId } from '@vale/shared';
+import { GEAR, ITEM_IDS, MAX_ATTACK_SPEED, isItem, isLoot, type GearId } from '@vale/shared';
 import { z } from 'zod';
 
 const UNIT = { ms: 0.001, s: 1, m: 60, h: 3600 } as const;
@@ -12,19 +12,25 @@ export const duration = z.union([
   return Number(n) * UNIT[u as keyof typeof UNIT];
 });
 const chance = z.number().min(0).max(1);
+// Itens vêm de content/items/: confere na hora de validar (a lista pode mudar com o servidor ligado).
+const unknownItem = (id: string) => `item "${id}" não existe em content/items/ (itens: gold, ${ITEM_IDS.join(', ')})`;
+// Registro "item: valor" em que cada chave precisa ser um item (ou ouro, com `loot`).
+const byItem = <T extends z.ZodType>(value: T, loot = false) => z.record(z.string(), value).superRefine((r, ctx) => {
+  for (const k of Object.keys(r)) if (!(loot ? isLoot(k) : isItem(k))) ctx.addIssue({ code: 'custom', path: [k], message: unknownItem(k) });
+});
 // Drop: "heart: 0.2" (chance, 1 unidade) ou "gold: { chance: 0.8, min: 1, max: 3 }".
 const dropEntry = z.union([chance, z.strictObject({ chance, min: z.number().int().positive(), max: z.number().int().positive() })])
   .refine(d => typeof d === 'number' || d.min <= d.max, 'min não pode ser maior que max');
 const enemy = z.strictObject({
   hp: z.number().int().positive(), respawn: duration, damage: z.number().nonnegative(), xp: z.number().int().nonnegative(),
-  drops: z.partialRecord(z.enum(LOOT_IDS as [LootId, ...LootId[]]), dropEntry).default({})
+  drops: byItem(dropEntry, true).default({})
 });
 const rate = z.number().nonnegative();
 // Loja: "heart: 15" = preço em ouro. buy: o que ela vende; sell: o que ela compra de você.
-const prices = z.partialRecord(z.enum(ITEM_IDS as [ItemId, ...ItemId[]]), z.number().int().positive()).default({});
+const prices = byItem(z.number().int().positive()).default({});
 const shop = z.strictObject({ buy: prices, sell: prices });
 // Atributos de um equipamento: ataque, poder mágico, velocidade de ataque (%), defesa, vida, mana e regenerações (por segundo).
-const statBonus = z.strictObject({
+export const statBonus = z.strictObject({
   attack: z.number(), magic: z.number(), attackSpeed: z.number().min(0).max(MAX_ATTACK_SPEED), defense: z.number().min(0),
   hp: z.number(), mp: z.number(), hpRegen: z.number(), mpRegen: z.number()
 }).partial();
@@ -33,8 +39,11 @@ const statBonus = z.strictObject({
 export const configSchema = z.strictObject({
   world: z.strictObject({
     maps: z.record(z.string().regex(/^[a-z0-9-]+$/, 'id de mapa: só letras minúsculas sem acento, números e hífen'), z.string().min(1)),
-    start: z.string()
-  }).refine(w => w.start in w.maps, { message: 'world.start precisa ser um dos mapas de world.maps', path: ['start'] }),
+    start: z.string(),
+    // mapas com uma cópia por grupo (masmorras): criada ao entrar, descartada quando esvazia
+    instanced: z.array(z.string()).default([])
+  }).refine(w => w.start in w.maps, { message: 'world.start precisa ser um dos mapas de world.maps', path: ['start'] })
+    .refine(w => w.instanced.every(m => m in w.maps && m !== w.start), { message: 'world.instanced: só mapas de world.maps, e nunca o mapa principal', path: ['instanced'] }),
   server: z.strictObject({
     port: z.number().int().min(1).max(65535),
     maxPlayers: z.number().int().positive(),
@@ -95,6 +104,7 @@ export const configSchema = z.strictObject({
     respawnPoint: z.string(),
     respawnDelay: duration,
     invulnerableAfterRespawn: duration,
+    fragment: z.number().int().min(0).max(100).default(5),   // vida máxima a mais por fragmento de vida achado
     revive: duration.default(1.5)   // levantar amigo caído: tempo segurando o botão de Ação ao lado dele (0 = desligado)
   }),
   rates: z.strictObject({ xp: rate, drop: rate, gold: rate }),

@@ -1,0 +1,17 @@
+{
+  "name": "Espada curta",
+  "desc": "Uma espada simples que parece mais uma faca velha!",
+  "gear": {
+    "like": "sword",
+    "damage": 3,
+    "stats": {
+      "attack": 1,
+      "magic": 1,
+      "attackSpeed": 15,
+      "defense": 1,
+      "hp": 1,
+      "mp": 1
+    },
+    "color": "#0044ff"
+  }
+}

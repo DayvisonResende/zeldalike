@@ -1,0 +1,7 @@
+{
+  "name": "Gancho",
+  "desc": "Atira uma corrente na mira: prende em pilares e puxa você até lá, por cima de água e buracos. Atordoa monstros e traz itens.",
+  "gear": {
+    "like": "hook"
+  }
+}

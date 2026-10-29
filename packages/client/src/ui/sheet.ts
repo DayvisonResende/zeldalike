@@ -1,4 +1,4 @@
-import { GEAR_NAME, gearIn, gearLines, type GearRules } from '@vale/shared';
+import { gearName, gearIn, gearLines, type GearRules } from '@vale/shared';
 import type { Inventory } from '../session/types';
 
 const el = <K extends keyof HTMLElementTagNameMap>(tag: K, props: Partial<HTMLElementTagNameMap[K]> = {}) => Object.assign(document.createElement(tag), props);
@@ -26,7 +26,7 @@ export function renderSheet(inv: Inventory | null, rules: GearRules | null) {
   );
   gearEl.replaceChildren(...(['a', 'c'] as const).map(k => {
     const g = gearIn(inv, k), d = el('div');
-    d.append(el('b', { textContent: `${k.toUpperCase()}: ${GEAR_NAME[g]}` }), ...(rules ? gearLines(rules, g) : ['Carregando…']).map(t => el('span', { textContent: t })));
+    d.append(el('b', { textContent: `${k.toUpperCase()}: ${gearName(g)}` }), ...(rules ? gearLines(rules, g) : ['Carregando…']).map(t => el('span', { textContent: t })));
     return d;
   }));
 }

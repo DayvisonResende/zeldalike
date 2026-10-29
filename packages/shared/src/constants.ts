@@ -1,7 +1,9 @@
 export const TS = 16;                  // tamanho do tile em pixels
 export const TICK_RATE = 60;           // passos de simulação por segundo; as velocidades são "por passo"
 export const VIEW_W = 256, VIEW_H = 224;
-export const SWING = 13, SPIN = 26;
+export const SWING = 13, SPIN = 26;   // passos de um golpe e de um giro
+export const BOW_SHOT = 7, BOW_END = 17;   // arco: solta a flecha no passo 7, termina no 17
+export const CAST_AT = 6, CAST_END = 14;   // cajado: solta a magia no passo 6, termina no 14
 
 export type Dir = 0 | 1 | 2 | 3;       // 0 baixo, 1 cima, 2 esquerda, 3 direita
 export const D: readonly (readonly [number, number])[] = [[0, 1], [0, -1], [-1, 0], [1, 0]];

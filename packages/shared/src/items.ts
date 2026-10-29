@@ -1,27 +1,23 @@
-// Itens do jogo. O que viaja pela rede e vai para o banco é só o id.
-export type ItemId = 'heart' | 'mana' | 'jelly' | 'shell' | 'lambari' | 'tilapia' | 'trout' | 'moonfish' | 'blindfish' | 'boot' | 'bomb' | 'firestaff' | 'lightstaff' | 'darktome';
-export type LootId = ItemId | 'gold';   // ouro cai no chão, mas vai para o contador, não para o inventário
-export interface ItemDef { name: string; desc: string; heal?: number; mana?: number; gear?: boolean }   // gear: equipa no botão A ou C
-export const ITEMS: Record<ItemId, ItemDef> = {
-  heart: { name: 'Coração', desc: 'Recupera 25 de vida.', heal: 25 },
-  mana: { name: 'Poção de mana', desc: 'Recupera 20 de mana.', mana: 20 },
-  jelly: { name: 'Geleia de geleca', desc: 'Material pegajoso. Vai servir para algo um dia.' },
-  shell: { name: 'Carapaça de besouro', desc: 'Dura e brilhante. Vai servir para algo um dia.' },
-  // peixes (os novos sempre no fim: a ordem entra no número que viaja pela rede)
-  lambari: { name: 'Lambari', desc: 'Pequeno e comum. Comer recupera 8 de vida.', heal: 8 },
-  tilapia: { name: 'Tilápia', desc: 'Um bom almoço. Comer recupera 15 de vida.', heal: 15 },
-  trout: { name: 'Truta dourada', desc: 'Rara e brilhante. Comer recupera 30 de vida.', heal: 30 },
-  moonfish: { name: 'Peixe-lua', desc: 'Só aparece à noite. Comer recupera 20 de vida e 20 de mana.', heal: 20, mana: 20 },
-  blindfish: { name: 'Peixe-cego', desc: 'Vive no escuro da caverna. Comer recupera 12 de vida.', heal: 12 },
-  boot: { name: 'Bota velha', desc: 'Molhada e sem par. Não serve para nada… ou serve?' },
-  bomb: { name: 'Bomba', desc: 'Tecla 3 (ou Usar) põe uma acesa. E levanta para arremessar. Abre paredes rachadas.' },
-  firestaff: { name: 'Cajado de Fogo', desc: 'Bola de fogo na mira. Segure e solte: explosão. Gasta mana.', gear: true },
-  lightstaff: { name: 'Cajado de Luz', desc: 'Cura você e quem estiver perto. Segure e solte: cura maior que empurra monstros. Gasta mana.', gear: true },
-  darktome: { name: 'Grimório Sombrio', desc: 'Sombra que deixa o alvo lento e rouba vida. Segure e solte: maldição. Gasta mana.', gear: true }
-};
-export const ITEM_IDS = Object.keys(ITEMS) as ItemId[];
-export const LOOT_IDS: LootId[] = ['gold', ...ITEM_IDS];
-export const isItem = (v: unknown): v is ItemId => typeof v === 'string' && v in ITEMS;
+// Itens do jogo: vêm dos arquivos de content/items/ (um <id>.json e um <id>.png por item; ver docs/OFICINA.md).
+// O servidor lê e valida a pasta e manda a lista ao cliente; aqui fica só o registro. O que viaja e vai para o banco é o id.
+export type ItemId = string;
+export type LootId = ItemId;   // inclui 'gold': ouro cai no chão, mas vai para o contador, não para o inventário
+import type { GearDef } from './gear';
+export interface ItemDef { name: string; desc: string; heal?: number; mana?: number; gear?: GearDef }   // gear: equipa no botão A ou C
+export const ITEMS: Record<ItemId, ItemDef> = {};
+export const ITEM_IDS: ItemId[] = [];
+export const LOOT_IDS: LootId[] = ['gold'];
+// Itens que o código usa pelo id (coração e poção nos atalhos, bomba, peixes da pesca): não podem faltar na pasta.
+export const REQUIRED_ITEMS: ItemId[] = ['heart', 'mana', 'bomb', 'lambari', 'tilapia', 'trout', 'moonfish', 'blindfish', 'boot'];
+// Troca o registro inteiro (ao ligar o servidor, ao recarregar a pasta, ao chegar a lista no cliente).
+export function setItems(defs: Record<ItemId, ItemDef>) {
+  for (const k of Object.keys(ITEMS)) delete ITEMS[k];
+  Object.assign(ITEMS, defs);
+  ITEM_IDS.splice(0, ITEM_IDS.length, ...Object.keys(defs));
+  LOOT_IDS.splice(0, LOOT_IDS.length, 'gold', ...ITEM_IDS);
+}
+export const isItem = (v: unknown): v is ItemId => typeof v === 'string' && Object.hasOwn(ITEMS, v);
+export const isLoot = (v: unknown): v is LootId => v === 'gold' || v === 'key' || isItem(v);   // key: chave de masmorra (vai para o contador do mapa)
 
 /* ---------- Inventário: espaços fixos; itens iguais empilham ---------- */
 export type Slot = { id: ItemId; n: number } | null;

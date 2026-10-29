@@ -14,6 +14,7 @@ import { getMaps, startMap } from '../map';
 import { eventFor, inView } from './interest';
 import { onlineCharacters } from '../auth/routes';
 import { Parties, type LeaveResult } from './parties';
+import { getCatalog, onCatalog } from '../content/items';
 import { accountForToken } from '../auth/sessions';
 import { getCharacter, saveCharacters, type CharacterRow, type CharacterState } from '../persistence/characters';
 import { getDb } from '../persistence/db';
@@ -31,6 +32,9 @@ interface Seat {
 }
 interface Auth { accountId: number; username: string; character: CharacterRow }
 const profileOf = (p: Player): Profile => ({ id: p.id, name: p.name, look: { ...p.look } });
+const instanced = (map: string) => getConfig().world.instanced.includes(map);
+const baseOf = (key: string) => key.split('#')[0];   // "masmorra#g3" → "masmorra"
+const INSTANCE_LINGER = 60;   // segundos que uma instância vazia espera antes de sumir (dá tempo de reconectar)
 const whereOf = (w: World, p: Player) => w.map.regionAt(p.x, p.y)?.name ?? w.map.data.name;
 const fmtWait = (s: number) => s >= 60 ? `${Math.floor(s / 60)}min ${String(s % 60).padStart(2, '0')}s` : `${s}s`;
 
@@ -52,6 +56,7 @@ export class WorldRoom extends Room {
   private sendEvery = 3;
   private saveTimer?: NodeJS.Timeout;
   private unsub?: () => void;
+  private unsubItems?: () => void;
 
   // Mundo principal (onde se nasce e renasce).
   get world() { return this.worlds.get(startMap())!; }
@@ -59,12 +64,14 @@ export class WorldRoom extends Room {
   onCreate() {
     const seed = Date.now() | 0;
     for (const [id, map] of Object.entries(getMaps())) {
+      if (instanced(id)) continue;   // masmorras: uma cópia por grupo, criada quando alguém entra (ver instanceWorld)
       const w = new World(map, toRules(getConfig()), seed + this.worlds.size);
       w.home = id === startMap(); w.id = id;
       this.worlds.set(id, w); this.events.set(id, []);
     }
     this.apply(getConfig());
     this.unsub = onConfig(c => this.apply(c));
+    this.unsubItems = onCatalog(() => { for (const s of this.seats.values()) s.client.send(MSG.items, getCatalog()); });   // itens novos chegam na hora
     this.onMessage(MSG.input, (client, msg) => this.onInput(client, msg));
     this.onMessage(MSG.hello, client => this.welcome(client));   // o cliente pede quando já está ouvindo
     this.onMessage(MSG.profile, (client, msg) => this.onProfile(client, msg));
@@ -115,7 +122,7 @@ export class WorldRoom extends Room {
     }
     const s = resume ?? this.loadState(c), w = this.worlds.get(s.map)!;
     const p = w.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
-    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear;
+    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear; p.fragments = s.fragments;
     for (const [id, b64] of Object.entries(s.explored)) { const o = this.worlds.get(id); if (o) p.explored[id] = base64ToBits(b64, exploredSize(o.map.cols, o.map.rows)); }
     p.hp = s.hp; p.mp = s.mp; refreshStats(w, p);   // máximos pelo nível e pelo equipamento (corta o que passar)
     if (oldId) p.party = this.parties.rename(oldId, client.sessionId)?.id ?? null;   // entrou de novo: continua no grupo
@@ -152,7 +159,7 @@ export class WorldRoom extends Room {
     if (mark) { this.marks.delete(client.sessionId); this.sendMark(mark.map, { id: client.sessionId, clear: true }); }
     this.markAt.delete(client.sessionId);
   }
-  async onDispose() { this.unsub?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
+  async onDispose() { this.unsub?.(); this.unsubItems?.(); clearTimeout(this.saveTimer); await this.saveAll(); }
 
   /* ---------- Trocar de mapa ---------- */
   // Leva o jogador (com tudo que ele tem) para outro mundo e manda o mapa novo para o cliente.
@@ -167,9 +174,49 @@ export class WorldRoom extends Room {
     return f.p;
   }
   private onPortal(id: string, to: string, point: string) {
-    const dest = this.worlds.get(to);
+    const key = instanced(to) ? this.instanceKey(to, id) : to;
+    const dest = instanced(to) ? this.instanceWorld(to, key) : this.worlds.get(to);
     const at = dest?.map.data.points?.[point] ?? dest?.map.data.spawn;
-    if (at) this.transfer(id, to, at);
+    if (at) this.transfer(id, key, at);
+  }
+
+  /* ---------- Instâncias (masmorras) ---------- */
+  // Cada grupo tem a sua cópia do mapa; sozinho, a cópia é só sua. Quem entra depois no mesmo grupo cai na mesma.
+  private instanceKey(map: string, id: string) {
+    const g = this.parties.of(id);
+    return `${map}#${g ? g.id : 'solo' + this.seats.get(id)!.charId}`;
+  }
+  private instanceWorld(map: string, key: string) {
+    let w = this.worlds.get(key);
+    if (w) { this.emptySince.delete(key); return w; }
+    const data = getMaps()[map]; if (!data) return null;
+    w = new World(data, toRules(getConfig()), (Date.now() + this.worlds.size) | 0);
+    w.home = false; w.id = map;   // baús e mapa explorado contam pelo mapa, não pela cópia
+    w.tick = this.world.tick;     // mesma hora do dia do mapa principal
+    w.instance = true;            // monstros derrubados não voltam
+    this.worlds.set(key, w); this.events.set(key, []);
+    console.log(`[instância] ${key} criada`);
+    return w;
+  }
+  private emptySince = new Map<string, number>();
+  // Instância vazia some depois de INSTANCE_LINGER (quem está reconectando ainda conta: o jogador fica no mundo).
+  private sweepInstances() {
+    const now = Date.now();
+    for (const [key, w] of this.worlds) {
+      if (!key.includes('#')) continue;
+      if (w.players.size) { this.emptySince.delete(key); continue; }
+      const since = this.emptySince.get(key) ?? now; this.emptySince.set(key, since);
+      if (now - since < INSTANCE_LINGER * 1000) continue;
+      this.worlds.delete(key); this.events.delete(key); this.emptySince.delete(key);
+      for (const [id, m] of this.marks) if (m.map === key) this.marks.delete(id);
+      console.log(`[instância] ${key} descartada`);
+    }
+  }
+  // Saída de uma masmorra: aonde o portal de saída dela leva (um mapa comum); sem isso, o renascimento do mapa principal.
+  private exitOf(map: string): { map: string; x: number; y: number } {
+    const out = getMaps()[map]?.portals?.find(p => p.to && !instanced(p.to) && getMaps()[p.to]?.points?.[p.arrive]);
+    if (out) return { map: out.to!, ...getMaps()[out.to!].points![out.arrive] };
+    return { map: startMap(), ...respawnPos(this.world, this.world.rules.player.respawnPoint) };
   }
   // Caído fora do mapa principal: renasce no principal.
   private goHome(id: string) {
@@ -196,20 +243,24 @@ export class WorldRoom extends Room {
         if (items.length) chestLoot[k] = items;
       }
     } catch { }
+    let fragments: string[] = [];
+    try { const f = JSON.parse(c.fragments ?? '[]'); if (Array.isArray(f)) fragments = f.filter(k => typeof k === 'string'); } catch { }
     const explored: Record<string, string> = {};
     try { for (const [k, v] of Object.entries(JSON.parse(c.explored ?? '{}'))) if (typeof v === 'string' && this.worlds.has(k)) explored[k] = v; } catch { }
-    return { map, ...at, chests, chestLoot, explored, hp, mp: c.mp === null ? m.mp : c.mp, look: { cloak: c.cloak, hair: c.hair },
+    return { map, ...at, chests, chestLoot, explored, fragments, hp, mp: c.mp === null ? m.mp : c.mp, look: { cloak: c.cloak, hair: c.hair },
       level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack), gear: parseGear(gear) };
   }
   // Quem sai caído volta no ponto de renascimento do mapa principal, com a vida cheia.
   private stateOf(p: Player, map: string): CharacterState {
     const w = this.worlds.get(map); if (w) pruneChests(w, p);
-    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear },
+    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear }, fragments: [...p.fragments],
       explored: Object.fromEntries(Object.entries(p.explored).map(([k, v]) => [k, bitsToBase64(v)])) };
     if (p.state === 'dead') {
       const at = respawnPos(this.world, this.world.rules.player.respawnPoint);
       return { map: startMap(), ...at, hp: p.maxHp, mp: p.maxMp, ...keep };
     }
+    // saiu do jogo dentro de uma masmorra: a cópia não sobrevive, então volta pela porta dela, no mapa principal
+    if (map.includes('#')) return { ...this.exitOf(baseOf(map)), hp: p.hp, mp: p.mp, ...keep };
     return { map, x: p.x, y: p.y, hp: p.hp, mp: p.mp, ...keep };
   }
   private async save(list: [Seat, Player][]) {
@@ -232,11 +283,12 @@ export class WorldRoom extends Room {
       id: client.sessionId, tick: w.tick, tiles: w.map.tiles.map(r => r.join('')), sendEvery: this.sendEvery, motd: getConfig().server.motd,
       map: { ...w.map.data, enemies: [] }, at: me ? { x: me.x, y: me.y } : w.map.data.spawn,
       profiles: [...this.worlds.values()].flatMap(o => [...o.players.values()].map(profileOf)),
-      explored: me ? bitsToBase64(exploredOf(w, me)) : '', safe: getConfig().pvp.safeZones,
+      explored: me ? bitsToBase64(exploredOf(w, me)) : '', safe: getConfig().pvp.safeZones, mapId: w.id,
       marks: [...this.marks].filter(([id, m]) => m.map === w.id && m.until > Date.now() && this.seesMark(id, client.sessionId)).map(([id, m]) => ({ id, name: m.name, x: m.x, y: m.y, ttl: m.until - Date.now() }))
     };
     client.send(MSG.welcome, msg);
     client.send(MSG.rules, this.gearRules());
+    client.send(MSG.items, getCatalog());
   }
   private broadcastProfile(msg: ProfileMsg, except?: Client) {
     for (const seat of this.seats.values()) if (seat.client !== except) seat.client.send(MSG.profile, msg);
@@ -526,6 +578,7 @@ export class WorldRoom extends Room {
       }
     }
     for (const m of moves) m();
+    if (this.ticks % 60 === 0) this.sweepInstances();
     const night = sunlight(dayTime(this.world)) < 0.5;
     if (this.night !== null && night !== this.night) this.sendChat({ ch: 'system', text: night ? 'A noite caiu no Vale. Cuidado com os morcegos.' : 'O sol nasceu no Vale.' });
     this.night = night;
@@ -553,6 +606,7 @@ export class WorldRoom extends Room {
       if (inv) msg.iv = [inv.phase === 'warn' ? -1 : remaining(this.world), Math.max(0, Math.ceil((inv.until - this.world.tick) / TICK_RATE))];
       if (w.tick % 40 < this.sendEvery) msg.r = [...w.players.values()].filter(o => o.id !== id && o.state !== 'dead').map(o => [o.id, Math.floor(o.x / 16), Math.floor(o.y / 16)]);
       msg.g = this.partyInfo(id, seat.map);
+      if (w.keys || w.map.data.keys || w.map.data.rooms) msg.kc = w.keys;   // masmorra: chaves do grupo
       if (seat.bagSent !== me.bagVersion) { msg.bag = me.bag; seat.bagSent = me.bagVersion; }
       const ch = openChests(w, me), mark = ch.join(';') || '-';   // muda ao abrir e quando um baú enche de novo ('' = nunca enviado)
       if (mark !== seat.chestsSent) { msg.ch = ch; seat.chestsSent = mark; }

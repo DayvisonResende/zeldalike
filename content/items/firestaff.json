@@ -1,0 +1,7 @@
+{
+  "name": "Cajado de Fogo",
+  "desc": "Bola de fogo na mira. Segure e solte: explosão. Gasta mana.",
+  "gear": {
+    "like": "firestaff"
+  }
+}

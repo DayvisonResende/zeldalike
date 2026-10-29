@@ -37,6 +37,7 @@ export interface Rules {
     respawnPoint: string;                 // id da região; vazio = ponto de partida do mapa
     respawnDelay: number; invulnerableAfterRespawn: number;
     revive: number;                       // segurando o botão ao lado de um amigo caído por esse tempo, ele levanta (0 = desligado)
+    fragment: number;                     // vida máxima a mais por fragmento de vida achado
   };
   pvp: {
     mode: PvpMode;
@@ -75,7 +76,7 @@ export const DEFAULT_RULES: Rules = {
   },
   shops: {},
   events: { invasion: { every: 0, warning: 30, duration: 180, count: 20, zone: 'clareira', reward: { xp: 40, gold: 20 } } },
-  player: { maxHp: 100, maxMana: 50, hpRegen: 2, manaRegen: 3, regenDelay: 5, respawnPoint: '', respawnDelay: 5, invulnerableAfterRespawn: 3, revive: 1.5 },
+  player: { maxHp: 100, maxMana: 50, hpRegen: 2, manaRegen: 3, regenDelay: 5, respawnPoint: '', respawnDelay: 5, invulnerableAfterRespawn: 3, revive: 1.5, fragment: 5 },
   pvp: { mode: 'optional', safeZones: [], toggleCooldown: 300, combatLock: 30, damage: { sword: 15, spin: 25, dash: 20, arrow: 10, thrown: 20, bomb: 30 }, factor: 0.5 },
   party: { maxSize: 4, xpRange: 320 },
   weapons: { sword: 10, spin: 20, dash: 20, arrow: 10, thrown: 20, bomb: 30 },

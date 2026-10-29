@@ -1,5 +1,5 @@
 import type { PlayerView } from '@vale/shared';
-import { ITEM_ICON } from '../render/sprites';
+import { GOLD_ICON, KEY_ICON } from '../render/sprites';
 import type { Inventory, PartyState } from '../session/types';
 
 const nameEl = document.getElementById('roomname')!;
@@ -14,7 +14,16 @@ export function showRegion(name: string) {
 const hud = document.getElementById('hud')!, death = document.getElementById('death')!, deathTimer = document.getElementById('deathTimer')!;
 const deathTitle = death.querySelector('strong')!, badge = document.getElementById('pvpBadge')!;
 const lvlEl = document.getElementById('lvl')!, xpEl = document.getElementById('xpbar')!, goldEl = document.getElementById('gold')!.querySelector('b')!;
-document.getElementById('gold')!.querySelector('canvas')!.getContext('2d')!.drawImage(ITEM_ICON.gold, 0, 0);
+document.getElementById('gold')!.querySelector('canvas')!.getContext('2d')!.drawImage(GOLD_ICON, 0, 0);
+const keysEl = document.getElementById('keys')!;
+keysEl.querySelector('canvas')!.getContext('2d')!.drawImage(KEY_ICON, 0, 0);
+let keysKey = '';
+// Masmorra: chaves do grupo, ao lado do ouro (some fora de masmorra).
+export function updateKeys(n: number | null) {
+  const k = String(n); if (k === keysKey) return;
+  keysKey = k; keysEl.hidden = n === null; keysEl.querySelector('b')!.textContent = String(n ?? 0);
+  keysEl.setAttribute('aria-label', `${n ?? 0} chave${n === 1 ? '' : 's'} do grupo`);
+}
 let progKey = '';
 // Ícones de PvP em pixel art, usados pelo CSS: espadas cruzadas no selo do HUD, caveira ao lado do nome.
 function pixelIcon(rows: string[], pal: Record<string, string>) {

@@ -44,7 +44,7 @@ export function spawnLoot(w: World, list: DropRule[], x: number, y: number, owne
 export function dropLoot(w: World, e: Enemy, killer: Player | undefined) {
   spawnLoot(w, w.rules.enemies[e.type].drops, e.x, e.y, killer?.id ?? null);
 }
-export const lootName = (item: LootId, n: number) => item === 'gold' ? `${n} de ouro` : `${n > 1 ? n + ' ' : ''}${ITEMS[item].name}`;
+export const lootName = (item: LootId, n: number) => item === 'gold' ? `${n} de ouro` : item === 'key' ? (n > 1 ? `${n} chaves` : 'chave') : `${n > 1 ? n + ' ' : ''}${ITEMS[item].name}`;
 
 /* ---------- Pegar com o botão de Ação (B) ---------- */
 // O item fica no chão até alguém apertar B perto dele; segurar B pega tudo em volta.
@@ -63,6 +63,7 @@ function take(w: World, p: Player, d: Drop) {
   const stack = w.rules.inventory.stack;
   let got = d.n;
   if (d.item === 'gold') p.gold += d.n;
+  else if (d.item === 'key') { w.keys += d.n; for (const o of w.players.values()) notice(w, o, `${p.name} pegou uma chave. Chaves: ${w.keys}`); }   // do grupo, não de quem pegou
   else {
     if (!canFit(p.bag, d.item, stack)) { notice(w, p, 'Inventário cheio.'); return 0; }
     got = d.n - addItem(p.bag, d.item, d.n, stack);

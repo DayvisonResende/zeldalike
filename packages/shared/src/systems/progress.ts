@@ -29,7 +29,7 @@ export function gainXp(w: World, p: Player, amount: number) {
     if (p.level >= w.rules.leveling.maxLevel) p.xp = 0;
     // sobe de nível: máximos maiores e vida e mana cheias
     const m = maxStats(w, p.level);
-    p.maxHp = m.hp + p.stats.hp; p.maxMp = m.mp + p.stats.mp; p.hp = p.maxHp; p.mp = p.maxMp;
+    p.maxHp = m.hp + p.stats.hp + p.fragments.length * w.rules.player.fragment; p.maxMp = m.mp + p.stats.mp; p.hp = p.maxHp; p.mp = p.maxMp;
     w.emit({ t: 'levelup', id: p.id, x: p.x, y: p.y, level: p.level });
     burst(w, p.x, p.y - 8, 'spark', 14, { s: 1.3, z: 10, up: 2.2 });
     sfx(w, 'levelup', p);

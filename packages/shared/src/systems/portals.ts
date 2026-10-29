@@ -20,7 +20,7 @@ export function updatePortals(w: World) {
 }
 // Chegada num ponto: zera movimentos em andamento.
 export function arrive(p: Player, at: { x: number; y: number }) {
-  p.fish = null;
+  p.fish = null; p.hook = null;
   if (p.carry === 'player') p.carry = null;   // quem estava no colo fica para trás (e desce sozinho)
   p.holding = null;
   p.x = at.x; p.y = at.y; p.z = 0; p.kx = p.ky = 0; p.dvx = p.dvy = 0; p.hop = null; p.push = 0;

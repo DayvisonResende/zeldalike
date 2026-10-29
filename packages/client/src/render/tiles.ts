@@ -106,6 +106,28 @@ function paintCaveWall(x: Ctx, v: number, face: boolean) {
     x.fillStyle = '#16121e'; x.fillRect(0, 15, 16, 1);
   }
 }
+// Porta trancada: madeira com ferragens num batente de pedra, fechadura dourada no meio.
+function paintLockedDoor(x: Ctx) {
+  x.fillStyle = '#1b1226'; x.fillRect(1, 0, 14, 16);
+  x.fillStyle = '#6e6255'; x.fillRect(1, 0, 2, 16); x.fillRect(13, 0, 2, 16); x.fillRect(1, 0, 14, 2);
+  x.fillStyle = '#8a7c6c'; x.fillRect(1, 0, 14, 1); x.fillRect(1, 0, 1, 16);
+  x.fillStyle = '#7a4a2a'; x.fillRect(3, 2, 10, 14);
+  x.fillStyle = '#5a3420'; for (const i of [5, 8, 11]) x.fillRect(i, 2, 1, 14);
+  x.fillStyle = '#3a3d46'; x.fillRect(3, 4, 10, 2); x.fillRect(3, 12, 10, 2);
+  x.fillStyle = '#7a7d87'; x.fillRect(3, 4, 10, 1); x.fillRect(3, 12, 10, 1);
+  x.fillStyle = '#1b1226'; x.fillRect(5, 7, 6, 5);
+  x.fillStyle = '#e9b44c'; x.fillRect(6, 7, 4, 4);
+  x.fillStyle = '#1b1226'; x.fillRect(7, 8, 2, 1); x.fillRect(8, 9, 1, 1);
+}
+// Grade de sala: fechada, barras de ferro; aberta, só as fendas no chão de onde as barras sobem.
+function paintGrate(x: Ctx, closed: boolean) {
+  if (!closed) { x.fillStyle = '#1b1226'; for (const i of [2, 6, 10]) { x.fillRect(i + 1, 1, 2, 1); x.fillRect(i + 1, 14, 2, 1); } return; }
+  x.fillStyle = 'rgba(16,12,24,.35)'; x.fillRect(0, 14, 16, 2);
+  for (const i of [1, 5, 9, 13]) { x.fillStyle = '#1b1226'; x.fillRect(i - 1, 0, 4, 16); x.fillStyle = '#4d505a'; x.fillRect(i, 0, 2, 16); x.fillStyle = '#8f929b'; x.fillRect(i, 0, 1, 16); }
+  x.fillStyle = '#1b1226'; x.fillRect(0, 3, 16, 3); x.fillRect(0, 10, 16, 3);
+  x.fillStyle = '#3a3d46'; x.fillRect(0, 4, 16, 1); x.fillRect(0, 11, 16, 1);
+  x.fillStyle = '#7a7d87'; x.fillRect(0, 4, 16, 1);
+}
 // Entrada de caverna: arco escuro aberto numa rocha.
 function paintCaveMouth(x: Ctx) {
   x.fillStyle = '#9b6641'; x.fillRect(0, 0, 16, 16);
@@ -180,6 +202,10 @@ export function tileFor(map: WorldMap, tx: number, ty: number, wf: number) {
     case 'I': {   // parede ilusória: igual à de verdade, só com um brilho quase imperceptível (a luz revela)
       const face = !WALLS.has(nb(map, tx, ty + 1, 'W'));
       return tileImg('I' + v + (face ? 'f' : ''), x => { paintCaveWall(x, v, face); x.fillStyle = '#3d3552'; x.fillRect(4, 5, 1, 1); x.fillRect(11, 3, 1, 1); });
+    }
+    case 'L': case 'D': case 'O': {   // porta trancada e grades de sala, em cima do chão em volta (caverna ou pedra)
+      const cave = nearCave((x, y) => nb(map, x, y, c), tx, ty);
+      return tileImg(c + v + (cave ? 'q' : ''), x => { if (cave) paintCaveFloor(x, v); else paintStone(x, v, 0); if (c === 'L') paintLockedDoor(x); else paintGrate(x, c === 'D'); });
     }
     case 'h': return tileImg('h', paintCaveMouth);
     case 'u': return tileImg('u', paintStairs);

@@ -1,0 +1,6 @@
+{
+  "name": "Peixe-lua",
+  "desc": "Só aparece à noite. Comer recupera 20 de vida e 20 de mana.",
+  "heal": 20,
+  "mana": 20
+}

@@ -8,6 +8,7 @@ import { burst, sfx } from './fx';
 import { breakTile } from './regrowth';
 import { nearCave } from '../world/tiles';
 import { harmPlayer } from './pvp';
+import { gearScale, swordOf, weaponDamage } from '../gear';
 
 export interface SwordPose { ox: number; oy: number; ang: number; len: number }
 
@@ -42,11 +43,11 @@ export function swordHits(w: World, p: Player) {
     cutAt(w, x, y, p.id);
     for (const e of w.enemies) {
       if (e.dying || p.hit.has(e.id)) continue;
-      if (hitsEnemy(e, x, y)) { p.hit.add(e.id); damage(w, e, w.rules.weapons[p.state === 'spin' ? 'spin' : 'sword'] + p.stats.attack, p.x, p.y, p); }
+      if (hitsEnemy(e, x, y)) { p.hit.add(e.id); damage(w, e, weaponDamage(w, swordOf(p), p.state === 'spin' ? 'spin' : 'sword') + p.stats.attack, p.x, p.y, p); }
     }
     for (const o of w.players.values()) {
       if (o === p || p.hit.has(o.id) || !hitsBody(o, x, y)) continue;
-      if (harmPlayer(w, p, o, p.state === 'spin' ? 'spin' : 'sword')) p.hit.add(o.id);
+      if (pvpHit(w, p, o, p.state === 'spin' ? 'spin' : 'sword')) p.hit.add(o.id);
     }
   }
 }
@@ -54,18 +55,20 @@ export function swordHits(w: World, p: Player) {
 export function pokeTip(w: World, p: Player) {
   const s = swordPose(p); if (!s) return;
   const [x, y] = along(s, 1);
-  for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, w.rules.weapons.sword + p.stats.attack, p.x, p.y, p);
-  for (const o of w.players.values()) if (o !== p && hitsBody(o, x, y)) harmPlayer(w, p, o, 'sword');
+  for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, weaponDamage(w, swordOf(p), 'sword') + p.stats.attack, p.x, p.y, p);
+  for (const o of w.players.values()) if (o !== p && hitsBody(o, x, y)) pvpHit(w, p, o, 'sword');
 }
 export function dashHits(w: World, p: Player) {
   const s = swordPose(p); if (!s) return;
   for (const f of [0.6, 1.0]) {
     const [x, y] = along(s, f);
     cutAt(w, x, y, p.id);
-    for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, w.rules.weapons.dash + p.stats.attack, p.x, p.y, p);
-    for (const o of w.players.values()) if (o !== p && hitsBody(o, x, y)) harmPlayer(w, p, o, 'dash');
+    for (const e of w.enemies) if (!e.dying && e.hurtT === 0 && hitsEnemy(e, x, y)) damage(w, e, weaponDamage(w, swordOf(p), 'dash') + p.stats.attack, p.x, p.y, p);
+    for (const o of w.players.values()) if (o !== p && hitsBody(o, x, y)) pvpHit(w, p, o, 'dash');
   }
 }
+// Golpe de espada num jogador: o dano do PvP cresce com o da espada (Espada de Ferro 1,4× = 1,4× no PvP também).
+const pvpHit = (w: World, p: Player, o: Player, a: 'sword' | 'spin' | 'dash') => harmPlayer(w, p, o, a, w.rules.pvp.damage[a] * gearScale(w, swordOf(p)));
 export function damage(w: World, e: Enemy, n: number, sx: number, sy: number, by?: Player) {
   if (e.type === 'chicken') { chickenHit(w, e, sx, sy, by); return; }
   if (e.hurtT > 0) return;

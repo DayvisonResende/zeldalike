@@ -12,6 +12,7 @@ export interface Enemy extends Body {
   anger: number; angerBy: string | null; angerAt: number;   // galinha: golpes seguidos de quem, e quando foi o último
   maxHp: number;
   slowUntil?: number; slowed?: boolean;                     // lento (sombra) até este passo; slowed: calculado a cada passo
+  mini?: boolean;                                           // minichefe de masmorra: mais vida, mais dano, maior
   minion?: boolean;                                         // geleca chamada pelo Rei (não volta quando morre)
   enraged?: boolean; lands?: number;                        // Rei Geleca: furioso (metade da vida) e pulos dados
   hitters?: Record<string, number>;                         // Rei Geleca: dano de cada jogador (todos ganham XP e loot)

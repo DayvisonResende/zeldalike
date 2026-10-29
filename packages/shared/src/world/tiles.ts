@@ -3,8 +3,9 @@
    q  chão de caverna   W parede de caverna   h entrada de caverna   u escada   t tocha (ilumina à noite)
    X  paredão rachado   Y parede de caverna rachada (bomba abre; fecham de novo com o tempo)
    j  tocha apagada (o fogo acende; acesas todas as do grupo, o portão perto abre)   G portão   I parede ilusória (a luz revela)
-   B  bloco (empurra)   P placa de pressão   Q bloco em cima de placa */
-export const SOLID = new Set(['T', 'b', 'r', 'w', 'c', 's', 'o', 'W', 't', 'X', 'Y', 'j', 'G', 'I', 'B', 'Q']);
+   B  bloco (empurra)   P placa de pressão   Q bloco em cima de placa
+   L  porta trancada (abre com uma chave)   D grade de sala fechada   O grade aberta (fecha quando a sala tranca) */
+export const SOLID = new Set(['T', 'b', 'r', 'w', 'c', 's', 'o', 'W', 't', 'X', 'Y', 'j', 'G', 'I', 'B', 'Q', 'L', 'D']);
 export const GRASSY = new Set(['.', ',', 'f', 'g', 'T', 'b', 'r', 's']);
 // Caverna: o chão em volta de pedras e arbustos vira chão de caverna (no desenho e quando se levanta uma pedra).
 export const CAVE = new Set(['q', 'W', 'u', 'h']);
@@ -24,5 +25,6 @@ export const TILE_KINDS = [
   { code: 'q', name: 'Chão de caverna' }, { code: 'W', name: 'Parede de caverna' }, { code: 'h', name: 'Entrada de caverna' }, { code: 'u', name: 'Escada' },
   { code: 't', name: 'Tocha' }, { code: 'X', name: 'Paredão rachado' }, { code: 'Y', name: 'Parede de caverna rachada' },
   { code: 'j', name: 'Tocha apagada' }, { code: 'G', name: 'Portão' }, { code: 'I', name: 'Parede ilusória' },
-  { code: 'B', name: 'Bloco (empurra)' }, { code: 'P', name: 'Placa de pressão' }, { code: 'Q', name: 'Bloco na placa' }
+  { code: 'B', name: 'Bloco (empurra)' }, { code: 'P', name: 'Placa de pressão' }, { code: 'Q', name: 'Bloco na placa' },
+  { code: 'L', name: 'Porta trancada' }, { code: 'D', name: 'Grade fechada' }, { code: 'O', name: 'Grade aberta' }
 ] as const;

@@ -102,6 +102,10 @@ valem `pvp.factor` (0,5 = metade do ataque, do poder mágico e da defesa). Menu 
 ficha e o que cada botão faz; no inventário, escolher uma arma mostra os números dela e o que muda ao equipar no A ou
 no C (verde melhora, vermelho piora).
 
+**Gancho:** equipamento (no A ou no C) que atira uma corrente na mira até 8 tiles. Preso num pilar, puxa você até
+ele, por cima de água e buracos; em monstro, tira um pouco e atordoa; num item do chão, traz até você. Fica no baú do
+Covil do Besouro, na Masmorra do Musgo. Qualquer item da Oficina pode se comportar como gancho (`"like": "hook"`).
+
 **Grupo:** `G` (ou Menu → Grupo) mostra quem está online, em que região, com "Convidar". O convite aparece no alto da
 tela (Aceitar/Recusar) e na aba Grupo; também dá pelo chat: `/convidar nome`, `/aceitar`, `/recusar`, `/sairdogrupo`,
 `/grupo`. Até `party.maxSize` (4) por grupo; quem convidou lidera (pode convidar e tirar; saindo, o mais antigo lidera).
@@ -164,6 +168,40 @@ de passar para um amigo. XP, curva de nível, tabelas de drop e taxas ficam no `
 (nomes sobre a cabeça: todos, só dos outros ou nenhum; som; caminhos dos monstros) e controles.
 Tudo fica salvo no navegador.
 
+## Itens (`content/items/`)
+
+Cada item é um par de arquivos: `<id>.json` com os dados e `<id>.png` com o ícone (16×16, fundo transparente). O id é o
+nome do arquivo (letras minúsculas, números e hífen) e nunca deve mudar: o banco e os inventários guardam o id. O nome
+pode mudar à vontade.
+
+```json
+{ "name": "Coração", "desc": "Recupera 25 de vida.", "heal": 25 }
+```
+
+Campos: `name`, `desc`, `heal` (vida ao usar), `mana` (mana ao usar) e `gear` para equipamento (vai no A ou no C):
+
+```json
+{ "name": "Espada de Ferro", "desc": "Pesada.", "gear": { "like": "sword", "damage": 15, "stats": { "defense": 10 }, "color": "#5fa8ff" } }
+```
+
+`like`: como se comporta (`sword`, `bow`, `firestaff`, `lightstaff`, `darktome`). `damage`: dano próprio (só espada e
+arco; giro, dash e PvP crescem na mesma proporção; sem ele, o da arma de base). `stats`: atributos (os mesmos da seção
+`gear` do `config.yaml`). `color`: lâmina da espada, pedra do cajado ou madeira do arco. O servidor valida a
+pasta ao ligar e a cada mudança (com erros em português, como o `config.yaml`); com o servidor ligado, o item novo chega
+aos jogadores na hora. Um item usado numa loja, num drop ou num baú não pode sumir: a mudança é ignorada e o erro aparece
+no terminal. Para pôr o item no jogo, use o id no `config.yaml` (lojas e drops) ou num baú do mapa.
+
+### Oficina
+
+O passo a passo completo, para qualquer pessoa, está em [docs/GUIA-DA-OFICINA.md](docs/GUIA-DA-OFICINA.md) (e dentro
+da própria Oficina, no botão "Como usar").
+
+Com `npm run dev` (no PC), a Oficina fica em http://localhost:5173/oficina.html: entre com a mesma conta do jogo (precisa
+estar em `admins` no `config.yaml`). Ela mostra os itens e cria ou muda consumíveis, materiais e equipamentos (nome,
+descrição, cura, mana, ícone; no equipamento, como se comporta, dano, atributos e cor), gravando os arquivos em `content/items/`. Em "Onde aparece", põe o item em lojas e nos drops dos monstros, gravando no
+`config.yaml` só as linhas do item, e mostra em quais baús ele está. Depois é commitar e subir para o servidor. No servidor do home
+lab (`npm start`) a Oficina fica desligada; para ligá-la à força: `OFICINA=1 npm start`.
+
 ## Editar o mapa (Tiled)
 
 O mundo é um mapa do [Tiled](https://www.mapeditor.org) (grátis): `content/maps/vale.tmj`.
@@ -189,6 +227,15 @@ O mundo é um mapa do [Tiled](https://www.mapeditor.org) (grátis): `content/map
    - **portais** — retângulos com classe `portal`: quem pisa vai para o ponto `chegada` do mapa `destino`
      (o id do mapa em `world.maps` no config; vazio = este mesmo mapa). Dica: ponha a chegada de forma que
      quem chega já esteja andando para longe do portal de volta (entrou indo para o norte → a saída fica atrás).
+   - **especiais** — objetos de masmorra (servem em qualquer mapa):
+     - `chave` (ponto): chave no chão. As chaves são do mapa (numa masmorra, do grupo): quem pegar, qualquer um usa.
+     - `sala` (retângulo): sala que tranca. Quem entra com monstros vivos dentro dela fica trancado (as grades
+       `Grade aberta` dentro ou na borda da sala viram `Grade fechada`) até derrubar todos. Propriedade opcional
+       `recompensa`: `chave` ou o id de um item, que cai no meio da sala quando ela é limpa.
+     - `fragmento` (ponto): fragmento de vida. Cada personagem pega uma vez; dá `player.fragment` (5) de vida máxima para sempre.
+   - **Monstros**: propriedade `minichefe` = `sim` deixa o monstro 1,5× maior, com 6× a vida, 1,5× o dano e 5× o XP.
+   - **Tiles de masmorra**: `Porta trancada` (abre com uma chave, botão de Ação de frente para ela), `Grade aberta` e
+     `Grade fechada` (das salas que trancam), e o `Pilar`, onde o gancho prende.
 3. Salve e rode `npm run map:check`: ele lista erros e avisos em português (placa sem texto, monstro dentro
    de árvore, região que o config cita e não existe…).
    - **Mapa escuro** (caverna): Mapa → Propriedades do mapa → propriedade booleana `escuro` marcada. Fica sempre de noite lá.
@@ -198,6 +245,11 @@ O mundo é um mapa do [Tiled](https://www.mapeditor.org) (grátis): `content/map
 O mapa pode ter qualquer tamanho. Vários mapas: liste em `world.maps` no `config.yaml` (cada um é um mundo
 separado, com monstros e chat "Perto" próprios) e ligue com portais; `world.start` é o mapa principal, onde
 renasce quem cai em qualquer mapa. O `npm run map:check` confere todos os mapas e os portais entre eles.
+**Masmorras:** os mapas listados em `world.instanced` têm uma cópia por grupo (sozinho, uma só sua), criada ao entrar
+pelo portal e descartada 1 minuto depois de vazia. Na cópia, monstro derrubado não volta, as chaves e as portas são
+do grupo, e baús e fragmentos contam por personagem (abrir de novo noutra cópia não vale). Quem cai lá dentro volta ao
+Vale; quem sai do jogo lá dentro volta pela porta da masmorra. A primeira é a **Masmorra do Musgo**
+(`content/maps/masmorra.tmj`), com a entrada na escada atrás do Rei Geleca, no alto da Caverna Funda.
 Tipo de tile novo: acrescente no fim de `TILE_KINDS` (shared/src/world/tiles.ts), desenhe em
 client/src/render/tiles.ts e rode `npm run map:tileset` para atualizar o tileset do Tiled.
 

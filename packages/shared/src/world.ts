@@ -24,6 +24,7 @@ import { updateInvasion, type Invasion } from './systems/invasion';
 import { updateSpells, type Spell } from './systems/magic';
 import { updateBlocks, type BlockHome } from './systems/blocks';
 import { updateExplore } from './systems/explore';
+import { collectFragments, spawnKeys, updateRooms, type RoomState } from './systems/dungeon';
 
 // O mundo inteiro: mapa, jogadores, inimigos e objetos voando. Roda igual no servidor e no navegador.
 export class World {
@@ -52,15 +53,19 @@ export class World {
   predicting = false;            // mundo da previsão no cliente: só a própria jogadora, o resto vem do servidor
   invasion: Invasion | null = null;
   nextInvasion = 0; invasionEvery = -1;   // tick da próxima invasão; `every` usado para agendar (reagenda se o config mudar)
+  keys = 0;                      // chaves do mapa (numa masmorra, do grupo): abrem portas trancadas
+  rooms: RoomState[] = [];       // estado de cada sala que tranca
+  instance = false;              // cópia de masmorra: monstros derrubados não voltam
   home = true;   // é o mapa principal? Quem cai fora dele renasce no principal (o servidor cuida da transferência)
 
   constructor(data: MapData, rules: Rules = DEFAULT_RULES, seed = 1) {
     this.map = new WorldMap(data); this.rules = rules; this.rng = new Rng(seed);
-    this.spawns = data.enemies.map(s => ({ type: s.type, tx: s.x, ty: s.y, alive: null, at: 0, when: s.when }));
+    this.spawns = data.enemies.map(s => ({ type: s.type, tx: s.x, ty: s.y, alive: null, at: 0, when: s.when, mini: s.mini }));
     this.spawns.forEach((s, i) => {
       if (inSafeZone(this, s.tx * 16 + 8, s.ty * 16 + 8) || !inPeriod(this, s)) return;   // zona segura não tem monstros; os de outro período esperam
       const e = createEnemy(this, s.type, s.tx, s.ty, i); this.enemies.push(e); s.alive = e.id;
     });
+    spawnKeys(this);
   }
 
   addPlayer(id: string, name: string, x = this.map.data.spawn.x, y = this.map.data.spawn.y, look?: Look) {
@@ -98,7 +103,7 @@ export class World {
     updatePortals(this);
     if (opts.life !== false) { updateLife(this); updatePvp(this); updateLoot(this); }
     updateRegrowth(this); updateSpawns(this);
-    if (opts.life !== false) { updateInvasion(this); updateBlocks(this); updateExplore(this); }
+    if (opts.life !== false) { updateInvasion(this); updateBlocks(this); updateExplore(this); updateRooms(this); collectFragments(this); }
     for (const p of this.players.values()) {
       const r = this.map.regionAt(p.x, p.y);
       if (r && r.id !== p.region) { p.region = r.id; this.emit({ t: 'region', to: p.id, name: r.name }); }

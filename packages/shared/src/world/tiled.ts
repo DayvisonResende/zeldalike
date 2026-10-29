@@ -25,7 +25,7 @@ interface TTileset { tiles?: { id: number; properties?: TProp[]; objectgroup?: u
 
 const FLIP_BITS = 0x1fffffff;   // o Tiled usa os bits altos para espelhar/girar: aqui não importam
 // Camadas que o jogo entende. O resto (comum em tutoriais) é ignorado, com aviso.
-export const KNOWN_LAYERS = ['terreno', 'regioes', 'monstros', 'placas', 'pontos', 'portais', 'baus', 'npcs'];
+export const KNOWN_LAYERS = ['terreno', 'regioes', 'monstros', 'placas', 'pontos', 'portais', 'baus', 'npcs', 'especiais'];
 const prop = (o: { properties?: TProp[] }, name: string) => o.properties?.find(p => p.name === name)?.value;
 const slug = (s: string) => s.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 const norm = (s: string) => slug(s).replace(/-/g, '');
@@ -65,7 +65,7 @@ export function fromTiled(raw: unknown, rawTileset: unknown, name = 'mapa'): Til
   // objeto colocado na camada errada (acontece quando a camada selecionada no painel era outra)
   const misplaced = (o: TObject, here: string) => {
     const cls = (o.type || o.class || '').toLowerCase(), at = `x=${Math.floor(o.x / TS)}, y=${Math.floor(o.y / TS)}`;
-    const home = cls === 'slime' || cls === 'beetle' || cls === 'bat' || cls === 'chicken' || cls === 'king' ? 'monstros' : cls === 'placa' ? 'placas' : cls === 'regiao' ? 'regioes' : cls === 'portal' ? 'portais' : cls === 'bau' ? 'baus' : cls === 'npc' ? 'npcs' : norm(o.name ?? '') === 'partida' ? 'pontos' : null;
+    const home = cls === 'slime' || cls === 'beetle' || cls === 'bat' || cls === 'chicken' || cls === 'king' ? 'monstros' : cls === 'placa' ? 'placas' : cls === 'regiao' ? 'regioes' : cls === 'portal' ? 'portais' : cls === 'bau' ? 'baus' : cls === 'npc' ? 'npcs' : cls === 'chave' || cls === 'sala' || cls === 'fragmento' ? 'especiais' : norm(o.name ?? '') === 'partida' ? 'pontos' : null;
     if (!home || home === here) return false;
     errors.push(`"${o.name || cls}" em ${at} está na camada "${here}", mas é da camada "${home}". No Tiled: botão direito no objeto → Mover para a camada → ${home}`);
     return true;
@@ -91,7 +91,8 @@ export function fromTiled(raw: unknown, rawTileset: unknown, name = 'mapa'): Til
     if (type !== 'bat' && SOLID.has(tileAt(o.x, o.y) ?? 'T')) warnings.push(`${type} em ${where} está em cima de algo sólido: talvez não consiga andar`);
     const quando = slug(String(prop(o, 'quando') ?? ''));
     if (quando && quando !== 'dia' && quando !== 'noite') { errors.push(`${type} em ${where}: "quando" precisa ser "dia" ou "noite" (ou ficar vazio para sempre)`); continue; }
-    enemies.push(quando ? { type: type as EnemyType, x: tx, y: ty, when: quando === 'dia' ? 'day' : 'night' } : { type: type as EnemyType, x: tx, y: ty });
+    const mini = prop(o, 'minichefe') === true || ['sim', 'true'].includes(slug(String(prop(o, 'minichefe') ?? '')));   // mais vida, mais dano, maior
+    enemies.push({ type: type as EnemyType, x: tx, y: ty, ...(quando ? { when: quando === 'dia' ? 'day' as const : 'night' as const } : {}), ...(mini ? { mini: true } : {}) });
   }
 
   /* ---------- placas ---------- */
@@ -141,6 +142,24 @@ export function fromTiled(raw: unknown, rawTileset: unknown, name = 'mapa'): Til
     chests.push({ x: tx, y: ty, loot, respawn });
   }
 
+  /* ---------- especiais: chaves, salas que trancam, fragmentos de vida ---------- */
+  const keys: NonNullable<MapData['keys']> = [], rooms: NonNullable<MapData['rooms']> = [], fragments: NonNullable<MapData['fragments']> = [];
+  for (const o of layer('especiais')?.objects ?? []) {
+    if (misplaced(o, 'especiais')) continue;
+    const cls = (o.type || o.class || o.name || '').toLowerCase(), tx = Math.floor(o.x / TS), ty = Math.floor(o.y / TS), where = `x=${tx}, y=${ty}`;
+    if (cls === 'chave' || cls === 'fragmento') {
+      const cx = o.width ? o.x + o.width / 2 : o.x, cy = o.height ? o.y + o.height / 2 : o.y;
+      if (SOLID.has(tileAt(cx, cy) ?? 'T')) { errors.push(`${cls} em ${where} está em cima de algo sólido`); continue; }
+      if (cls === 'chave') keys.push({ x: Math.round(cx), y: Math.round(cy) });
+      else fragments.push({ x: Math.floor(cx / TS), y: Math.floor(cy / TS) });
+    } else if (cls === 'sala') {
+      if (!o.width || !o.height) { errors.push(`sala em ${where} precisa ser um retângulo (a área da sala)`); continue; }
+      const reward = String(prop(o, 'recompensa') ?? '').trim();
+      if (reward && reward !== 'chave' && !LOOT_IDS.includes(reward)) { errors.push(`sala em ${where}: recompensa "${reward}" não existe (use "chave" ou o id de um item)`); continue; }
+      rooms.push({ x: tx, y: ty, w: Math.max(1, Math.round(o.width / TS)), h: Math.max(1, Math.round(o.height / TS)), ...(reward ? { reward } : {}) });
+    } else errors.push(`objeto de classe "${cls || '(vazia)'}" em ${where} na camada "especiais": use "chave", "sala" ou "fragmento"`);
+  }
+
   /* ---------- NPCs ---------- */
   const npcs: NonNullable<MapData['npcs']> = [];
   for (const o of layer('npcs')?.objects ?? []) {
@@ -167,7 +186,8 @@ export function fromTiled(raw: unknown, rawTileset: unknown, name = 'mapa'): Til
   if (errors.length) throw new MapError(`${name}: o mapa tem problemas:\n` + errors.map(e => '  • ' + e).join('\n'));
   const title = prop(m, 'nome'), dark = prop(m, 'escuro') === true || prop(m, 'escuro') === 'true';
   return {
-    map: { name: typeof title === 'string' ? title : name, cols: W, rows: H, spawn: { x: Math.round(start!.x), y: Math.round(start!.y) }, ...(dark ? { dark: true } : {}), points, portals, chests, npcs, regions, tiles: rows.map(r => r.join('')), enemies, signs },
+    map: { name: typeof title === 'string' ? title : name, cols: W, rows: H, spawn: { x: Math.round(start!.x), y: Math.round(start!.y) }, ...(dark ? { dark: true } : {}), points, portals, chests, npcs, regions, tiles: rows.map(r => r.join('')), enemies, signs,
+      ...(keys.length ? { keys } : {}), ...(rooms.length ? { rooms } : {}), ...(fragments.length ? { fragments } : {}) },
     warnings
   };
 }

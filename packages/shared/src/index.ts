@@ -34,4 +34,7 @@ export { BLAST, FUSE, explode, type Bomb } from './systems/bombs';
 export { invaded, remaining, startInvasion, type Invasion } from './systems/invasion';
 export { REVEAL, base64ToBits, bitsToBase64, exploredOf, exploredSize, isExplored, reveal } from './systems/explore';
 export { manaCost, type Spell, type SpellKind } from './systems/magic';
-export { MAX_ATTACK_SPEED, STAT_KEYS, STAT_LABEL, afterDefense, attackStep, emptyStats, formatStat, gearLines, refreshStats, statDiff, statLines, statsOf, type GearRules, type Stats } from './systems/stats';
+export { MAX_ATTACK_SPEED, STAT_KEYS, STAT_LABEL, afterDefense, gearBonus, attackStep, emptyStats, formatStat, gearLines, refreshStats, statDiff, statLines, statsOf, type GearRules, type Stats } from './systems/stats';
+export { balance, type Balance, type CalcRules } from './balance';
+export { collectFragments, fragmentHp, fragmentKey, openDoor, spawnKeys, updateRooms, type RoomState } from './systems/dungeon';
+export { HOOK_RANGE, HOOK_TARGETS, startHook, updateHook, type Hook } from './systems/hook';

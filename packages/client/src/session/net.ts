@@ -1,9 +1,10 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG, World, applyOwnState, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
-  type ChatMsg, type ChatRequest, type GearRules, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
+  type ChatMsg, type ChatRequest, type GearRules, type ItemCatalogMsg, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
+import { setCatalog } from '../render/icons';
 import type { Inventory, MapState, Mark, PartyState, Scene, Session, Status } from './types';
 
 const OVERLAY_TICKS = 90;   // quanto tempo um corte previsto espera a confirmação do servidor
@@ -34,6 +35,8 @@ export class NetSession implements Session {
   onParty?: (m: PartyMsg) => void;
   private partyNow: PartyState | null = null;
   private rulesNow: GearRules | null = null;
+  private keys: number | null = null;
+  private mapId = '';   // id do mapa (como o servidor chama), para os fragmentos achados
   onLeave?: (code: number) => void;
   onMapChange?: () => void;
   leave() { return this.room?.leave(); }
@@ -62,6 +65,7 @@ export class NetSession implements Session {
     room.onMessage(MSG.mark, (m: MarkMsg) => this.onMark(m));
     room.onMessage(MSG.party, (m: PartyMsg) => this.onParty?.(m));
     room.onMessage(MSG.rules, (m: GearRules) => { this.rulesNow = m; });
+    room.onMessage(MSG.items, (m: ItemCatalogMsg) => setCatalog(m));   // itens do servidor (inclusive os novos da Oficina)
     room.onDrop(() => { this.status = 'reconnecting'; });
     room.onReconnect(() => { this.status = 'online'; });
     room.onLeave(code => { this.status = 'offline'; this.onLeave?.(code); });
@@ -73,7 +77,7 @@ export class NetSession implements Session {
     else this.marks.set(m.id, { id: m.id, name: m.name, x: m.x, y: m.y, until: Date.now() + m.ttl });
   }
   private welcome(m: WelcomeMsg) {
-    this.meId = m.id; this.sendEvery = m.sendEvery;
+    this.meId = m.id; this.sendEvery = m.sendEvery; this.mapId = m.mapId ?? '';
     this.explored = base64ToBits(m.explored ?? '', exploredSize(m.map.cols, m.map.rows));
     this.safe = m.safe ?? [];
     this.marks = new Map((m.marks ?? []).flatMap(k => 'clear' in k ? [] : [[k.id, { id: k.id, name: k.name, x: k.x, y: k.y, until: Date.now() + k.ttl }] as const]));
@@ -117,6 +121,7 @@ export class NetSession implements Session {
     const est = s.t - this.local;
     if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
     this.interp.push(toFrame(s));
+    this.keys = s.kc ?? null;
     this.pvpInfo = s.pvp; this.xpNext = s.xpNext; this.day = s.day; this.invasion = s.iv ?? null;
     this.partyNow = s.g ? { leader: s.g.leader, members: s.g.m.map(([id, name, level, hp, dead, x, y, where]) => ({ id, name, level, hp, dead: dead === 1, at: x < 0 ? null : { x, y }, where })) } : null;
     if (s.r) this.roster = s.r.map(([id, x, y]) => ({ id, x, y }));
@@ -202,6 +207,7 @@ export class NetSession implements Session {
     const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;
     const chests = (this.map.data.chests ?? []).map(c => ({ x: c.x, y: c.y, open: this.openChests.has(`${c.x},${c.y}`) }));
     return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, bombs: v.bombs, spells: v.spells, chests, npcs: this.map.data.npcs ?? [],
-      day: this.day, invasion: this.invasion, dark: !!this.map.data.dark, profiles: this.profiles, flow };
+      day: this.day, invasion: this.invasion, dark: !!this.map.data.dark, profiles: this.profiles, flow, keys: this.keys,
+      fragments: (this.map.data.fragments ?? []).filter(f => !this.player?.fragments.includes(`${this.mapId}:${f.x},${f.y}`)) };
   }
 }

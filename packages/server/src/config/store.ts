@@ -2,8 +2,10 @@ import path from 'node:path';
 import type { Config } from './schema';
 
 // Pasta do arquivo de config: caminhos do config (banco, backups) são relativos a ela.
-let baseDir = process.cwd();
+let baseDir = process.cwd(), file = '';
 export function setConfigDir(dir: string) { baseDir = dir; }
+export function setConfigFile(f: string) { file = f; setConfigDir(path.dirname(f)); }
+export const configFile = () => file;   // o config.yaml em uso (a Oficina grava nele)
 export const configPath = (p: string) => path.resolve(baseDir, p);
 
 // Configuração atual, compartilhada pelo servidor. Quem precisa reagir a mudanças se inscreve.

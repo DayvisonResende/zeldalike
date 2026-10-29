@@ -66,6 +66,12 @@ export const migrations: Record<string, Migration> = {
       await db.schema.alterTable('characters').addColumn('chests', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"mapa:x,y": quando abriu (ms)}
     }
   },
+  '010_fragmentos_de_vida': {
+    async up(db: Kysely<unknown>) {
+      // fragmentos de vida já achados: ["vale:12,30", ...]
+      await db.schema.alterTable('characters').addColumn('fragments', 'text', c => c.notNull().defaultTo('[]')).execute();
+    }
+  },
   '009_mapa_explorado': {
     async up(db: Kysely<unknown>) {
       // tiles já vistos, por mapa: {"vale": "base64 dos bits"}

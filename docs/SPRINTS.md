@@ -102,17 +102,41 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 
 ## Sprint 7: Oficina (base e itens)
 
-- [ ] Conteúdo como dados em `content/` (validado, erros em português, recarregado ao salvar).
-- [ ] Itens tirados do código para arquivos, com ícone em PNG; o jogo continua igual.
-- [ ] Oficina com login de administrador.
-- [ ] Construtor de itens (com atributos), sala de testes e calculadora de equilíbrio.
+- Decidido (2026-10-28): a Oficina roda no PC (cria os arquivos; sobe para o servidor por commit). Arma nova: cor sobre
+  o desenho atual ou uma imagem própria, que o jogo gira no golpe (sem quadros de animação). Ícones 16×16.
+- [x] Itens tirados do código para arquivos: `content/items/<id>.json` e `<id>.png` (16×16), validados com erros em
+      português e recarregados ao salvar (com o servidor ligado, o item novo chega aos jogadores na hora). O jogo continua igual.
+- [ ] Os demais conteúdos como dados (monstros, NPCs, magias): com os construtores deles, depois.
+- [x] Oficina com login de administrador (`/oficina`, só com OFICINA=1, que o `npm run dev` liga; mesma conta do jogo,
+      só quem está em `admins`).
+- [x] Construtor de itens, etapa A: consumíveis e materiais (nome, id que sai do nome, descrição, cura, mana, ícone PNG
+      16×16 com prévia de como fica no inventário). Grava em `content/items/` e o item entra no jogo na hora.
+- [x] Etapa B: equipamentos. "Comporta-se como" espada, arco, Cajado de Fogo, de Luz ou Grimório; dano próprio (espada e
+      arco: giro, dash e PvP crescem junto); atributos; cor da lâmina, da pedra ou da madeira. Imagem própria: depois.
+- [x] Etapa C: onde aparece. Lojas (vende por, compra por) e drops de monstros (chance, mín., máx.) gravados no
+      `config.yaml` mexendo só nas linhas do item (comentários e o resto do arquivo ficam iguais; o config inteiro é
+      conferido antes de gravar). Baús: a Oficina mostra onde estão; editar continua no Tiled.
+- [x] Etapa D: calculadora de equilíbrio (golpes para derrubar cada monstro, dano por segundo e PvP comparados com a arma
+      inicial, defesa, cura em corações; avisos em amarelo para o que sai muito do padrão).
+- [x] Guia da Oficina (`docs/GUIA-DA-OFICINA.md`), também dentro dela no botão "Como usar": do zero até o item no servidor.
+- [ ] Testar com a galera: criar um item de verdade, subir para o servidor e ver aparecer para todos.
+- Sala de testes: depende das instâncias (sprint 8); até lá, testar com `/dar`.
 
 ## Sprint 8: instâncias e masmorra
 
-- [ ] Instâncias: uma cópia do mapa por grupo, criada ao entrar e descartada ao esvaziar.
-- [ ] Primeira masmorra (6 a 10 salas): chaves (contador), sala que tranca até matar os monstros, minichefe, chefe.
-- [ ] Item de exploração (por exemplo, o gancho) que também abre partes do Vale.
-- [ ] Fragmentos de vida escondidos no Vale.
+- Decidido (2026-10-29): eu monto a primeira masmorra e você ajusta no Tiled; gancho e fragmentos funcionando agora
+  (usados na masmorra), e no Vale quando o mapa novo estiver pronto; quem cai na masmorra volta ao Vale.
+- [x] Instâncias: `world.instanced` no config; uma cópia por grupo (sozinho, uma só sua), criada ao entrar e descartada
+      1 minuto depois de vazia. Na cópia, monstro derrubado não volta.
+- [x] Primeira masmorra, a Masmorra do Musgo (7 salas, entrada atrás do Rei Geleca na caverna): chaves do grupo
+      (contador no HUD), portas trancadas, salas que trancam até derrubar todos, minichefe (Covil do Besouro), quebra-cabeça
+      de bloco e placa, chefe (Rei Geleca no trono). Peças no Tiled: camada `especiais` (chave, sala, fragmento),
+      propriedade `minichefe`, tiles Porta trancada e Grades.
+- [x] Gancho: atravessa rios puxando-se até pilares, atordoa monstros, traz itens; é o tesouro do Covil. Também como
+      comportamento na Oficina ("Gancho").
+- [x] Fragmentos de vida (+5 de vida máxima cada, uma vez por personagem, salvos no banco). Um na masmorra.
+- [ ] No Vale novo: pilares para o gancho (atalhos e lugares escondidos) e fragmentos escondidos.
+- [ ] Testar com a galera: grupo de 3 ou 4 na masmorra, alguém caindo, alguém saindo do jogo lá dentro.
 
 ## Sprint 9: raridade
 
