@@ -13,7 +13,7 @@ import type { MapData } from './world/map';
 
 /* Mensagens entre cliente e servidor. Tudo em arrays curtos: com 100 jogadores, cada byte conta.
    Posições viajam em décimos de pixel e ângulos em milésimos de radiano, como inteiros. */
-export const MSG = { hello: 'h', input: 'i', snapshot: 's', welcome: 'w', profile: 'p', chat: 'c', pvp: 'v', item: 't', shop: 'k', mark: 'm', party: 'g', rules: 'r', items: 'n' } as const;   // rules: GearRules (números das armas), ao entrar e quando o config muda
+export const MSG = { hello: 'h', input: 'i', snapshot: 's', welcome: 'w', profile: 'p', chat: 'c', pvp: 'v', item: 't', shop: 'k', mark: 'm', party: 'g', rules: 'r', items: 'n', telemetry: 'y' } as const;   // rules: GearRules (números das armas), ao entrar e quando o config muda
 
 /* ---------- Input: [seq, bits, mira] ---------- */
 const HELD = ['up', 'down', 'left', 'right', 'a', 'b', 'c', 'd'] as const;
@@ -108,6 +108,14 @@ export function applyOwnState(p: Player, s: OwnState) {
   p.gear = { ...gear }; p.stats = { ...stats }; p.fragments = [...fragments]; p.hook = hook && { ...hook };
   p.fish = fish && { ...fish };
   p.hop = hop && { ...hop }; p.liftFrom = liftFrom && { ...liftFrom }; p.hit = new Set(hit);
+}
+// O que a previsão do cliente simula do seu estado. Vida, mana, ouro, nível e afins vêm só do servidor (a previsão
+// roda sem "life"): ficam de fora da comparação e são copiados à parte (applyOwnLife).
+const OWN_LIFE = ['hp', 'maxHp', 'mp', 'maxMp', 'killer', 'pvp', 'pvpActive', 'safe', 'level', 'xp', 'gold', 'stats', 'fragments'] as const;
+export function ownSimKey(s: OwnState) { const o: Partial<OwnState> = { ...s }; for (const k of OWN_LIFE) delete o[k]; return JSON.stringify(o); }
+export function applyOwnLife(p: Player, s: OwnState) {
+  p.hp = s.hp; p.maxHp = s.maxHp; p.mp = s.mp; p.maxMp = s.maxMp; p.killer = s.killer; p.pvp = s.pvp; p.pvpActive = s.pvpActive; p.safe = s.safe;
+  p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.stats = { ...s.stats }; p.fragments = [...s.fragments];
 }
 
 /* ---------- Mensagens do servidor ---------- */

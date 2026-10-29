@@ -29,6 +29,8 @@ import { updatePad } from './ui/pad';
 import { hideTitle, showTitle, titleShown } from './ui/titlebg';
 import { assistTarget } from './aimassist';
 import { loadIgnored, loadProfile, loadSettings, saveIgnored, saveProfile, saveSettings, type Settings } from './ui/settings';
+import { DebugPanel } from './ui/debug';
+import { FRAME_PARTS, type FramePart } from '@vale/shared';
 import './style.css';
 
 // Mapa que vem no pacote do jogo: usado offline e de fundo antes de entrar. Online, vale o mapa que o servidor manda.
@@ -55,6 +57,14 @@ const params = new URLSearchParams(location.search);
 const WS = location.protocol === 'https:' ? 'wss' : 'ws';
 const SERVER = params.get('server') || import.meta.env.VITE_SERVER_URL || (import.meta.env.DEV ? `${WS}://${location.hostname}:2567` : `${WS}://${location.host}`);
 const OFFLINE = params.has('offline');
+const netNow = () => session instanceof NetSession && session.status === 'online' ? session : null;
+const debug = new DebugPanel({
+  net: () => netNow()?.debug() ?? null,
+  start: (minutes, device) => netNow()?.telemetry({ start: { minutes, device } }),
+  send: sample => netNow()?.telemetry({ sample }),
+  stop: () => netNow()?.telemetry({ stop: true }),
+  say: text => chat.add({ ch: 'system', text }, false)
+});
 // Online, o mundo só conecta depois de entrar na conta e escolher o personagem; até lá a sessão é um mundo vazio.
 let session: Session = OFFLINE ? new LocalSession(MAP, profile) : new NetSession(MAP);
 let ready = OFFLINE;   // já dá para começar a jogar?
@@ -69,7 +79,7 @@ async function enterWorld(c: CharacterSummary) {
   await net.connect(SERVER, { token: api.token!, characterId: c.id });
   session = net; bindChat(net);
   net.onParty = m => partyPanel.receive(m);
-  net.onMapChange = () => { stage.classList.remove('fade'); void stage.offsetWidth; stage.classList.add('fade'); };
+  net.onMapChange = () => { debug.event('mapa'); stage.classList.remove('fade'); void stage.offsetWidth; stage.classList.add('fade'); };
   net.onLeave = code => connectionLost(code);
   playing = c;
 }
@@ -94,7 +104,7 @@ function connectionLost(code: number) {
   if (leaving || !playing || rejoining) return;
   if (code === 4002) { backToAccount('Seu personagem entrou em outro lugar.'); return; }
   if (code === 4003) { backToAccount('Você foi expulso do servidor por um administrador.'); return; }
-  rejoining = true; retryDelay = 1000; lostAt = Date.now();
+  rejoining = true; retryDelay = 1000; lostAt = Date.now(); debug.event('caiu');
   scheduleRetry();
 }
 // Recarrega a página (o mundo some, o login lembrado continua) e mostra o motivo na tela de conta.
@@ -126,7 +136,7 @@ async function retry() {
   if (Date.now() - lostAt > GIVE_UP) { rejoining = false; await giveUp(); return; }
   try {
     await enterWorld(playing);
-    rejoining = false; retryDelay = 1000;
+    rejoining = false; retryDelay = 1000; debug.reconnected();
     chat.add({ ch: 'system', text: 'Conexão de volta.' }, false);
   } catch (e) {
     const code = (e as { code?: number }).code;
@@ -137,7 +147,7 @@ async function retry() {
   }
 }
 window.addEventListener('online', () => { if (rejoining) scheduleRetry(true); });
-document.addEventListener('visibilitychange', () => { if (!document.hidden && rejoining) scheduleRetry(true); });
+document.addEventListener('visibilitychange', () => { debug.event(document.hidden ? 'segundo plano' : 'voltou'); if (!document.hidden && rejoining) scheduleRetry(true); });
 // o app Android chama isto quando a internet volta
 (window as unknown as { __reconnectNow?: () => void }).__reconnectNow = () => { if (rejoining) scheduleRetry(true); };
 
@@ -194,6 +204,9 @@ const refocus = () => { try { stage.focus({ preventScroll: true }); } catch { } 
 // /ignorar nome: esconde as mensagens (e os balões) de alguém, só para você; fica guardado neste navegador.
 const ignored = loadIgnored();
 function sendChat(req: ChatRequest) {
+  const dbg = /^\/debug(?:\s+(\S+))?\s*$/i.exec(req.text);
+  if (dbg) { debug.command(dbg[1] ?? ''); return; }
+  if (/^\/marca\s*$/i.test(req.text)) { debug.mark(); return; }
   const m = /^\/(ignorar|designorar|ignorados)\b\s*(.*)$/i.exec(req.text);
   if (!m) { session.chat(req); return; }
   const cmd = m[1].toLowerCase(), name = m[2].trim().replace(/^"|"$/g, ''), key = name.toLowerCase();
@@ -273,6 +286,7 @@ document.getElementById('menuBtn')!.addEventListener('click', () => { if (!accou
 const HEAR = 48;
 const nearCam = (x: number, y: number) => x > cam.x - HEAR && x < cam.x + VIEW_W + HEAR && y > cam.y - HEAR && y < cam.y + VIEW_H + HEAR;
 function handle(ev: GameEvent) {
+  if (ev.t === 'sfx' && ev.name === 'hit') debug.event(ev.by ? 'acerto previsto' : 'acerto do servidor');
   switch (ev.t) {
     case 'sfx': if (nearCam(ev.x, ev.y)) sfx(ev.name); break;
     case 'burst': if (nearCam(ev.x, ev.y)) particles.burst(ev.x, ev.y, ev.palette, ev.n, ev.o); break;
@@ -311,6 +325,7 @@ function aim() {
   return lock && attacking ? Math.atan2(lock.y - (me.y - 6), lock.x - me.x) : null;
 }
 function update() {
+  let t = performance.now();
   tick++;
   if (shake > 0) shake--;
   let inp = emptyInput();
@@ -318,12 +333,21 @@ function update() {
   if (!started || menu.open || chat.open || bag.open || shop.open || worldMap.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
   else if (dialog.open) dialog.update(input.sample(null).tap);   // lendo: o personagem fica parado, mas o mundo continua
   else inp = input.sample(aim());
-  for (const ev of session.step(inp)) handle(ev);
+  const gear = session.inventory()?.gear;   // /debug: com o quê (espada, arco, cajado…)
+  if (inp.tap & BUTTON.a) debug.event('ataque ' + (gear?.a ?? 'A'));
+  if (inp.tap & BUTTON.c) debug.event('ataque ' + (gear?.c ?? 'C'));
+  t = sub('sim_entrada', t);
+  const evs = session.step(inp);
+  t = sub('sim_sessao', t);
+  for (const ev of evs) handle(ev);
+  t = sub('sim_efeitos', t);
   particles.update();
+  t = sub('sim_particulas', t);
   menu.tick();
   const me = session.me();
   follow(cam, me ?? MAP.spawn, session.map);
   updateStatus();
+  sub('sim_resto', t);
 }
 
 // Quem está no colo é desenhado em cima de quem carrega, na posição que a tela mostra de quem carrega
@@ -340,14 +364,41 @@ function attachHeld(scene: ReturnType<Session['scene']>) {
 const STEP = 1000 / 60;
 let last = performance.now(), acc = 0;
 follow(cam, MAP.spawn, session.map);
+// /debug: tempo de cada parte do quadro (somado dentro do quadro)
+const parts: Partial<Record<FramePart, number>> = {};
+let lapAt = 0;
+function lap(name: FramePart) { const t = performance.now(); parts[name] = (parts[name] ?? 0) + t - lapAt; lapAt = t; }
+// pedaço de dentro de uma parte (não mexe na volta): soma desde `from` e devolve o agora
+function sub(name: FramePart, from: number) { const t = performance.now(); parts[name] = (parts[name] ?? 0) + t - from; return t; }
+/* Ritmo: 60 quadros, ou 30 firmes quando o aparelho não aguenta 60. Oscilar entre 20 e 50 parece pior que 30 estáveis,
+   e cada quadro atrasado obriga o seguinte a correr vários passos (e atrasar mais). No automático, duas janelas
+   seguidas de 5 s abaixo de 48 fps em jogo ligam os 30 até o fim da sessão (sem ficar trocando). */
+const pace = { cap: false, since: 0, frames: 0, low: 0 };
+const capped = () => settings.fps === '30' || (settings.fps === 'auto' && pace.cap);
+function judgePace(now: number) {
+  if (settings.fps !== 'auto' || pace.cap || !started || session.status !== 'online') { pace.since = 0; return; }
+  if (!pace.since) { pace.since = now; pace.frames = 0; return; }
+  pace.frames++;
+  if (now - pace.since < 5000) return;
+  pace.low = pace.frames * 1000 / (now - pace.since) < 48 ? pace.low + 1 : 0;
+  if (pace.low >= 2) { pace.cap = true; debug.event('modo 30 fps'); }
+  pace.since = now; pace.frames = 0;
+}
 function frame(now: number) {
+  if (capped() && now - last < 1000 / 30 - 4) { requestAnimationFrame(frame); return; }   // 30: pula um quadro sim, um não
+  judgePace(now);
+  const t0 = lapAt = performance.now();
   acc += Math.min(100, now - last); last = now;
-  while (acc >= STEP) { update(); acc -= STEP; }
+  let steps = 0;
+  while (acc >= STEP) { update(); acc -= STEP; steps++; }
+  lap('simulacao');
+  if (session instanceof NetSession) for (const [k, ms] of session.takeTimes()) parts[k] = (parts[k] ?? 0) + ms;
   const reticle = input.mouse.active && started && !dialog.open && !menu.open ? input.mouse : null;
   const scene = session.scene(settings.paths);
   profilesNow = scene.profiles;
   attachHeld(scene);
   updateLock(scene);
+  lap('cena');
   updateClock(scene.day, scene.dark); updateRaid(scene.invasion); updateKeys(scene.keys);
   if (titleShown() && ready && session.status === 'online' && session.me()) hideTitle();   // o mundo chegou: a cena de título sai
   const me = session.me();
@@ -364,15 +415,23 @@ function frame(now: number) {
     const p = scene.players.find(q => q.id === m.id);
     return [{ x: p?.x ?? m.at.x, y: p?.y ?? m.at.y, dead: m.dead }];
   });
+  lap('interface');
   render(ctx, scene, { me: session.me(), cam, particles, lock, marks, friends, showPaths: settings.paths, reticle, shake, tick, talking });
+  lap('desenho');
   nameTags.update(scene, cam, settings.names, settings.bubbles, partyIds);
   floaters.update(cam);
+  lap('nomes');
   bag.render(); shop.render();
   worldMap.render(tick);
   minimap.render(started && !account.open && !worldMap.open ? mapView() : null, settings.minimap, tick);
+  lap('mapas');
   updateHud(session.status === 'connecting' ? undefined : session.me(), session.inventory(), id => profilesNow.get(id)?.name);
   updateParty(session.status === 'connecting' ? null : party, meId);
   partyPanel.render(menu.open);
+  lap('interface');
+  for (const k of FRAME_PARTS) if (parts[k] !== undefined) { debug.part(k, parts[k]!); delete parts[k]; }
+  debug.frame(now, performance.now() - t0, steps);
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
+if (params.has('debug')) debug.start(1);   // ?debug no endereço: grava 1 minuto desde a abertura

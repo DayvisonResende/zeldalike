@@ -94,7 +94,7 @@ export class World {
   step(opts: { players?: boolean; life?: boolean } = {}): GameEvent[] {
     this.tick++;
     if (opts.players !== false) for (const p of this.players.values()) { updatePlayer(this, p); p.input.tap = 0; }
-    refreshFlow(this);
+    if (!this.predicting) refreshFlow(this);   // a previsão não tem monstros: o mapa de caminhos seria trabalho perdido (e ela roda muitas vezes)
     for (const e of this.enemies) updateEnemy(this, e);
     separate(this);
     this.enemies = this.enemies.filter(e => !e.dead);

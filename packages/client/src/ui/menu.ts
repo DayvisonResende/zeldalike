@@ -2,7 +2,7 @@ import { ITEMS, NAME_MAX, cleanName, type GearRules, type ItemId, type ProfileRe
 import type { Inventory } from '../session/types';
 import { renderSheet } from './sheet';
 import { buildSwatches, drawPreview, markSwatches } from './swatches';
-import type { NameMode, PadSize, Settings } from './settings';
+import type { FpsMode, NameMode, PadSize, Settings } from './settings';
 
 export interface MenuHooks {
   profile(): ProfileRequest;
@@ -57,6 +57,7 @@ export class Menu {
     (document.getElementById('optAssist') as HTMLInputElement).addEventListener('change', e => this.set({ aimAssist: (e.target as HTMLInputElement).checked }));
     (document.getElementById('optVibrate') as HTMLInputElement).addEventListener('change', e => this.set({ vibrate: (e.target as HTMLInputElement).checked }));
     this.el.querySelectorAll<HTMLInputElement>('input[name=padSize]').forEach(r => r.addEventListener('change', () => this.set({ padSize: r.value as PadSize })));
+    this.el.querySelectorAll<HTMLInputElement>('input[name=fps]').forEach(r => r.addEventListener('change', () => this.set({ fps: r.value as FpsMode })));
     // clicar fora do cartão fecha
     this.el.addEventListener('pointerdown', e => { if (e.target === this.el) this.close(); });
   }
@@ -90,6 +91,7 @@ export class Menu {
     (document.getElementById('optAssist') as HTMLInputElement).checked = s.aimAssist;
     (document.getElementById('optMinimap') as HTMLInputElement).checked = s.minimap;
     this.el.querySelectorAll<HTMLInputElement>('input[name=padSize]').forEach(r => { r.checked = r.value === s.padSize; });
+    this.el.querySelectorAll<HTMLInputElement>('input[name=fps]').forEach(r => { r.checked = r.value === s.fps; });
     this.marks();
   }
   // Gira a prévia do personagem enquanto o menu está aberto.

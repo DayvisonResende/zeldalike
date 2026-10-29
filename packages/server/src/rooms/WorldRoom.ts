@@ -1,6 +1,7 @@
 import { Room, ServerError, type Client } from 'colyseus';
+import path from 'node:path';
 import {
-  INVITE_TTL, ITEMS, LOOT_IDS, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState, refreshStats,
+  INVITE_TTL, ITEMS, LOOT_IDS, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, decodeTelemetry, dropItem, emptyInput, maxStats, ownState, refreshStats,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
   type ChatMsg, type GearRules, type OnlineEntry, type PartyMsg, type PartyTuple, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
@@ -19,6 +20,7 @@ import { accountForToken } from '../auth/sessions';
 import { getCharacter, saveCharacters, type CharacterRow, type CharacterState } from '../persistence/characters';
 import { getDb } from '../persistence/db';
 import { submitRecord } from '../persistence/records';
+import { Recording } from './telemetry';
 
 const MAX_QUEUE = 12;  // inputs guardados por jogador; acima disso descarta os mais velhos
 const CATCH_UP = 3;    // fila maior que isso: aplica dois inputs por passo
@@ -29,6 +31,7 @@ interface Seat {
   bagSent: number; chestsSent: string; queue: { seq: number; input: InputState }[]; ack: number;
   profileAt: number; chatTokens: number; chatAt: number; kicked?: boolean;
   username: string;   // login da conta (para saber quem é administrador)
+  rec?: Recording;    // gravação do /debug em andamento
 }
 interface Auth { accountId: number; username: string; character: CharacterRow }
 const profileOf = (p: Player): Profile => ({ id: p.id, name: p.name, look: { ...p.look } });
@@ -81,6 +84,7 @@ export class WorldRoom extends Room {
     this.onMessage(MSG.shop, (client, msg) => this.onShop(client, msg));
     this.onMessage(MSG.mark, (client, msg) => this.onMark(client, msg));
     this.onMessage(MSG.party, (client, msg) => this.onParty(client, msg));
+    this.onMessage(MSG.telemetry, (client, msg) => this.onTelemetry(client, msg));
     this.setFixedTimestep(() => this.step(), TICK_RATE);
     this.scheduleSave();
   }
@@ -116,7 +120,7 @@ export class WorldRoom extends Room {
       oldId = id;
       const old = this.find(id);
       if (old) { resume = this.stateOf(old.p, old.seat.map); old.w.removePlayer(id); }
-      seat.kicked = true; this.seats.delete(id);
+      seat.kicked = true; this.seats.delete(id); seat.rec?.close('entrou de outro lugar');
       seat.client.send(MSG.chat, { ch: 'system', text: 'Seu personagem entrou em outro lugar.' } satisfies ChatMsg);
       seat.client.leave(4002);
     }
@@ -146,6 +150,7 @@ export class WorldRoom extends Room {
   async onLeave(client: Client) {
     const seat = this.seats.get(client.sessionId);
     if (!seat || seat.kicked) return;   // expulso por ter entrado de outro lugar: já foi salvo e trocado
+    seat.rec?.close('saiu'); seat.rec = undefined;
     const f = this.find(client.sessionId);
     onlineCharacters.delete(seat.charId);
     if (f) await this.save([[seat, f.p]]);
@@ -264,9 +269,13 @@ export class WorldRoom extends Room {
     return { map, x: p.x, y: p.y, hp: p.hp, mp: p.mp, ...keep };
   }
   private async save(list: [Seat, Player][]) {
+    const t0 = performance.now();
     try { await saveCharacters(getDb(), list.map(([s, p]) => ({ id: s.charId, state: this.stateOf(p, s.map) }))); }
     catch (e) { console.error('[banco] falha ao salvar personagens:', e); }
+    this.note(`salvou ${list.length} no banco em ${Math.round(performance.now() - t0)} ms`);
   }
+  // /debug: anota em todas as gravações em andamento.
+  private note(text: string) { for (const s of this.seats.values()) s.rec?.note(text); }
   private saveAll() {
     return this.save([...this.seats.keys()].flatMap(id => { const f = this.find(id); return f ? [[f.seat, f.p] as [Seat, Player]] : []; }));
   }
@@ -327,6 +336,19 @@ export class WorldRoom extends Room {
       const o = s.map === seat.map ? f.w.players.get(id) : undefined;
       if (o && Math.hypot(o.x - p.x, o.y - p.y) <= cfg.localRange) s.client.send(MSG.chat, msg);
     }
+  }
+  // /debug: o cliente liga a gravação, manda um resumo por segundo e desliga; o servidor junta o lado dele e salva.
+  private onTelemetry(client: Client, raw: unknown) {
+    const f = this.find(client.sessionId), m = decodeTelemetry(raw);
+    if (!f || !m) return;
+    const seat = f.seat, say = (text: string) => seat.client.send(MSG.chat, { ch: 'system', text } satisfies ChatMsg);
+    const done = (reason: string) => { if (!seat.rec) return; seat.rec.close(reason); say(`Gravação salva: ${path.basename(seat.rec.file)}`); seat.rec = undefined; };
+    if ('start' in m) {
+      done('outra gravação');
+      seat.rec = new Recording(configPath('data/telemetria'), f.p.name, m.start.minutes, {
+        mapa: seat.map, aparelho: m.start.device, servidor: { passosPorSegundo: TICK_RATE, enviosPorSegundo: getConfig().network.sendRate, jogadores: this.seats.size } });
+    } else if ('sample' in m) { if (seat.rec && !seat.rec.sample(m.sample, seat.map)) done('tempo'); }
+    else done('parou');
   }
   // Marcador "venham aqui!": um por jogador, vale MARK_TTL, chega a quem está no mesmo mapa. { x, y } em pixels, ou { clear: true }.
   private onMark(client: Client, raw: unknown) {
@@ -554,7 +576,15 @@ export class WorldRoom extends Room {
     }
   }
 
+  private stepAt = 0;
   private step() {
+    const t0 = performance.now(), gap = this.stepAt ? t0 - this.stepAt : 0;
+    this.stepAt = t0;
+    this.advance();
+    const ms = performance.now() - t0;
+    for (const seat of this.seats.values()) seat.rec?.step(ms, gap);   // /debug: quanto o servidor levou e esperou
+  }
+  private advance() {
     // Cada input vira exatamente um passo do jogador, como o cliente previu. Sem input, ele espera;
     // com fila acumulada (a rede engasgou), aplica dois por passo até alcançar.
     for (const [id, seat] of this.seats) {
@@ -578,11 +608,16 @@ export class WorldRoom extends Room {
       }
     }
     for (const m of moves) m();
-    if (this.ticks % 60 === 0) this.sweepInstances();
+    if (this.ticks % 60 === 0) { const t = performance.now(); this.sweepInstances(); const ms = performance.now() - t; if (ms > 5) this.note(`limpou instâncias em ${Math.round(ms)} ms`); }
     const night = sunlight(dayTime(this.world)) < 0.5;
     if (this.night !== null && night !== this.night) this.sendChat({ ch: 'system', text: night ? 'A noite caiu no Vale. Cuidado com os morcegos.' : 'O sol nasceu no Vale.' });
     this.night = night;
-    if (++this.ticks % this.sendEvery === 0) { this.sendSnapshots(); for (const k of this.events.keys()) this.events.set(k, []); }
+    if (++this.ticks % this.sendEvery === 0) {
+      const t = performance.now();
+      this.sendSnapshots(); for (const k of this.events.keys()) this.events.set(k, []);
+      const ms = performance.now() - t;
+      for (const s of this.seats.values()) s.rec?.sending(ms);
+    }
   }
   private sendSnapshots() {
     for (const [id, seat] of this.seats) {
@@ -611,6 +646,7 @@ export class WorldRoom extends Room {
       const ch = openChests(w, me), mark = ch.join(';') || '-';   // muda ao abrir e quando um baú enche de novo ('' = nunca enviado)
       if (mark !== seat.chestsSent) { msg.ch = ch; seat.chestsSent = mark; }
       seat.client.send(MSG.snapshot, msg);
+      seat.rec?.sent(JSON.stringify(msg).length, performance.now());   // tamanho aproximado (o fio leva msgpack)
     }
   }
 }

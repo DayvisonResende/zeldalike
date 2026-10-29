@@ -1,10 +1,12 @@
 import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, type Room } from '@colyseus/sdk';
 import { matchMaker } from 'colyseus';
 import { BUTTON, MSG, World, damagePlayer, encodeInput, reelCursor, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
 import { parseConfig } from '../src/config/load';
-import { getConfig, setConfig } from '../src/config/store';
+import { getConfig, setConfig, setConfigDir } from '../src/config/store';
 import { startServer } from '../src/app';
 import { getDb, openDatabase, setDb } from '../src/persistence/db';
 import { fileURLToPath } from 'node:url';
@@ -573,5 +575,36 @@ describe('chat: comandos e moderação', () => {
     await say(a, 'que p0rra é essa');
     expect(b.chat.at(-1)?.text).toBe('que ***** é essa');
     await a.room.leave(); await b.room.leave();
+  });
+});
+
+describe('/debug: gravação', () => {
+  it('início, um resumo por segundo com o lado do servidor, fim; o arquivo fica em data/telemetria', async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'telemetria-'));
+    setConfigDir(tmp);
+    const a = await bot('Medidora');
+    const device = { ua: 'teste', screen: '800x400', dpr: 2, app: true, net: 'wifi', version: 'dev' };
+    const sample = { fps: 40, worst: 120, js: 30, slow: 3, catchUp: 2, parts: { desenho: 20, lixo: 9 }, gap: 300, snaps: 15, delay: 150, ahead: 2, frozen: 1, ev: ['ataque×2', 'marca'] };
+    a.room.send(MSG.telemetry, { start: { minutes: 1, device } });
+    await sleep(300);
+    a.room.send(MSG.telemetry, { sample });
+    a.room.send(MSG.telemetry, { sample });   // cedo demais: ignorada
+    await sleep(600);
+    a.room.send(MSG.telemetry, { sample });
+    a.room.send(MSG.telemetry, { stop: true });
+    await sleep(300);
+    expect(a.chat.at(-1)?.text).toMatch(/^Gravação salva: .*_Medidora\.jsonl$/);
+    const [file] = fs.readdirSync(path.join(tmp, 'data/telemetria'));
+    const lines = fs.readFileSync(path.join(tmp, 'data/telemetria', file), 'utf8').trim().split('\n').map(l => JSON.parse(l));
+    expect(lines.map(l => l.tipo)).toEqual(['inicio', 's', 's', 'fim']);
+    expect(lines[0]).toMatchObject({ jogador: 'Medidora', minutos: 1, aparelho: device, servidor: { passosPorSegundo: 60 } });
+    expect(lines[1].cliente).toMatchObject({ fps: 40, parts: { desenho: 20 }, ev: ['ataque×2', 'marca'] });
+    expect(lines[1].cliente.parts).not.toHaveProperty('lixo');
+    expect(lines[1].servidor.passos).toBeGreaterThan(10);
+    expect(lines[1].servidor.envios).toBeGreaterThan(3);
+    expect(lines[1].servidor.bytes).toBeGreaterThan(0);
+    expect(lines[1].servidor).toHaveProperty('lacoTravadoMax'); expect(lines[1].servidor).toHaveProperty('gcMs'); expect(lines[1].servidor).toHaveProperty('montarEnviosMax');
+    expect(lines[3]).toMatchObject({ tipo: 'fim', motivo: 'parou' });
+    await a.room.leave();
   });
 });

@@ -37,8 +37,46 @@ const mixThrown = (a: ThrownView, b: ThrownView, k: number): ThrownView => ({ ..
 const mixArrow = (a: ArrowView, b: ArrowView, k: number): ArrowView => ({ ...b, x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) });
 const mixSpell = (a: SpellView, b: SpellView, k: number): SpellView => ({ ...b, x: lerp(a.x, b.x, k), y: lerp(a.y, b.y, k) });
 
+// Snapshot atrasado: quem estava andando segue no mesmo rumo por alguns passos, em vez de congelar e depois pular.
+// Salto grande entre dois snapshots (renasceu, trocou de lugar) não é movimento: fica parado.
+const MAX_AHEAD = 5, TELEPORT = 24;
+function ahead<V extends { x: number; y: number; z: number }>(a: Map<unknown, V>, b: Map<unknown, V>, k: number): V[] {
+  const out: V[] = [];
+  for (const [id, vb] of b) {
+    const va = a.get(id);
+    out.push(va && Math.abs(vb.x - va.x) + Math.abs(vb.y - va.y) < TELEPORT ? { ...vb, x: lerp(va.x, vb.x, k), y: lerp(va.y, vb.y, k), z: Math.max(0, lerp(va.z, vb.z, k)) } : vb);
+  }
+  return out;
+}
+
+/* Relógio do servidor visto daqui, pelo relógio de verdade (não pelos passos locais: num aparelho lento os passos atrasam
+   e o relógio confundiria lentidão com rede). Mede o quanto os snapshots chegam atrasados nos últimos ~2 s e soma ao
+   atraso da cena o que cobre 9 em cada 10 deles, até MAX_EXTRA. Paradas maiores que isso nenhum atraso esconde
+   (a extrapolação cobre um pouco); esperar mais só deixaria o golpe mais atrasado. A mudança é gradual, para a cena não
+   voltar no tempo. */
+const STEP_MS = 1000 / 60, MAX_EXTRA = 6, WINDOW = 40;   // passos; snapshots lembrados
+export class SnapshotClock {
+  private offset = NaN;          // ms do servidor (passo × duração) menos o relógio local
+  private late: number[] = [];   // atraso de cada snapshot recente, em passos
+  private extra = 0;             // atraso a mais em uso, em passos
+  push(serverTick: number, now: number) {
+    const est = serverTick * STEP_MS - now;
+    if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 500) { this.offset = est; this.late = []; return; }
+    this.late.push(Math.max(0, (this.offset - est) / STEP_MS));
+    if (this.late.length > WINDOW) this.late.shift();
+    const sorted = [...this.late].sort((a, b) => a - b), target = Math.min(MAX_EXTRA, sorted[Math.floor(sorted.length * 0.9)]);
+    this.extra += Math.max(-0.05, Math.min(0.5, target - this.extra));
+    this.offset += (est - this.offset) * 0.05;
+  }
+  reset() { this.offset = NaN; this.late = []; this.extra = 0; }
+  ready() { return !Number.isNaN(this.offset); }
+  tick(now: number) { return (now + this.offset) / STEP_MS; }   // passo do servidor agora (fracionado: a cena anda a cada quadro)
+  delay(sendEvery: number) { return sendEvery * 2 + 2 + this.extra; }
+}
+
 export class Interpolator {
   private frames: Frame[] = [];
+  ahead = 0; frozen = 0;   // quadros desenhados além do último snapshot: seguindo o rumo / já parados
   push(f: Frame) {
     if (this.frames.length && f.t <= this.frames[this.frames.length - 1].t) return;   // chegou fora de ordem
     this.frames.push(f);
@@ -48,6 +86,15 @@ export class Interpolator {
   at(t: number) {
     const fs = this.frames;
     if (!fs.length) return { players: [], enemies: [], thrown: [], arrows: [], spells: [], drops: [], bombs: [] };
+    const last = fs[fs.length - 1];
+    if (t > last.t) { if (t - last.t > MAX_AHEAD || fs.length < 2) this.frozen++; else this.ahead++; }   // para o /debug
+    if (t > last.t && fs.length > 1) {
+      const prev = fs[fs.length - 2], k = 1 + Math.min(t - last.t, MAX_AHEAD) / (last.t - prev.t);
+      return {
+        players: ahead(prev.players, last.players, k), enemies: ahead(prev.enemies, last.enemies, k),
+        thrown: [...last.thrown.values()], arrows: [...last.arrows.values()], spells: [...last.spells.values()], drops: last.drops, bombs: last.bombs
+      };
+    }
     let i = fs.length - 1;
     while (i > 0 && fs[i].t > t) i--;
     while (i > 1 && fs.length > 3 && fs[0].t < fs[i - 1].t) fs.shift(), i--;   // descarta o que já passou

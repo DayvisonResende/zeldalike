@@ -23,7 +23,7 @@ export function swordPose(p: Pick<Player, 'x' | 'y' | 'aim' | 'state' | 't'>): S
   if (p.state === 'spin') return { ox: p.x, oy: p.y - 6, ang: p.aim + (p.t / SPIN) * Math.PI * 2, len: 13 };
   return null;
 }
-const along = (s: SwordPose, f: number): [number, number] => [s.ox + Math.cos(s.ang) * s.len * f, s.oy + Math.sin(s.ang) * s.len * f + 5];
+export const along = (s: SwordPose, f: number): [number, number] => [s.ox + Math.cos(s.ang) * s.len * f, s.oy + Math.sin(s.ang) * s.len * f + 5];
 // Ponto de golpe dentro do corpo (com folga para a altura do sprite). Serve para monstros e jogadores.
 export function hitsBody(e: { x: number; y: number; hw: number; hh: number; z: number }, x: number, y: number) { return x > e.x - e.hw - 3 && x < e.x + e.hw + 3 && y > e.y - e.hh - 9 - e.z && y < e.y + e.hh + 3; }
 export const hitsEnemy = hitsBody;

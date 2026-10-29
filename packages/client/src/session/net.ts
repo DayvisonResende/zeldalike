@@ -1,13 +1,16 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
-  MSG, TS, World, applyOwnState, blocksShot, type Arrow, type EnemyView, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
-  type ChatMsg, type ChatRequest, type GearRules, type ItemCatalogMsg, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
+  MSG, TS, World, along, applyOwnLife, applyOwnState, decodeInput, ownSimKey, ownState, blocksShot, hitsEnemy, swordPose, type Arrow, type EnemyView, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
+  type ChatMsg, type ChatRequest, type GearRules, type ItemCatalogMsg, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type FramePart, type SnapshotMsg, type TelemetryMsg, type WelcomeMsg
 } from '@vale/shared';
-import { Interpolator, toFrame } from './interpolate';
+import { Interpolator, SnapshotClock, toFrame } from './interpolate';
 import { setCatalog } from '../render/icons';
 import type { Inventory, MapState, Mark, PartyState, Scene, Session, Status } from './types';
+import type { NetDebug } from '../ui/debug';
 
 const OVERLAY_TICKS = 90;   // quanto tempo um corte previsto espera a confirmação do servidor
+// Corpo do monstro, igual ao do servidor (createEnemy): o Rei é maior, o besouro um pouco mais alto.
+const body = (e: EnemyView) => ({ hw: e.type === 'king' ? 12 : 6, hh: e.type === 'king' ? 8 : e.type === 'beetle' ? 5 : 4 });
 
 /* Online: o servidor manda no mundo. O cliente
    - prevê o próprio movimento na hora (um World só com você, sem monstros) e corrige quando o servidor discorda;
@@ -22,7 +25,7 @@ export class NetSession implements Session {
   private overlay = new Map<string, number>();                // cortes previstos ainda sem confirmação → validade
   private pending: { seq: number; input: InputState }[] = [];
   private seq = 0;
-  private local = 0; private offset = NaN; private sendEvery = 3;
+  private local = 0; private clock = new SnapshotClock(); private sendEvery = 3;
   private interp = new Interpolator();
   private queued: { t: number; ev: GameEvent[] }[] = [];
   private smooth = { x: 0, y: 0 };
@@ -90,7 +93,7 @@ export class NetSession implements Session {
       if (changed) this.onMapChange?.();
     }
     m.tiles.forEach((row, ty) => [...row].forEach((c, tx) => { this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); }));
-    this.overlay.clear(); this.pending = []; this.queued = []; this.myArrows = []; this.interp.clear(); this.offset = NaN;
+    this.overlay.clear(); this.pending = []; this.queued = []; this.myArrows = []; this.interp.clear(); this.clock.reset(); this.predicted.clear(); this.felt.clear(); this.flash.clear(); this.echoes = [];
     if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, '', m.at.x, m.at.y); }
     else { const p = this.player; p.x = m.at.x; p.y = m.at.y; }
     this.smooth = { x: 0, y: 0 };
@@ -116,10 +119,20 @@ export class NetSession implements Session {
   mark(x: number, y: number) { if (this.status === 'online') this.room?.send(MSG.mark, { x, y }); }
   clearMark() { if (this.status === 'online') this.room?.send(MSG.mark, { clear: true }); }
   private snapshot(s: SnapshotMsg) {
+    const t0 = performance.now();
+    this.onSnapshot(s);
+    this.snapMs = Math.max(this.snapMs, performance.now() - t0);
+  }
+  // /debug: tempo de partes da previsão neste quadro (o main soma às partes do quadro)
+  private times = new Map<FramePart, number>();
+  private time(k: FramePart, from: number) { this.times.set(k, (this.times.get(k) ?? 0) + performance.now() - from); }
+  takeTimes() { const t = [...this.times]; this.times.clear(); return t; }
+  private onSnapshot(s: SnapshotMsg) {
     this.dropsNow = s.d.map(unpackDrop).map(d => ({ id: d.id, item: d.item, n: d.n, x: d.x, y: d.y, owner: d.reserved ? '?' : null, ownerUntil: d.reserved ? Infinity : 0, expires: Infinity, born: -Infinity }));
-    // relógio: estima o passo do servidor a partir do local, sem saltos pequenos
-    const est = s.t - this.local;
-    if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
+    const now = performance.now();
+    if (this.snapAt) this.gapMax = Math.max(this.gapMax, now - this.snapAt);
+    this.snapAt = now; this.snaps++;
+    this.clock.push(s.t, now);
     this.interp.push(toFrame(s));
     this.keys = s.kc ?? null;
     this.pvpInfo = s.pvp; this.xpNext = s.xpNext; this.day = s.day; this.invasion = s.iv ?? null;
@@ -131,20 +144,29 @@ export class NetSession implements Session {
     this.reconcile(s);
   }
 
-  // Volta ao estado que o servidor confirmou e reaplica os inputs que ele ainda não viu.
+  /* Volta ao estado que o servidor confirmou e reaplica os inputs que ele ainda não viu. Refazer a previsão custa um
+     passo de simulação por input pendente (no celular, centenas por segundo); então, se o servidor chegou exatamente
+     onde a previsão chegou naquele input, a previsão de agora já está certa: só copia vida, ouro e afins. */
+  private predicted = new Map<number, string>();   // seq → estado previsto depois desse input (só o que a previsão simula)
   private reconcile(s: SnapshotMsg) {
     const p = this.player; if (!p || !s.me) return;
+    const agreed = this.predicted.get(s.ack) === ownSimKey(s.me);
+    for (const seq of this.predicted.keys()) if (seq <= s.ack) this.predicted.delete(seq);
+    this.pending = this.pending.filter(i => i.seq > s.ack);
+    if (agreed) { applyOwnLife(p, s.me); return; }
     const bx = p.x, by = p.y;
     applyOwnState(p, s.me);
-    this.pending = this.pending.filter(i => i.seq > s.ack);
+    this.replays += this.pending.length; this.pendingMax = Math.max(this.pendingMax, this.pending.length);
     for (const i of this.pending) this.predict(i.input);
     // a diferença vira um deslize suave, a não ser que seja grande demais (aí teleporta)
     this.smooth.x += bx - p.x; this.smooth.y += by - p.y;
     if (Math.hypot(this.smooth.x, this.smooth.y) > 24) this.smooth = { x: 0, y: 0 };
   }
   private predict(input: InputState, live = false) {
+    const t0 = performance.now();
     this.pred.setInput(this.meId, input);
     const evs = this.pred.step({ life: false });
+    if (live) this.time('sim_mundo', t0);
     // flechas que você acabou de soltar: seguem aqui na hora (o servidor não manda as suas de volta; ver myArrows)
     if (live) for (const a of this.pred.arrows) if (a.owner === this.meId) this.myArrows.push({ ...a });
     for (const ev of evs) if (ev.t === 'tile') this.overlay.set(ev.tx + ',' + ev.ty, this.local + OVERLAY_TICKS);
@@ -157,7 +179,7 @@ export class NetSession implements Session {
      quem decide o dano continua sendo o servidor. */
   private myArrows: Arrow[] = [];
   private lastEnemies: EnemyView[] = [];
-  private stepArrows() {
+  private stepArrows(out: GameEvent[]) {
     for (const a of this.myArrows) {
       if (a.stuck) { if (--a.stuck <= 0) a.dead = true; continue; }
       a.x += a.vx; a.y += a.vy;
@@ -166,9 +188,44 @@ export class NetSession implements Session {
       if (!this.map.inBounds(cx, cy)) { a.dead = true; continue; }
       if (blocksShot(this.map.tiles[cy][cx])) { a.stuck = 30; continue; }
       // mesmas caixas do servidor (createEnemy): o Rei é maior; atordoado, a flecha passa direto
-      if (this.lastEnemies.some(e => e.hurtT === 0 && Math.abs(e.x - tx) < (e.type === 'king' ? 12 : 6) + 2 && Math.abs(e.y - ty) < (e.type === 'king' ? 8 : e.type === 'beetle' ? 5 : 4) + 5)) a.dead = true;
+      const e = this.lastEnemies.find(e => e.hurtT === 0 && Math.abs(e.x - tx) < body(e).hw + 2 && Math.abs(e.y - ty) < body(e).hh + 5);
+      if (e) { a.dead = true; if (e.type !== 'chicken' && e.hp > 0) this.feel(e, out); }
     }
     this.myArrows = this.myArrows.filter(a => !a.dead);
+  }
+  /* ---------- Seus golpes ----------
+     O dano chega do servidor uma ida e volta depois, com o monstro ~130 ms no passado. Para o golpe não parecer
+     atrasado, a espada (ou a sua flecha) que encosta num monstro como você o vê já toca o som e faz ele piscar; o
+     servidor continua decidindo o dano, e o som dele, quando chega, é descartado (já tocou). */
+  private felt = new Set<number>();                       // monstros que este golpe já acertou
+  private feltState = '';
+  private flash = new Map<number, number>();              // monstro → até quando pisca (passo local)
+  private echoes: { x: number; y: number; until: number }[] = [];   // sons de acerto já tocados, à espera do servidor
+  private feelHits(out: GameEvent[]) {
+    const p = this.player, s = p && p.state !== 'charge' ? swordPose(p) : null;
+    if (!p || !s || p.state !== this.feltState) this.felt.clear();
+    this.feltState = p?.state ?? '';
+    if (!p || !s) return;
+    for (const f of p.state === 'dash' ? [0.6, 1.0] : [0.5, 0.8, 1.05]) {
+      const [x, y] = along(s, f);
+      for (const e of this.lastEnemies) {
+        if (e.type === 'chicken' || e.hp <= 0 || e.hurtT > 0 || this.felt.has(e.id) || !hitsEnemy({ ...e, ...body(e) }, x, y)) continue;
+        this.felt.add(e.id); this.feel(e, out);
+      }
+    }
+  }
+  private feel(e: EnemyView, out: GameEvent[]) {
+    this.flash.set(e.id, this.local + 16);
+    this.echoes.push({ x: e.x, y: e.y, until: this.local + 60 });
+    out.push({ t: 'sfx', name: 'hit', x: e.x, y: e.y, by: this.meId });
+  }
+  // Som de acerto do servidor perto de um que você já ouviu: era o mesmo golpe.
+  private echoed(ev: GameEvent) {
+    if (ev.t !== 'sfx' || ev.name !== 'hit' || ev.by) return false;
+    this.echoes = this.echoes.filter(h => h.until > this.local);
+    const i = this.echoes.findIndex(h => Math.abs(h.x - ev.x) < 32 && Math.abs(h.y - ev.y) < 32);
+    if (i >= 0) this.echoes.splice(i, 1);
+    return i >= 0;
   }
   private applyTile(tx: number, ty: number, c: string) {
     this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); this.overlay.delete(tx + ',' + ty);
@@ -200,31 +257,47 @@ export class NetSession implements Session {
     const p = this.player; if (!p) return;
     return { ...p, x: p.x + this.smooth.x, y: p.y + this.smooth.y };
   }
-  private get renderTick() { return this.local + this.offset - (this.sendEvery * 2 + 2); }
+  // Para o /debug: o pior desde a última leitura.
+  private snapAt = 0; private gapMax = 0; private snaps = 0; private replays = 0; private pendingMax = 0; private snapMs = 0;
+  debug(): NetDebug {
+    const d = { gap: this.gapMax, delay: this.clock.delay(this.sendEvery) * 1000 / 60, ahead: this.interp.ahead, frozen: this.interp.frozen, snaps: this.snaps,
+      replays: this.replays, pending: this.pendingMax, snapMs: this.snapMs };
+    this.snapMs = 0; this.gapMax = 0; this.snaps = 0; this.replays = 0; this.pendingMax = 0; this.interp.ahead = 0; this.interp.frozen = 0;
+    return d;
+  }
+  telemetry(m: TelemetryMsg) { if (this.status === 'online') this.room?.send(MSG.telemetry, m); }
+  private get renderTick() { return this.clock.tick(performance.now()) - this.clock.delay(this.sendEvery); }
 
   step(input: InputState): GameEvent[] {
     this.local++;
-    this.stepArrows();
-    this.smooth.x *= 0.85; this.smooth.y *= 0.85;
     const out: GameEvent[] = [];
+    this.stepArrows(out);
+    this.smooth.x *= 0.85; this.smooth.y *= 0.85;
     if (this.status === 'online' && this.player && this.room) {
-      const seq = ++this.seq;
+      const seq = ++this.seq, msg = encodeInput(seq, input);
+      input = decodeInput(msg)!.input;   // a previsão usa o mesmo input que o servidor recebe (mira arredondada): assim os dois chegam ao mesmo lugar
       this.pending.push({ seq, input });
-      this.room.send(MSG.input, encodeInput(seq, input));
+      this.room.send(MSG.input, msg);
       // da previsão só saem os efeitos que você mesmo causou; o resto vem do servidor
       for (const ev of this.predict(input, true)) if ((ev.t === 'sfx' || ev.t === 'burst' || ev.t === 'shake') && ev.by === this.meId) out.push(ev);
+      const tk = performance.now();
+      this.predicted.set(seq, ownSimKey(ownState(this.player)));
+      this.time('sim_comparacao', tk);
+      this.feelHits(out);
     }
     for (const [k, until] of this.overlay) if (this.local > until) { const [tx, ty] = k.split(',').map(Number); this.pred.map.set(tx, ty, this.auth[ty][tx]); this.overlay.delete(k); }
     // eventos do servidor saem quando a cena interpolada chega ao momento deles
     const rt = this.renderTick;
     while (this.queued.length && this.queued[0].t <= rt + this.sendEvery) {
-      for (const ev of this.queued.shift()!.ev) { if (ev.t === 'tile') this.applyTile(ev.tx, ev.ty, ev.c); else out.push(ev); }
+      for (const ev of this.queued.shift()!.ev) { if (ev.t === 'tile') this.applyTile(ev.tx, ev.ty, ev.c); else if (!this.echoed(ev)) out.push(ev); }
     }
     return out;
   }
 
   scene(withFlow: boolean): Scene {
     const v = this.interp.at(this.renderTick), me = this.me();
+    for (const [id, until] of this.flash) if (until <= this.local) this.flash.delete(id);
+    if (this.flash.size) v.enemies = v.enemies.map(e => { const until = this.flash.get(e.id); return until && e.hurtT === 0 ? { ...e, hurtT: until - this.local } : e; });
     this.lastEnemies = v.enemies;
     const players = me ? [me, ...v.players] : v.players;
     const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;

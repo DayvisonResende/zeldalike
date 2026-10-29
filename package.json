@@ -9,7 +9,7 @@
     "dev": "concurrently -k -n servidor,cliente -c magenta,cyan \"npm run dev -w @vale/server\" \"npm run dev -w @vale/client\"",
     "server": "npm run dev -w @vale/server",
     "build": "npm run build -w @vale/client",
-    "typecheck": "tsc -p packages/shared && tsc -p packages/shared/test && tsc -p packages/server && tsc -p packages/client && tsc -p packages/tools",
+    "typecheck": "tsc -p packages/shared && tsc -p packages/shared/test && tsc -p packages/server && tsc -p packages/client && tsc -p packages/client/test && tsc -p packages/tools",
     "test": "vitest run",
     "check": "npm run typecheck && npm test",
     "client": "npm run dev -w @vale/client",
