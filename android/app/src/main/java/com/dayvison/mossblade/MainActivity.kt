@@ -10,6 +10,7 @@ import android.hardware.input.InputManager
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.Uri
+import android.net.wifi.WifiManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -202,16 +203,24 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
         )
     }
 
-    // Controle de videogame: o app lê e entrega à página pelo GamepadBridge.
+    // Controle de videogame: o app lê e entrega à página pelo GamepadBridge. O app empurra o estado quando ele muda
+    // (no máximo uma vez por quadro), em vez de a página perguntar a cada passo: cada pergunta atravessava do JavaScript
+    // para o Java e travava o quadro (a gravação do /debug mostrou até 42 ms só nisso).
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val wasConnected = pad.connected
-        if (pad.onKey(event)) { if (!wasConnected) notifyPad(); return true }
+        if (pad.onKey(event)) { if (!wasConnected) notifyPad(); pushPad(); return true }
         return super.dispatchKeyEvent(event)
     }
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         val wasConnected = pad.connected
-        if (pad.onMotion(event)) { if (!wasConnected) notifyPad(); return true }
+        if (pad.onMotion(event)) { if (!wasConnected) notifyPad(); pushPad(); return true }
         return super.dispatchGenericMotionEvent(event)
+    }
+    private var padQueued = false
+    private fun pushPad() {
+        if (padQueued) return
+        padQueued = true
+        web.postOnAnimation { padQueued = false; web.evaluateJavascript("window.__androidPad && window.__androidPad.push(${pad.state()})", null) }
     }
     override fun onInputDeviceAdded(deviceId: Int) { pad.refresh(); notifyPad() }
     override fun onInputDeviceRemoved(deviceId: Int) { pad.refresh(); notifyPad() }
@@ -238,8 +247,15 @@ class MainActivity : Activity(), InputManager.InputDeviceListener {
         }
     }
 
-    override fun onResume() { super.onResume(); web.onResume(); web.resumeTimers() }
-    override fun onPause() { web.onPause(); web.pauseTimers(); super.onPause() }   // pausado: o som para e a bateria agradece
+    /* Wi-Fi em baixa latência enquanto o jogo está na frente. Por padrão o Android economiza bateria segurando os
+       pacotes e entregando de uma vez a cada 100–200 ms: o jogo recebia os snapshots em rajadas (o /debug mostrou
+       ~130 ms entre chegadas, para envios a cada 50 ms). Solto ao sair da frente, para não gastar bateria à toa. */
+    private val wifiLock by lazy {
+        (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager)
+            .createWifiLock(WifiManager.WIFI_MODE_FULL_LOW_LATENCY, "mossblade:jogo").apply { setReferenceCounted(false) }
+    }
+    override fun onResume() { super.onResume(); web.onResume(); web.resumeTimers(); wifiLock.acquire() }
+    override fun onPause() { if (wifiLock.isHeld) wifiLock.release(); web.onPause(); web.pauseTimers(); super.onPause() }   // pausado: o som para e a bateria agradece
     override fun onSaveInstanceState(outState: Bundle) { super.onSaveInstanceState(outState); web.saveState(outState) }
     override fun onDestroy() {
         main.removeCallbacks(loadTimeout)

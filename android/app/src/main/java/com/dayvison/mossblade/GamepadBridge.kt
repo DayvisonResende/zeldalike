@@ -11,7 +11,7 @@ import kotlin.math.max
  *
  * A WebView nem sempre suporta a Gamepad API. Aqui o app guarda o estado do controle (botões e analógicos)
  * no mesmo formato do mapeamento "standard" dos navegadores, e um pequeno script (SHIM) troca
- * navigator.getGamepads() da página por um que lê daqui. O jogo não percebe a diferença.
+ * navigator.getGamepads() da página por um que devolve o último estado empurrado pelo app. O jogo não percebe a diferença.
  */
 class GamepadBridge {
     private val buttons = FloatArray(17)
@@ -68,7 +68,7 @@ class GamepadBridge {
         return true
     }
 
-    /** Chamado pela página a cada quadro (window.AndroidGamepad.state()). */
+    /** Estado atual em JSON: o app empurra para a página quando muda; a página só pede ao conectar ou desconectar. */
     @JavascriptInterface
     fun state(): String = synchronized(this) {
         val n = name ?: return "{\"connected\":false}"
@@ -103,19 +103,19 @@ class GamepadBridge {
   var pad = { id: '', index: 0, connected: false, mapping: 'standard', timestamp: 0, axes: [0, 0, 0, 0], buttons: [] };
   for (var i = 0; i < 17; i++) pad.buttons.push({ pressed: false, touched: false, value: 0 });
   var was = false;
-  function read() {
-    try {
-      var s = JSON.parse(window.AndroidGamepad.state());
-      pad.connected = !!s.connected;
-      if (s.connected) {
-        pad.id = s.id; pad.axes = s.axes;
-        for (var i = 0; i < 17; i++) { var v = s.buttons[i] || 0; pad.buttons[i] = { pressed: v > 0.5, touched: v > 0, value: v }; }
-        pad.timestamp = performance.now();
-      }
-    } catch (e) { pad.connected = false; }
+  function apply(s) {
+    pad.connected = !!s.connected;
+    if (s.connected) {
+      pad.id = s.id; pad.axes = s.axes;
+      for (var i = 0; i < 17; i++) { var v = s.buttons[i] || 0; pad.buttons[i] = { pressed: v > 0.5, touched: v > 0, value: v }; }
+      pad.timestamp = performance.now();
+    }
   }
-  navigator.getGamepads = function () { read(); return pad.connected ? [pad] : []; };
+  function read() { try { apply(JSON.parse(window.AndroidGamepad.state())); } catch (e) { pad.connected = false; } }
+  // O app empurra o estado quando muda (push); a página só lê o que já está aqui, sem atravessar para o Java.
+  navigator.getGamepads = function () { return pad.connected ? [pad] : []; };
   window.__androidPad = {
+    push: function (s) { apply(s); },
     changed: function () {
       read();
       if (pad.connected === was) return;

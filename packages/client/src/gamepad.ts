@@ -15,9 +15,12 @@ export class Gamepads {
   aim: number | null = null;   // ângulo do analógico direito, ou null
   private prev: boolean[] = [];
   private id: string | null = null;
+  // Só lê o controle depois que um se conectou: os navegadores (e o app Android) avisam com "gamepadconnected".
+  // Sem isso, cada passo perguntaria ao navegador; no app, a pergunta atravessa até o Java e trava o quadro.
+  private plugged = false;
   constructor(private input: Input, private hooks: PadHooks) {
-    window.addEventListener('gamepadconnected', e => this.hooks.connected(e.gamepad.id));
-    window.addEventListener('gamepaddisconnected', () => { if (!this.first()) { this.hooks.connected(null); this.release(); } });
+    window.addEventListener('gamepadconnected', e => { this.plugged = true; this.hooks.connected(e.gamepad.id); });
+    window.addEventListener('gamepaddisconnected', () => { if (!this.first()) { this.plugged = false; this.hooks.connected(null); this.release(); } });
   }
   get active() { return this.id !== null; }
   private first() { return [...(navigator.getGamepads?.() ?? [])].find(g => g && g.connected) ?? null; }
@@ -25,6 +28,7 @@ export class Gamepads {
 
   // Uma vez por passo, antes de amostrar o Input.
   poll() {
+    if (!this.plugged) return;
     const gp = this.first();
     if (!gp) { if (this.id) this.release(); return; }
     this.id = gp.id;

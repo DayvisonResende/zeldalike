@@ -61,7 +61,18 @@ snapshots, eventos como ataque e acerto) e o do servidor (tempo dos passos, envi
       os mesmos inputs, servidor e previsão chegam ao mesmo estado). A previsão usa o input como o servidor recebe
       (mira arredondada).
 - [x] Flecha com resposta na hora: acertou um monstro na sua tela, toca o som e ele pisca, como a espada.
-- [ ] Gravar de novo no celular para medir a previsão mais leve.
+- [x] Gravação no app Android, Wi-Fi, 5 min (2026-10-29 17:51): servidor perfeito (passo de 0,2 ms) e previsão em dia
+      (quase nada refeito). Travado em 30 fps pelo modo automático. Dois culpados:
+  - **Ler o controle custava mais que desenhar:** `sim_entrada` 5,8 ms de mediana (até 42 ms) contra 5,3 ms do desenho.
+    No app, cada `navigator.getGamepads()` atravessava do JavaScript para o Java, 60 vezes por segundo, mesmo sem
+    controle. Corrigido: a página só lê o controle depois de um `gamepadconnected`, e o app empurra o estado do controle
+    quando ele muda (no máximo uma vez por quadro) em vez de a página perguntar.
+  - **Wi-Fi do Android em economia de energia:** snapshots enviados a cada 50 ms chegavam em rajadas (mediana de 132 ms
+    entre chegadas, até 515 ms), e o atraso da cena ficava perto do máximo (~230 ms). Corrigido no app: `WifiLock` em
+    baixa latência enquanto o jogo está na frente.
+  - Menor: o servidor envia em ritmo irregular (até 80 ms em vez de 50; passos a cada 32–47 ms). Jeito de relógio de
+    sistema com pouca resolução; ver em que sistema roda o servidor do home lab.
+- [ ] Gerar o APK novo, instalar e gravar de novo com `/debug 5` (comparar `sim_entrada`, fps, `gap` e `delay`).
 
 ### Rede por UDP (WebTransport)
 

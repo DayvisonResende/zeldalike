@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- saber quando a internet volta, para reconectar na hora -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Wi-Fi em baixa latência enquanto se joga (WifiLock): sem isso o Android entrega os pacotes em rajadas -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <!-- Funciona com toque ou com controle; nenhum dos dois é obrigatório. -->
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
