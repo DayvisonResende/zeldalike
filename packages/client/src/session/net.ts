@@ -1,6 +1,6 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
-  MSG, World, applyOwnState, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
+  MSG, TS, World, applyOwnState, blocksShot, type Arrow, type EnemyView, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
   type ChatMsg, type ChatRequest, type GearRules, type ItemCatalogMsg, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
@@ -90,7 +90,7 @@ export class NetSession implements Session {
       if (changed) this.onMapChange?.();
     }
     m.tiles.forEach((row, ty) => [...row].forEach((c, tx) => { this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); }));
-    this.overlay.clear(); this.pending = []; this.queued = []; this.interp.clear(); this.offset = NaN;
+    this.overlay.clear(); this.pending = []; this.queued = []; this.myArrows = []; this.interp.clear(); this.offset = NaN;
     if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, '', m.at.x, m.at.y); }
     else { const p = this.player; p.x = m.at.x; p.y = m.at.y; }
     this.smooth = { x: 0, y: 0 };
@@ -142,12 +142,33 @@ export class NetSession implements Session {
     this.smooth.x += bx - p.x; this.smooth.y += by - p.y;
     if (Math.hypot(this.smooth.x, this.smooth.y) > 24) this.smooth = { x: 0, y: 0 };
   }
-  private predict(input: InputState) {
+  private predict(input: InputState, live = false) {
     this.pred.setInput(this.meId, input);
     const evs = this.pred.step({ life: false });
+    // flechas que você acabou de soltar: seguem aqui na hora (o servidor não manda as suas de volta; ver myArrows)
+    if (live) for (const a of this.pred.arrows) if (a.owner === this.meId) this.myArrows.push({ ...a });
     for (const ev of evs) if (ev.t === 'tile') this.overlay.set(ev.tx + ',' + ev.ty, this.local + OVERLAY_TICKS);
     this.pred.thrown = []; this.pred.arrows = []; this.pred.drops = this.dropsNow; this.pred.bombs = []; this.pred.spells = []; this.pred.regrow.clear();   // objetos voando, drops e regeneração vêm do servidor
     return evs;
+  }
+  /* ---------- Suas flechas ----------
+     O arco é previsto (anda na hora), então a flecha também: se viesse do servidor, chegaria atrasada (a rede mais a
+     interpolação), descolada do arco. Aqui ela voa, crava na parede e some ao acertar um monstro como no servidor;
+     quem decide o dano continua sendo o servidor. */
+  private myArrows: Arrow[] = [];
+  private lastEnemies: EnemyView[] = [];
+  private stepArrows() {
+    for (const a of this.myArrows) {
+      if (a.stuck) { if (--a.stuck <= 0) a.dead = true; continue; }
+      a.x += a.vx; a.y += a.vy;
+      if (--a.life <= 0) { a.dead = true; continue; }
+      const tx = a.x + Math.cos(a.ang) * 5, ty = a.y + Math.sin(a.ang) * 5, cx = Math.floor(tx / TS), cy = Math.floor(ty / TS);
+      if (!this.map.inBounds(cx, cy)) { a.dead = true; continue; }
+      if (blocksShot(this.map.tiles[cy][cx])) { a.stuck = 30; continue; }
+      // mesmas caixas do servidor (createEnemy): o Rei é maior; atordoado, a flecha passa direto
+      if (this.lastEnemies.some(e => e.hurtT === 0 && Math.abs(e.x - tx) < (e.type === 'king' ? 12 : 6) + 2 && Math.abs(e.y - ty) < (e.type === 'king' ? 8 : e.type === 'beetle' ? 5 : 4) + 5)) a.dead = true;
+    }
+    this.myArrows = this.myArrows.filter(a => !a.dead);
   }
   private applyTile(tx: number, ty: number, c: string) {
     this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); this.overlay.delete(tx + ',' + ty);
@@ -183,6 +204,7 @@ export class NetSession implements Session {
 
   step(input: InputState): GameEvent[] {
     this.local++;
+    this.stepArrows();
     this.smooth.x *= 0.85; this.smooth.y *= 0.85;
     const out: GameEvent[] = [];
     if (this.status === 'online' && this.player && this.room) {
@@ -190,7 +212,7 @@ export class NetSession implements Session {
       this.pending.push({ seq, input });
       this.room.send(MSG.input, encodeInput(seq, input));
       // da previsão só saem os efeitos que você mesmo causou; o resto vem do servidor
-      for (const ev of this.predict(input)) if ((ev.t === 'sfx' || ev.t === 'burst' || ev.t === 'shake') && ev.by === this.meId) out.push(ev);
+      for (const ev of this.predict(input, true)) if ((ev.t === 'sfx' || ev.t === 'burst' || ev.t === 'shake') && ev.by === this.meId) out.push(ev);
     }
     for (const [k, until] of this.overlay) if (this.local > until) { const [tx, ty] = k.split(',').map(Number); this.pred.map.set(tx, ty, this.auth[ty][tx]); this.overlay.delete(k); }
     // eventos do servidor saem quando a cena interpolada chega ao momento deles
@@ -203,10 +225,11 @@ export class NetSession implements Session {
 
   scene(withFlow: boolean): Scene {
     const v = this.interp.at(this.renderTick), me = this.me();
+    this.lastEnemies = v.enemies;
     const players = me ? [me, ...v.players] : v.players;
     const flow = withFlow && players.length ? bfs(this.map, players.map(p => tileOf(this.map, p.x, p.y)), 32) : null;
     const chests = (this.map.data.chests ?? []).map(c => ({ x: c.x, y: c.y, open: this.openChests.has(`${c.x},${c.y}`) }));
-    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: v.arrows, drops: v.drops, bombs: v.bombs, spells: v.spells, chests, npcs: this.map.data.npcs ?? [],
+    return { map: this.map, meId: this.meId, players, enemies: v.enemies, thrown: v.thrown, arrows: [...v.arrows, ...this.myArrows], drops: v.drops, bombs: v.bombs, spells: v.spells, chests, npcs: this.map.data.npcs ?? [],
       day: this.day, invasion: this.invasion, dark: !!this.map.data.dark, profiles: this.profiles, flow, keys: this.keys,
       fragments: (this.map.data.fragments ?? []).filter(f => !this.player?.fragments.includes(`${this.mapId}:${f.x},${f.y}`)) };
   }

@@ -593,7 +593,7 @@ export class WorldRoom extends Room {
         p: [...w.players.values()].filter(p => p.id !== id && near(p)).map(packPlayer),
         e: w.enemies.filter(near).map(packEnemy),
         o: w.thrown.filter(near).map(packThrown),
-        a: w.arrows.filter(near).map(packArrow),
+        a: w.arrows.filter(a => near(a) && a.owner !== id).map(packArrow),   // as suas o cliente já desenha na hora (previstas)
         ev: this.events.get(seat.map)!.filter(ev => eventFor(ev, id, view)),
         pvp: { mode: w.rules.pvp.mode, lock: pvpLock(w, me) },
         d: w.drops.filter(near).map(d => packDrop({ ...d, reserved: !!d.owner && d.owner !== id && w.tick < d.ownerUntil, fading: d.expires - w.tick < 600 })),
