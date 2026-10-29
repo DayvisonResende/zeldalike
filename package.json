@@ -15,7 +15,8 @@
     "client": "npm run dev -w @vale/client",
     "start": "npm run build && npm run start -w @vale/server",
     "map:tileset": "npm run tileset -w @vale/tools",
-    "map:check": "npm run check -w @vale/tools"
+    "map:check": "npm run check -w @vale/tools",
+    "clock:check": "npm run clock -w @vale/tools"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",
