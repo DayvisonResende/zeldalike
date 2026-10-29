@@ -10,6 +10,7 @@ import { MapError, type MapData } from '@vale/shared';
 import { checkPortals, loadMap, setMaps } from './map';
 import { ITEMS_DIR, ItemsError, getCatalog, loadItems, setCatalog, watchItems } from './content/items';
 import { oficinaEnabled } from './oficina/routes';
+import { preciseTimers } from './timer';
 
 // CONFIG=arquivo.yaml troca a configuração (por exemplo, uma de produção ou de teste).
 const CONFIG_FILE = process.env.CONFIG ? path.resolve(process.env.CONFIG) : fileURLToPath(new URL('../config.yaml', import.meta.url));
@@ -57,6 +58,8 @@ scheduleBackups(db, () => ({ ...getConfig().database.backup, dir: configPath(get
 
 // PORT no ambiente vence o config: é como as hospedagens (Fly, Railway, Render) dizem a porta.
 const port = Number(process.env.PORT) || getConfig().server.port;
+const clock = await preciseTimers();   // Windows: relógio de 1 ms antes de o laço do jogo começar
+if (clock) console.log(`[relógio] ${clock}`);
 const { roomId, hasClient } = await startServer(port);
 console.log(`[vale] mundo "${WORLD_MAP.name}" no ar: ${WORLD_MAP.cols}x${WORLD_MAP.rows} tiles, ${WORLD_MAP.regions.length} regiões, sala ${roomId}, porta ${port}`);
 console.log(hasClient

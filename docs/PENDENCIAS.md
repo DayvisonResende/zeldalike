@@ -72,7 +72,14 @@ snapshots, eventos como ataque e acerto) e o do servidor (tempo dos passos, envi
     baixa latência enquanto o jogo está na frente.
   - Menor: o servidor envia em ritmo irregular (até 80 ms em vez de 50; passos a cada 32–47 ms). Jeito de relógio de
     sistema com pouca resolução; ver em que sistema roda o servidor do home lab.
-- [ ] Gerar o APK novo, instalar e gravar de novo com `/debug 5` (comparar `sim_entrada`, fps, `gap` e `delay`).
+- [x] Gravação com o APK novo (2026-10-29 18:22): `sim_entrada` caiu de 5,8 para 0,3 ms e o código por quadro de 11,7
+      para 7,8 ms. Mas os fps seguiram em 30 desde o primeiro segundo (ver a opção "Quadros por segundo") e as rajadas
+      de rede não mudaram com o Wi-Fi de baixa latência (~123 ms entre chegadas).
+- [ ] **Servidor em Windows (home lab):** o relógio do Windows acorda a cada 15,6 ms; o laço de 16,7 ms do Colyseus
+      sai amontoado (passos a cada 32–47 ms, envios a cada 70–80 ms em vez de 50). `src/timer.ts` pede 1 ms ao Windows
+      (`timeBeginPeriod`) ao ligar, se o pacote `koffi` estiver instalado. Passo a passo em `docs/RELOGIO-WINDOWS.md`.
+      O terminal do servidor mostra `[relógio] ...` dizendo se ligou. Depois, gravar de novo e ver `esperaEntrePassosMax`
+      (deve ficar perto de 17) e `intervaloEnvioMax` (perto de 50).
 
 ### Rede por UDP (WebTransport)
 
