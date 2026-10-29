@@ -66,6 +66,12 @@ export const migrations: Record<string, Migration> = {
       await db.schema.alterTable('characters').addColumn('chests', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"mapa:x,y": quando abriu (ms)}
     }
   },
+  '008_resto_dos_baus': {
+    async up(db: Kysely<unknown>) {
+      // o que não coube na mochila ao abrir um baú: {"mapa:x,y": [{"item": "heart", "n": 2}]}
+      await db.schema.alterTable('characters').addColumn('chest_loot', 'text', c => c.notNull().defaultTo('{}')).execute();
+    }
+  },
   '007_equipamento': {
     async up(db: Kysely<unknown>) {
       await db.schema.alterTable('characters').addColumn('gear', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"a": "sword", "c": "bow"}

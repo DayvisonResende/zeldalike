@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client, type Room } from '@colyseus/sdk';
 import { matchMaker } from 'colyseus';
-import { MSG, World, damagePlayer, encodeInput, reelCursor, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
+import { BUTTON, MSG, World, damagePlayer, encodeInput, reelCursor, emptyInput, unpackPlayer, type ChatMsg, type GameEvent, type InputState, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg } from '@vale/shared';
 import { parseConfig } from '../src/config/load';
 import { getConfig, setConfig } from '../src/config/store';
 import { startServer } from '../src/app';
@@ -342,7 +342,9 @@ describe('progresso e itens', () => {
     e.x = p.x + 4; e.y = p.y; e.lastHitBy = p.id; e.hp = 0; e.dying = true; e.hurtT = 1;
     const gains: string[] = [];
     a.room.onMessage(MSG.snapshot, (s: SnapshotMsg) => { for (const ev of s.ev as GameEvent[]) if (ev.t === 'gain') gains.push(ev.text); });
-    await sleep(600);
+    await sleep(500);
+    await hold(a, { b: true, tap: BUTTON.b }, 600);   // segura o botão de Ação: pega tudo em volta
+    await sleep(150);
     world.rules.enemies.slime.drops = saved;
     expect(a.last!.me).toMatchObject({ xp: 5, gold: 3, level: 1 });
     expect(a.last!.xpNext).toBe(50);
@@ -443,6 +445,34 @@ describe('baús', () => {
     await sleep(150);
     expect(b.ch).toEqual([]);                                          // para outro personagem, cheio
     await room2.leave(); await b.room.leave();
+  });
+  it('mochila cheia: o resto fica guardado no baú, sobrevive a sair e voltar, e é entregue depois', async () => {
+    const a = await bot('Acumuladora');
+    const vale = (matchMaker.getLocalRoomById(roomId) as unknown as { world: World }).world;
+    const chest = vale.map.data.chests![0], key = `vale:${chest.x},${chest.y}`;
+    const p = vale.players.get(a.room.sessionId)!;
+    for (let i = 0; i < p.bag.length; i++) p.bag[i] = { id: 'jelly', n: 99 };
+    p.bagVersion++;
+    p.x = chest.x * 16 + 8; p.y = (chest.y + 1) * 16 + 4; p.dir = 1;
+    await sleep(100);
+    await hold(a, { b: true, tap: 2 }, 50); await hold(a, {}, 400);
+    const left = p.chestLoot[key];
+    expect(left?.length).toBeGreaterThan(0);                            // o que não coube ficou no baú
+    expect(a.ch ?? []).toEqual([]);                                     // e ele aparece fechado para ela
+    await a.room.leave(); await sleep(150);
+    const acc = accounts.get('Acumuladora')!;
+    const room2 = await new Client(`ws://127.0.0.1:${PORT}`).join('world', { token: acc.token, characterId: acc.charId });
+    room2.send(MSG.hello);
+    await sleep(250);
+    const again = vale.players.get(room2.sessionId)!;
+    expect(again.chestLoot[key]).toEqual(left);                         // salvo no banco
+    again.bag[0] = null; again.bag[1] = null; again.bag[2] = null; again.bagVersion++;
+    again.x = chest.x * 16 + 8; again.y = (chest.y + 1) * 16 + 4; again.dir = 1;
+    room2.send(MSG.input, encodeInput(1, { ...emptyInput(), b: true, tap: 2 }));
+    await sleep(300);
+    expect(again.chestLoot[key]).toBeUndefined();                       // entregue
+    expect(again.bag.slice(0, 3).some(s => s && s.id !== 'jelly')).toBe(true);
+    await room2.leave();
   });
 });
 

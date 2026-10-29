@@ -13,54 +13,84 @@ export interface Drop {
   owner: string | null; ownerUntil: number;   // só o dono pega até ownerUntil; depois, qualquer um
   expires: number; born: number;
 }
-const PICK_RANGE = 11;
+export const PICK_RANGE = 14;    // pegar com o botão: o item mais perto até essa distância
+export const SWEEP_RANGE = 40;   // segurar o botão: tudo em volta até essa distância
+export const SWEEP_HOLD = 24;    // passos segurando o botão para pegar tudo
 
 function spawnDrop(w: World, item: LootId, n: number, x: number, y: number, owner: string | null) {
   const d: Drop = { id: w.nextId++, item, n, x, y, owner, ownerUntil: owner ? w.tick + ticks(w.rules.loot.ownerTime) : 0, expires: w.tick + ticks(w.rules.loot.lifetime), born: w.tick };
   w.drops.push(d);
   return d;
 }
-// Sorteia uma lista de drops e espalha em volta de um ponto, reservada a `owner`.
-export function spawnLoot(w: World, list: DropRule[], x: number, y: number, owner: string | null, dropRate = w.rules.rates.drop) {
-  const r = w.rules;
-  let k = 0;
+// Sorteia uma tabela de drop: o que saiu e quanto.
+export function rollLoot(w: World, list: DropRule[], dropRate = w.rules.rates.drop) {
+  const out: { item: LootId; n: number }[] = [];
   for (const d of list) {
     if (w.rng.next() >= Math.min(1, d.chance * dropRate)) continue;
     let n = d.min + w.rng.int(d.max - d.min + 1);
-    if (d.item === 'gold') n = Math.max(1, Math.round(n * r.rates.gold));
-    const a = k++ * 2.4;   // espalha um pouco em volta
-    spawnDrop(w, d.item, n, x + Math.cos(a) * (k > 1 ? 7 : 0), y + Math.sin(a) * (k > 1 ? 5 : 0), owner);
+    if (d.item === 'gold') n = Math.max(1, Math.round(n * w.rules.rates.gold));
+    out.push({ item: d.item, n });
   }
+  return out;
+}
+// Sorteia uma lista de drops e espalha em volta de um ponto, reservada a `owner`.
+export function spawnLoot(w: World, list: DropRule[], x: number, y: number, owner: string | null, dropRate = w.rules.rates.drop) {
+  rollLoot(w, list, dropRate).forEach(({ item, n }, k) => {
+    const a = k * 2.4;   // espalha um pouco em volta
+    spawnDrop(w, item, n, x + Math.cos(a) * (k ? 7 : 0), y + Math.sin(a) * (k ? 5 : 0), owner);
+  });
 }
 // Monstro derrubado: sorteia a tabela dele; o loot fica reservado a quem deu o último golpe.
 export function dropLoot(w: World, e: Enemy, killer: Player | undefined) {
   spawnLoot(w, w.rules.enemies[e.type].drops, e.x, e.y, killer?.id ?? null);
 }
-const lootName = (item: LootId, n: number) => item === 'gold' ? `${n} de ouro` : `${n > 1 ? n + ' ' : ''}${ITEMS[item].name}`;
+export const lootName = (item: LootId, n: number) => item === 'gold' ? `${n} de ouro` : `${n > 1 ? n + ' ' : ''}${ITEMS[item].name}`;
 
-// Uma vez por passo: some o que expirou; quem passa por cima pega (se puder e couber).
-export function updateLoot(w: World) {
-  w.drops = w.drops.filter(d => d.expires > w.tick);
+/* ---------- Pegar com o botão de Ação (B) ---------- */
+// O item fica no chão até alguém apertar B perto dele; segurar B pega tudo em volta.
+// Reservado: só o dono pega até ownerUntil. Recém-caído: espera um instante (deixa "cair").
+export const canPick = (w: World, p: Player, d: Drop) => d.n > 0 && w.tick - d.born >= 12 && (!d.owner || d.owner === p.id || w.tick >= d.ownerUntil);
+const dist = (p: Player, d: Drop) => Math.hypot(d.x - p.x, d.y - p.y);
+export function nearestDrop(w: World, p: Player, range = PICK_RANGE) {
+  let best: Drop | null = null, bd = range;
+  for (const d of w.drops) if (canPick(w, p, d) && dist(p, d) <= bd) { bd = dist(p, d); best = d; }
+  return best;
+}
+// Põe o drop na mochila (ouro, na carteira). Devolve o quanto pegou.
+// Na previsão do cliente só diz que pegaria: quem entrega de verdade é o servidor.
+function take(w: World, p: Player, d: Drop) {
+  if (w.predicting) return d.n;
   const stack = w.rules.inventory.stack;
-  for (const p of w.players.values()) {
-    if (p.state === 'dead') continue;
-    for (const d of w.drops) {
-      if (d.n <= 0 || Math.abs(d.x - p.x) > PICK_RANGE || Math.abs(d.y - p.y) > PICK_RANGE) continue;
-      if (d.owner && d.owner !== p.id && w.tick < d.ownerUntil) continue;
-      if (w.tick - d.born < 12) continue;   // deixa o drop "cair" antes de poder pegar
-      let got = d.n;
-      if (d.item === 'gold') p.gold += d.n;
-      else {
-        if (!canFit(p.bag, d.item, stack)) { notice(w, p, 'Inventário cheio.'); continue; }
-        got = d.n - addItem(p.bag, d.item, d.n, stack);
-        p.bagVersion++;
-      }
-      d.n -= got;
-      w.emit({ t: 'gain', to: p.id, x: p.x, y: p.y, text: '+' + lootName(d.item, got) });
-      sfx(w, 'pickup', p);
-    }
+  let got = d.n;
+  if (d.item === 'gold') p.gold += d.n;
+  else {
+    if (!canFit(p.bag, d.item, stack)) { notice(w, p, 'Inventário cheio.'); return 0; }
+    got = d.n - addItem(p.bag, d.item, d.n, stack);
+    p.bagVersion++;
   }
-  w.drops = w.drops.filter(d => d.n > 0);
+  d.n -= got;
+  w.emit({ t: 'gain', to: p.id, x: p.x, y: p.y, text: '+' + lootName(d.item, got) });
+  return got;
+}
+// B apertado perto de um item: pega o mais perto. Devolve true se havia item (o B não faz outra coisa).
+export function pickNearest(w: World, p: Player) {
+  const d = nearestDrop(w, p);
+  if (!d) return false;
+  if (take(w, p, d) && !w.predicting) sfx(w, 'pickup', p);
+  return true;
+}
+// B segurado: pega tudo em volta (do mais perto para o mais longe).
+export function pickAll(w: World, p: Player) {
+  const near = w.drops.filter(d => canPick(w, p, d) && dist(p, d) <= SWEEP_RANGE).sort((a, b) => dist(p, a) - dist(p, b));
+  let n = 0;
+  for (const d of near) if (take(w, p, d)) n++;
+  if (n && !w.predicting) sfx(w, 'pickup', p);
+  return n;
+}
+
+// Uma vez por passo: some o que expirou ou já foi pego.
+export function updateLoot(w: World) {
+  w.drops = w.drops.filter(d => d.expires > w.tick && d.n > 0);
 }
 const noticeAt = new WeakMap<Player, number>();
 function notice(w: World, p: Player, text: string) {

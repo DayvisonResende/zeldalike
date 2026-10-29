@@ -248,7 +248,9 @@ algo no chão para um amigo. A ideia é que o botão de **Ação (B)** pegue e a
 **Sugestão, a decidir:** o ouro vai direto para a carteira de quem derrubou o monstro, sem cair no chão, porque não ocupa
 espaço e apertar botão para cada moeda cansa.
 
-**Em estudo: o drop de monstro.** Ainda não é uma decisão final. As opções:
+**Drop de monstro:** no sprint 3 ficou no chão (pego com o botão), porque o ouro também continua caindo e uma regra só
+para a mesma morte é mais clara. Sugestão para depois: no chefe, um saquinho pessoal por jogador, porque com vários
+amigos o loot individual de cada um se mistura no chão. As opções estudadas:
 
 | Opção | Como fica | A favor | Contra |
 | --- | --- | --- | --- |

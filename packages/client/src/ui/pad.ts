@@ -1,4 +1,5 @@
-import { GEAR_NAME, gearIn, type PlayerView } from '@vale/shared';
+import { GEAR_NAME, gearIn, type DropView, type PlayerView } from '@vale/shared';
+import { pickable } from '../pickup';
 import { ITEM_ICON } from '../render/sprites';
 import type { Inventory } from '../session/types';
 import type { PadSize } from './settings';
@@ -16,7 +17,7 @@ const quick = (['heart', 'mana', 'bomb'] as const).map((id, i) => {
 const bomb = document.getElementById('btnBomb')!, bombCount = bomb.querySelector('b')!;
 bomb.querySelector('canvas')!.getContext('2d')!.drawImage(ITEM_ICON.bomb, 0, 0);
 let lastB = '';
-export function updatePad(me: PlayerView | undefined, inv: Inventory | null, size: PadSize) {
+export function updatePad(me: PlayerView | undefined, inv: Inventory | null, size: PadSize, drops: readonly DropView[]) {
   if (pad.dataset.size !== size) pad.dataset.size = size;
   for (const q of quick) {
     const n = inv ? inv.bag.reduce((t, s) => t + (s?.id === q.id ? s.n : 0), 0) : 0;
@@ -28,6 +29,6 @@ export function updatePad(me: PlayerView | undefined, inv: Inventory | null, siz
     const a = GEAR_NAME[gearIn(inv, 'a')], c = GEAR_NAME[gearIn(inv, 'c')];
     if (a + c !== lastGear) { lastGear = a + c; aLabel.textContent = a; cLabel.textContent = c; gearLine.textContent = `A ${a} · C ${c}`; }
   }
-  const b = me?.carry ? 'Arremessar' : me?.state === 'fish' ? 'Puxar' : 'Ação';
+  const b = me?.carry ? 'Arremessar' : me?.state === 'fish' ? 'Puxar' : pickable(me, drops) ? 'Pegar' : 'Ação';
   if (b !== lastB) { lastB = b; bLabel.textContent = b; }
 }

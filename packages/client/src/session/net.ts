@@ -1,6 +1,6 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
-  MSG, World, applyOwnState, bfs, cleanLook, cleanName, encodeInput, tileOf,
+  MSG, World, applyOwnState, bfs, cleanLook, cleanName, encodeInput, tileOf, unpackDrop, type Drop,
   type ChatMsg, type ChatRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, toFrame } from './interpolate';
@@ -82,7 +82,11 @@ export class NetSession implements Session {
     this.onWelcome?.(m.motd);
   }
 
+  // Itens no chão do último snapshot, no formato do mundo, para a previsão saber que o B vai pegar algo
+  // (só diz que pegaria; o servidor entrega). Reservado a outro: nunca pegável aqui.
+  private dropsNow: Drop[] = [];
   private snapshot(s: SnapshotMsg) {
+    this.dropsNow = s.d.map(unpackDrop).map(d => ({ id: d.id, item: d.item, n: d.n, x: d.x, y: d.y, owner: d.reserved ? '?' : null, ownerUntil: d.reserved ? Infinity : 0, expires: Infinity, born: -Infinity }));
     // relógio: estima o passo do servidor a partir do local, sem saltos pequenos
     const est = s.t - this.local;
     if (Number.isNaN(this.offset) || Math.abs(est - this.offset) > 30) this.offset = est; else this.offset += (est - this.offset) * 0.05;
@@ -109,7 +113,7 @@ export class NetSession implements Session {
     this.pred.setInput(this.meId, input);
     const evs = this.pred.step({ life: false });
     for (const ev of evs) if (ev.t === 'tile') this.overlay.set(ev.tx + ',' + ev.ty, this.local + OVERLAY_TICKS);
-    this.pred.thrown = []; this.pred.arrows = []; this.pred.drops = []; this.pred.bombs = []; this.pred.spells = []; this.pred.regrow.clear();   // objetos voando, drops e regeneração vêm do servidor
+    this.pred.thrown = []; this.pred.arrows = []; this.pred.drops = this.dropsNow; this.pred.bombs = []; this.pred.spells = []; this.pred.regrow.clear();   // objetos voando, drops e regeneração vêm do servidor
     return evs;
   }
   private applyTile(tx: number, ty: number, c: string) {

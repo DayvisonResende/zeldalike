@@ -40,6 +40,22 @@ describe('baús', () => {
     press();
     expect(p.gold).toBe(10);
   });
+  it('mochila cheia: o que não cabe fica guardado no baú para quem abriu; abrir de novo entrega', () => {
+    const { w, p, press } = setup();
+    for (let i = 0; i < p.bag.length; i++) p.bag[i] = { id: 'jelly', n: 99 };
+    const ev = press();
+    expect(p.gold).toBe(5);                                   // ouro entra na carteira mesmo assim
+    expect(ev).toContainEqual({ t: 'notice', to: 'a', text: 'Mochila cheia: o resto ficou guardado no baú para você.' });
+    expect(openChests(w, p)).toEqual([]);                     // aparece fechado: ainda tem coisa para você
+    const b = w.addPlayer('b', 'Beto', 4 * 16 + 8, 2 * 16 + 10);
+    expect(b.chestLoot).toEqual({});                          // o resto é só da Ana
+    w.removePlayer('b');
+    p.bag[0] = null;                                          // abriu espaço
+    press();
+    expect(p.bag[0]).toEqual({ id: 'heart', n: 1 });
+    expect(p.gold).toBe(5);                                   // o ouro não vem de novo
+    expect(openChests(w, p)).toEqual(['4,1']);
+  });
   it('cada personagem tem o seu: outro jogador ainda pode abrir', () => {
     const { w, press } = setup();
     press();

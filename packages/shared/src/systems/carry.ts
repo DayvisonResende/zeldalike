@@ -11,9 +11,11 @@ import { cast, waterAhead } from './fishing';
 import { liftBomb } from './bombs';
 import { liftPlayer } from './throwing';
 import { shopOffer } from './shop';
+import { pickNearest } from './loot';
 
-// Botão B: lê a placa à frente ou levanta um arbusto/pedra.
+// Botão B: pega o item mais perto no chão; senão lê a placa à frente, abre o baú, fala, pesca ou levanta um arbusto/pedra.
 export function interact(w: World, p: Player) {
+  if (pickNearest(w, p)) return true;
   if (!p.carry && waterAhead(w, p)) { cast(w, p); return true; }
   const [dx, dy] = D[p.dir];
   const fx = p.x + dx * (p.hw + 5), fy = p.y + dy * (p.hh + 5);

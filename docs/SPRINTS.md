@@ -50,10 +50,10 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 
 ## Sprint 3: itens
 
-- [ ] Item no chão é pego com o botão de Ação ("Pegar"); segurar pega tudo em volta.
-- [ ] Baú manda tudo para a mochila; decidir a regra de espaço (tudo ou nada, ou o baú guarda o resto).
-- [ ] Decidir se o ouro vai direto para a carteira.
-- [ ] Drop de monstro: continua no chão até a decisão (chão, dentro da criatura ou saquinho) em `docs/IDEIAS.md`.
+- [x] Item no chão é pego com o botão de Ação ("Pegar"); segurar pega tudo em volta; setinha em cima do item.
+- [x] Baú manda tudo para a mochila; decidido: o baú guarda o resto, só para quem abriu (salvo no personagem).
+- [x] Decidido: o ouro continua caindo no chão (e é pego com o botão, como os itens).
+- [x] Drop de monstro: continua no chão. Sugestão para depois: saquinho pessoal só no chefe (ver `docs/IDEIAS.md`).
 
 ## Sprint 4: jogar junto
 

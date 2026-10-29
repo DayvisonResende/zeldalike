@@ -12,6 +12,7 @@ import { struggle, throwPlayer } from './throwing';
 import { gearIn, type GearId, type GearSlot } from '../gear';
 import { cast, manaCost } from './magic';
 import { pushAgainst } from './blocks';
+import { SWEEP_HOLD, pickAll } from './loot';
 
 export function faceAim(p: Player) { p.aim = p.input.aim ?? FACE[p.dir]; p.dir = angDir(p.aim); }
 function startSwing(w: World, p: Player) { faceAim(p); p.state = 'swing'; p.t = 0; p.hit.clear(); sfx(w, 'swing', p, p.id); }
@@ -129,6 +130,7 @@ export function updatePlayer(w: World, p: Player) {
       if (tap('a') || tap('b')) { if (p.carry === 'player') throwPlayer(w, p); else throwObj(w, p); return; }
       speed = 1.1; break;
     default:
+      if (inp.b) { if (++p.holdB === SWEEP_HOLD) pickAll(w, p); } else p.holdB = 0;   // segurar B: pega tudo em volta
       if (tap('a')) { useGear(w, p, gearIn(p, 'a'), 'a'); return; }
       if (tap('c')) { useGear(w, p, gearIn(p, 'c'), 'c'); return; }
       if (tap('d')) { p.state = 'dashprep'; p.t = 0; return; }

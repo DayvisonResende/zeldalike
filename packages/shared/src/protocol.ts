@@ -93,14 +93,14 @@ export const packBomb = (b: BombView): BombTuple => [b.id, q(b.x), q(b.y), b.fus
 export const unpackBomb = (t: BombTuple): BombView => ({ id: t[0], x: uq(t[1]), y: uq(t[2]), fuse: t[3] });
 
 /* ---------- Estado completo do próprio jogador (para a previsão no cliente) ---------- */
-type OwnKeys = 'x' | 'y' | 'z' | 'push' | 'dvx' | 'dvy' | 'hop' | 'dir' | 'aim' | 'state' | 't' | 'step' | 'walkT' | 'inv' | 'kx' | 'ky' | 'carry' | 'liftFrom' | 'charge' | 'charged' | 'hp' | 'maxHp' | 'mp' | 'maxMp' | 'killer' | 'pvp' | 'pvpActive' | 'safe' | 'level' | 'xp' | 'gold' | 'inPortal' | 'portalWait' | 'steps' | 'fish' | 'carryFuse' | 'holding' | 'heldBy' | 'struggle' | 'prevDirs' | 'gear' | 'using' | 'useBtn' | 'big' | 'slowUntil' | 'shove';
+type OwnKeys = 'x' | 'y' | 'z' | 'push' | 'dvx' | 'dvy' | 'hop' | 'dir' | 'aim' | 'state' | 't' | 'step' | 'walkT' | 'inv' | 'kx' | 'ky' | 'carry' | 'liftFrom' | 'charge' | 'charged' | 'hp' | 'maxHp' | 'mp' | 'maxMp' | 'killer' | 'pvp' | 'pvpActive' | 'safe' | 'level' | 'xp' | 'gold' | 'inPortal' | 'portalWait' | 'steps' | 'fish' | 'carryFuse' | 'holding' | 'heldBy' | 'struggle' | 'prevDirs' | 'gear' | 'using' | 'useBtn' | 'big' | 'slowUntil' | 'shove' | 'holdB';
 export type OwnState = Pick<Player, OwnKeys> & { hit: (number | string)[] };
 export function ownState(p: Player): OwnState {
   return { x: p.x, y: p.y, z: p.z, push: p.push, dvx: p.dvx, dvy: p.dvy, hop: p.hop && { ...p.hop }, dir: p.dir, aim: p.aim, state: p.state, t: p.t, step: p.step, walkT: p.walkT,
     inv: p.inv, kx: p.kx, ky: p.ky, carry: p.carry, liftFrom: p.liftFrom && { ...p.liftFrom }, charge: p.charge, charged: p.charged, hit: [...p.hit],
     hp: Math.round(p.hp * 10) / 10, maxHp: p.maxHp, mp: Math.round(p.mp * 10) / 10, maxMp: p.maxMp,
     killer: p.killer, pvp: p.pvp, pvpActive: p.pvpActive, safe: p.safe, level: p.level, xp: p.xp, gold: p.gold, inPortal: p.inPortal, portalWait: p.portalWait, steps: p.steps, fish: p.fish && { ...p.fish }, carryFuse: p.carryFuse, holding: p.holding, heldBy: p.heldBy, struggle: p.struggle, prevDirs: p.prevDirs,
-    gear: { ...p.gear }, using: p.using, useBtn: p.useBtn, big: p.big, slowUntil: p.slowUntil, shove: p.shove };
+    gear: { ...p.gear }, using: p.using, useBtn: p.useBtn, big: p.big, slowUntil: p.slowUntil, shove: p.shove, holdB: p.holdB };
 }
 export function applyOwnState(p: Player, s: OwnState) {
   const { hit, hop, liftFrom, fish, gear, ...rest } = s;

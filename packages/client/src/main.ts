@@ -326,7 +326,7 @@ function frame(now: number) {
   updateClock(scene.day, scene.dark); updateRaid(scene.invasion);
   if (titleShown() && ready && session.status === 'online' && session.me()) hideTitle();   // o mundo chegou: a cena de título sai
   const me = session.me();
-  updatePad(me, session.inventory(), settings.padSize);
+  updatePad(me, session.inventory(), settings.padSize, scene.drops);
   updateBoss(me ? scene.enemies.find(e => e.type === 'king' && Math.hypot(e.x - me.x, e.y - me.y) < 200) : undefined);
   updateFishBar(session.me());
   if (!dialog.open) talking = null;

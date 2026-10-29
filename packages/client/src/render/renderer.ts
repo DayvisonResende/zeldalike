@@ -4,6 +4,7 @@ import type { Scene } from '../session/types';
 import type { Particles } from './particles';
 import { BANG, CHEST, ITEM_ICON, OBJ, bombFrame, QUES, SHADOW, batSprite, chickenSprite, kingSprite, beetleSprite, heroSprite, mk, slimeSprite } from './sprites';
 import { drawTiles, floorUnder } from './tiles';
+import { pickable } from '../pickup';
 
 type Ctx = CanvasRenderingContext2D;
 // talking: "x,y" do NPC que está conversando com você (ele se vira para você).
@@ -224,6 +225,12 @@ function drawPaths(ctx: Ctx, w: Scene, v: View) {
     } else { ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(e.x, e.y, 96, 0, Math.PI * 2); ctx.stroke(); }
   }
 }
+// Setinha amarela (com contorno) apontando para o item que o botão de Ação pega.
+function drawPickArrow(ctx: Ctx, x: number, y: number) {
+  const cx = Math.round(x), cy = Math.round(y);
+  ctx.fillStyle = '#1b1226'; ctx.fillRect(cx - 4, cy - 4, 9, 3); ctx.fillRect(cx - 3, cy - 1, 7, 2); ctx.fillRect(cx - 2, cy + 1, 5, 2); ctx.fillRect(cx - 1, cy + 3, 3, 1);
+  ctx.fillStyle = '#ffe66b'; ctx.fillRect(cx - 3, cy - 3, 7, 1); ctx.fillRect(cx - 2, cy - 2, 5, 2); ctx.fillRect(cx - 1, cy, 3, 2); ctx.fillRect(cx, cy + 2, 1, 1);
+}
 // Marca da ajuda na mira: quatro cantinhos em volta do alvo, pulsando.
 function drawLock(ctx: Ctx, t: { x: number; y: number }, tick: number) {
   const r = 9 + ((tick >> 3) & 1), x = Math.round(t.x), y = Math.round(t.y);
@@ -279,6 +286,8 @@ export function render(ctx: Ctx, w: Scene, v: View) {
     if (near(x + 8, y + 8)) list.push({ y: y + 12, d: () => ctx.drawImage(c.open ? CHEST.open : CHEST.closed, x, y + 2) });
   }
   // Drops: flutuam de leve; os reservados a outro jogador ficam meio apagados; piscam antes de sumir.
+  // O que o botão de Ação pegaria agora ganha uma setinha em cima.
+  const target = pickable(v.me, w.drops);
   for (const d of w.drops) {
     if (!near(d.x, d.y) || (d.fading && (v.tick >> 3) & 1)) continue;
     const bob = Math.round(Math.sin((v.tick + d.id * 13) / 14) * 1.5);
@@ -287,6 +296,7 @@ export function render(ctx: Ctx, w: Scene, v: View) {
       ctx.drawImage(SHADOW, Math.round(d.x - 7), Math.round(d.y - 2), 14, 4);
       ctx.drawImage(ITEM_ICON[d.item], Math.round(d.x - 5), Math.round(d.y - 12 + bob));
       ctx.globalAlpha = 1;
+      if (d === target) drawPickArrow(ctx, d.x, d.y - 16 + bob - ((v.tick >> 4) & 1));
     } });
   }
   for (const o of w.thrown) if (near(o.x, o.y)) { drawShadow(ctx, o.x, o.y); list.push({ y: o.y, d: () => o.type === 'bomb' ? ctx.drawImage(bombFrame(100, v.tick), Math.round(o.x - 6), Math.round(o.y - 9 - o.z)) : ctx.drawImage(OBJ[o.type], Math.round(o.x - 8), Math.round(o.y - 8 - o.z)) }); }

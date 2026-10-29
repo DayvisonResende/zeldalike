@@ -1,6 +1,6 @@
 import { Room, ServerError, type Client } from 'colyseus';
 import {
-  ITEMS, MSG, buyItem, startInvasion, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
+  ITEMS, LOOT_IDS, MSG, buyItem, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, dropItem, emptyInput, maxStats, ownState,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
   type ChatMsg, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
@@ -103,7 +103,7 @@ export class WorldRoom extends Room {
     }
     const s = resume ?? this.loadState(c), w = this.worlds.get(s.map)!;
     const p = w.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
-    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.gear = s.gear;
+    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear;
     const m = maxStats(w, p.level); p.maxHp = m.hp; p.maxMp = m.mp;
     p.hp = Math.min(s.hp, m.hp); p.mp = Math.min(s.mp, m.mp);
     onlineCharacters.add(c.id);
@@ -170,13 +170,21 @@ export class WorldRoom extends Room {
     try { gear = JSON.parse(c.gear ?? '{}'); } catch { gear = {}; }
     try { bag = JSON.parse(c.items); } catch { bag = []; }
     try { for (const [k, v] of Object.entries(JSON.parse(c.chests ?? '{}'))) if (typeof v === 'number') chests[k] = v; } catch { }
-    return { map, ...at, chests, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
+    // resto guardado nos baús: só o que fizer sentido (item conhecido, quantidade inteira positiva)
+    const chestLoot: CharacterState['chestLoot'] = {};
+    try {
+      for (const [k, v] of Object.entries(JSON.parse(c.chest_loot ?? '{}'))) {
+        const items = Array.isArray(v) ? v.filter(i => i && (LOOT_IDS as unknown[]).includes(i.item) && Number.isInteger(i.n) && i.n > 0).map(i => ({ item: i.item as LootId, n: i.n as number })) : [];
+        if (items.length) chestLoot[k] = items;
+      }
+    } catch { }
+    return { map, ...at, chests, chestLoot, hp, mp: c.mp === null ? m.mp : Math.min(c.mp, m.mp), look: { cloak: c.cloak, hair: c.hair },
       level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack), gear: parseGear(gear) };
   }
   // Quem sai caído volta no ponto de renascimento do mapa principal, com a vida cheia.
   private stateOf(p: Player, map: string): CharacterState {
     const w = this.worlds.get(map); if (w) pruneChests(w, p);
-    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, gear: { ...p.gear } };
+    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear } };
     if (p.state === 'dead') {
       const at = respawnPos(this.world, this.world.rules.player.respawnPoint);
       return { map: startMap(), ...at, hp: p.maxHp, mp: p.maxMp, ...keep };

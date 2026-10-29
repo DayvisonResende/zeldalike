@@ -21,7 +21,7 @@ export * from './view';
 export * from './accounts';
 export * from './items';
 export * from './gear';
-export { dropItem, useItem, type Drop, type ItemResult } from './systems/loot';
+export { PICK_RANGE, canPick, dropItem, lootName, useItem, type Drop, type ItemResult } from './systems/loot';
 export { MAX_DEAL, buyItem, sellItem, type ShopOffer, type ShopRule } from './systems/shop';
 export { gainXp, maxStats, xpToNext } from './systems/progress';
 export * from './world/tiled';
