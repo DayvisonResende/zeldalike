@@ -1,6 +1,7 @@
 import guideMd from '../../../../docs/GUIA-DA-OFICINA.md?raw';
+import tiledMd from '../../../../docs/GUIA-DO-TILED.md?raw';
 
-/* O guia da Oficina (docs/GUIA-DA-OFICINA.md) dentro dela mesma. Um arquivo só: o que se lê aqui é o que está no repositório.
+/* Os guias (docs/GUIA-DA-OFICINA.md e docs/GUIA-DO-TILED.md) dentro da Oficina. Um arquivo só: o que se lê aqui é o que está no repositório.
    Markdown simples (títulos, parágrafos, listas, tabelas, citações, código e negrito), sempre escapado antes. */
 const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 const inline = (s: string) => esc(s)
@@ -9,7 +10,9 @@ const inline = (s: string) => esc(s)
   .replace(/(https?:\/\/[^\s<)]*[^\s<).,;:])/g, '<a href="$1">$1</a>');   // sem o ponto final da frase
 const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
-export function renderGuide(md = guideMd) {
+// Cada guia com o seu endereço (#guia, #tiled) e o prefixo dos títulos (#g-…, #t-…), para os índices não se misturarem.
+export const GUIDES = { guia: { md: guideMd, p: 'g' }, tiled: { md: tiledMd, p: 't' } } as const;
+export function renderGuide(md: string = guideMd, p = 'g') {
   const lines = md.replace(/\r\n/g, '\n').split('\n'), out: string[] = [], toc: string[] = [];
   let i = 0;
   const para: string[] = [];
@@ -21,8 +24,8 @@ export function renderGuide(md = guideMd) {
     if (h) {
       flush();
       const lvl = h[1].length, id = slug(h[2]);
-      out.push(`<h${lvl} id="g-${id}">${inline(h[2])}</h${lvl}>`);
-      if (lvl === 2) toc.push(`<li><a href="#g-${id}">${inline(h[2])}</a></li>`);
+      out.push(`<h${lvl} id="${p}-${id}">${inline(h[2])}</h${lvl}>`);
+      if (lvl === 2) toc.push(`<li><a href="#${p}-${id}">${inline(h[2])}</a></li>`);
       i++; continue;
     }
     if (l.startsWith('|')) {   // tabela: cabeçalho, separador, linhas

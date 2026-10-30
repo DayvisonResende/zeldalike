@@ -216,7 +216,8 @@ lab (`npm start`) a Oficina fica desligada; para ligá-la à força: `OFICINA=1 
 
 ## Editar o mapa (Tiled)
 
-O mundo é um mapa do [Tiled](https://www.mapeditor.org) (grátis): `content/maps/vale.tmj`.
+O mundo é um mapa do [Tiled](https://www.mapeditor.org) (grátis): `content/maps/vale.tmj`. Para aprender do zero,
+com um exercício guiado: `docs/GUIA-DO-TILED.md` (também na Oficina, em "Guia do Tiled").
 
 1. No Tiled, abra o projeto `content/maps/vale.tiled-project` (Arquivo → Abrir projeto) e depois o `vale.tmj`.
 2. Edite as camadas:

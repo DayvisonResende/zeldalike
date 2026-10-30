@@ -12,6 +12,16 @@ O construtor combina **peças que o jogo já sabe fazer**. Um comportamento novo
 que teletransporta, um bumerangue que volta) precisa ser programado uma vez; depois vira peça e aparece na lista
 de todos os construtores que a usam.
 
+**Regra do projeto (2026-10-29):** a Oficina é **onde se cria o jogo e onde se administra o servidor inteiro**.
+
+- Tudo que for conteúdo ou adicional do jogo (itens, NPCs, monstros, peixes, colocáveis, eventos, arte e animação)
+  deve, sempre que possível, ser criado nela. Cada sistema novo sai com o seu campo ou construtor.
+- Tudo que hoje se ajusta no `config.yaml` (regras, lojas, drops, eventos, administradores) e as tarefas de
+  administração (anunciar, expulsar, iniciar um evento, publicar para a produção) também vão para ela, por formulário.
+- Fica fora: desenhar mapas (Tiled; a Oficina ensina e confere) e o que é programação de verdade.
+
+Pedidos e análise em `PEDIDOS.md`.
+
 ## Como é hoje
 
 | O que | Onde está hoje | Para a Oficina funcionar |
@@ -241,6 +251,27 @@ As marcadas com ★ são as mais valiosas.
 **Para entrar junto com a base:** sala de testes, calculadora de equilíbrio e "amigos sugerem, o administrador aprova".
 As duas primeiras evitam que um número errado estrague o jogo de todo mundo; a terceira transforma a Oficina num motivo
 a mais para jogar junto.
+
+## Mapa da independência (2026-10-29)
+
+Objetivo: o dono do jogo criar e manter o conteúdo sem depender de quem programa. Além do que está acima:
+
+| O quê | Para quê | Situação |
+| --- | --- | --- |
+| Criaturas e NPCs com moldes de quadros | monstros, chefes e NPCs sem código (ver `PEDIDOS.md` 16) | planejado |
+| Falas, lojas e missões dos NPCs | conversas com escolhas, "traga 5 geleias", recompensas | planejado com as missões |
+| **Gatilhos simples** | "quando pisar aqui / falar com X / derrotar todos → abrir porta, dar item, mostrar texto, nascer monstro" | **novo**; é o que permite criar quebra-cabeças e masmorras sem código |
+| Tabelas: pesca, tesouro, drops | o que sai, onde, quando, com que chance | drops e baús já se editam em "Onde aparece" |
+| Colocáveis e luz | tochas, fogueiras, móveis, lanterna | planejado |
+| Painel do servidor | regeneração, XP, ciclo do dia, PvP, tamanho do grupo, por formulário | hoje só editando o `config.yaml` |
+| Sala de testes, rascunho e desfazer | testar sem medo e voltar atrás | planejado (acima) |
+| Publicar para a produção por botão | sem VS Code nem `git pull` no servidor | **novo**; hoje são 6 passos |
+| Conferir mapa na Oficina | subir o `.tmj` e ver os erros do `map:check` em português, com o lugar marcado | **novo** |
+| Guias e aulas | Oficina, Tiled, animação de andar | Oficina pronto; os outros planejados |
+
+**O que continua precisando de programação:** comportamentos e mecânicas novas (que depois viram peças),
+sistemas grandes (troca, horta), defeitos do motor, rede e desempenho, segurança e atualização de bibliotecas.
+Quanto mais peças existirem, mais raro fica precisar disso.
 
 ## Ordem
 

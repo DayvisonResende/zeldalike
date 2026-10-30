@@ -167,6 +167,9 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 
 ## Depois (sem data)
 
+Pedidos da rodada de 2026-10-29 (tela completa, lanterna, aparência, pesca, moedas, menu ao tocar em alguém…), com
+análise e ordem sugerida: `PEDIDOS.md`.
+
 Primeiros minutos guiados (missão curta do Velho Tomé: andar, atacar, pegar item, falar com a Rosa), quando o mapa novo
 estiver pronto. Notificações no app Android, horta e fazenda, troca entre jogadores, construtores de NPCs, monstros e magias, receitas,
 missões, minijogos, clima, música por região, eventos de temporada, acessibilidade.

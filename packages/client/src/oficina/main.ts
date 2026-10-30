@@ -1,7 +1,7 @@
 import { MAX_ATTACK_SPEED, RARITY_COLOR, RARITY_NAME, STAT_KEYS, STAT_LABEL, balance, gearLines, type CalcRules, type EffectKind, type Rarity, isKind, WEAR_EFFECTS, WEAR_NAME, statLines, type WearDef, type WearSlot, setItems, type GearDef, type GearKind, type GearRules, type ItemCatalogMsg, type ItemDef, type Stats } from '@vale/shared';
 import { Api, ApiError, loadSession, saveSession } from '../net/api';
 import './oficina.css';
-import { renderGuide } from './guide';
+import { GUIDES, renderGuide } from './guide';
 
 /* Oficina: criar e editar itens (docs/OFICINA.md). Grava em content/items/ pelo servidor (só com OFICINA=1, no PC). */
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -338,14 +338,16 @@ $('saveUses').addEventListener('click', async () => {
   }
 });
 
-/* ---------- Guia (#guia) ---------- */
-// O guia abre por cima de tudo, até sem login. Os links do índice (#g-…) rolam dentro dele.
+/* ---------- Guias (#guia, #tiled) ---------- */
+// O guia abre por cima de tudo, até sem login. Os links do índice (#g-…, #t-…) rolam dentro dele.
+let guideShown = '';
 function route() {
-  const h = location.hash, reading = h === '#guia' || h.startsWith('#g-');
-  if (reading && !$('guideBody').childElementCount) $('guideBody').innerHTML = renderGuide();
-  $('guide').hidden = !reading; document.body.classList.toggle('reading', reading);
-  if (h === '#guia') window.scrollTo(0, 0);
-  else if (h.startsWith('#g-')) document.getElementById(h.slice(1))?.scrollIntoView();
+  const h = location.hash;
+  const name = (Object.keys(GUIDES) as (keyof typeof GUIDES)[]).find(k => h === '#' + k || h.startsWith(`#${GUIDES[k].p}-`));
+  if (name && guideShown !== name) { guideShown = name; $('guideBody').innerHTML = renderGuide(GUIDES[name].md, GUIDES[name].p); }
+  $('guide').hidden = !name; document.body.classList.toggle('reading', !!name);
+  if (name && h === '#' + name) window.scrollTo(0, 0);
+  else if (name) document.getElementById(h.slice(1))?.scrollIntoView();
 }
 window.addEventListener('hashchange', route);
 route();
