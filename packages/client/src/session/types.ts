@@ -1,4 +1,4 @@
-import type { GearRules, Stats, PartyMsg, PartyRequest, ArrowView, GearId, GearSlot, ItemId, SpellView, BombView, ChatMsg, ChatRequest, DistMap, DropView, Npc, PvpInfo, Slot, EnemyView, GameEvent, InputState, PlayerView, Profile, ProfileRequest, ThrownView, WorldMap } from '@vale/shared';
+import type { WearSlot, GearRules, Stats, PartyMsg, PartyRequest, ArrowView, GearId, GearSlot, ItemId, SpellView, BombView, ChatMsg, ChatRequest, DistMap, DropView, Npc, PvpInfo, Slot, EnemyView, GameEvent, InputState, PlayerView, Profile, ProfileRequest, ThrownView, WorldMap } from '@vale/shared';
 
 // Tudo que o renderer precisa para desenhar um quadro.
 export interface Scene {
@@ -21,7 +21,7 @@ export interface MapState { explored: Uint8Array; safe: readonly string[]; marks
 export interface PartyMember { id: string; name: string; level: number; hp: number; dead: boolean; at: { x: number; y: number } | null; where: string }
 export interface PartyState { leader: string; members: PartyMember[] }
 // Progresso e inventário do seu personagem.
-export interface Inventory { bag: Slot[]; gold: number; level: number; xp: number; xpNext: number; gear: Record<GearSlot, GearId>; stats: Stats; maxHp: number; maxMp: number }
+export interface Inventory { bag: Slot[]; gold: number; level: number; xp: number; xpNext: number; gear: Record<GearSlot, GearId>; stats: Stats; maxHp: number; maxMp: number; wear: Record<WearSlot, Slot> }
 export type Status = 'connecting' | 'online' | 'reconnecting' | 'offline' | 'local';
 
 // O jogo não sabe se está online ou não: fala sempre com uma Session.
@@ -39,6 +39,9 @@ export interface Session {
   useItem(slot: number): void;
   dropItem(slot: number): void;
   equip(gear: GearId, slot: GearSlot): void;   // põe no botão A ou C
+  wear(slot: number): void;                    // veste o que está nesse espaço da mochila
+  unwear(part: WearSlot): void;                // tira (volta para a mochila)
+  sortBag(): void;                             // organiza a mochila por tipo e raridade
   mapState(): MapState;
   mark(x: number, y: number): void;            // marcador "venham aqui!" (pixels)
   clearMark(): void;

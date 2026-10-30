@@ -5,6 +5,7 @@ import type { Npc } from '../world/map';
 import type { World } from '../world';
 import { sfx } from './fx';
 import type { ItemResult } from './loot';
+import { gearIdOf, gearIn } from '../gear';
 
 /* ---------- Lojas: NPCs com a propriedade "loja" no Tiled; preços em shops no config ---------- */
 // buy: o que a loja vende (e por quanto); sell: o que ela compra de você (e quanto paga).
@@ -49,7 +50,10 @@ export function sellItem(w: World, p: Player, shop: string, item: ItemId, n: num
   if (!price || !count(n)) return fail('Essa loja não compra isso.');
   if (!nearShop(w, p, shop)) return fail('Chegue mais perto do lojista.');
   let sold = 0;
-  for (let i = 0; i < p.bag.length && sold < n; i++) if (p.bag[i]?.id === item) sold += takeItem(p.bag, i, n - sold);
+  // equipamento: vende primeiro o que não está num botão e não tem sorteio (o melhor exemplar fica por último)
+  const worth = (i: number) => { const s = p.bag[i]!, g = gearIdOf(s); return (g === gearIn(p, 'a') || g === gearIn(p, 'c') ? 2 : 0) + (s.roll ? 1 : 0); };
+  const slots = p.bag.flatMap((s, i) => s?.id === item ? [i] : []).sort((a, b) => worth(a) - worth(b));
+  for (const i of slots) if (sold < n) sold += takeItem(p.bag, i, n - sold);
   if (!sold) return fail(`Você não tem ${ITEMS[item].name}.`);
   p.bagVersion++; p.gold += price * sold;
   w.emit({ t: 'gain', to: p.id, x: p.x, y: p.y - 8, text: `+${price * sold} de ouro` });

@@ -1,4 +1,4 @@
-import { ITEMS, type ItemId, type ShopOffer } from '@vale/shared';
+import { RARITY_COLOR, rarityOf, ITEMS, type ItemId, type ShopOffer } from '@vale/shared';
 import { iconsVersion, itemIcon } from '../render/icons';
 import type { Inventory } from '../session/types';
 
@@ -58,7 +58,7 @@ export class ShopPanel {
     const li = document.createElement('li'), cv = document.createElement('canvas'), icon = itemIcon(id);
     cv.width = icon.width; cv.height = icon.height; cv.getContext('2d')!.drawImage(icon, 0, 0);
     const info = document.createElement('span');
-    info.append(Object.assign(document.createElement('b'), { textContent: ITEMS[id].name }), Object.assign(document.createElement('small'), { textContent: `${price} · você tem ${have}` }));
+    info.append(Object.assign(document.createElement('b'), { textContent: ITEMS[id].name, style: `color:${RARITY_COLOR[rarityOf(id)]}` }), Object.assign(document.createElement('small'), { textContent: `${price} · você tem ${have}` }));
     li.append(cv, info);
     for (const [label, n, ok] of buttons) {
       const b = Object.assign(document.createElement('button'), { type: 'button', className: 'primary', textContent: label, disabled: !ok });

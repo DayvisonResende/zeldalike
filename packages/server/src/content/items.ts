@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { GEAR, REQUIRED_ITEMS, setItems, type ItemCatalogMsg, type ItemDef } from '@vale/shared';
+import { EFFECTS, GEAR, RARITIES, REQUIRED_ITEMS, STAT_KEYS, WEAR_EFFECTS, WEAR_SLOTS, setItems, type ItemCatalogMsg, type ItemDef } from '@vale/shared';
 import { z } from 'zod';
 import { statBonus } from '../config/schema';
 
@@ -18,8 +18,29 @@ export const itemSchema = z.strictObject({
     like: z.enum(GEAR),                                 // comporta-se como: sword, bow, firestaff, lightstaff ou darktome
     damage: z.number().int().min(1).max(999).optional(),   // dano próprio (só espada e arco); sem ele, o da arma de base
     stats: statBonus.optional(),                        // atributos que dá enquanto estiver no A ou no C
-    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'cor como #a1b2c3').optional()   // lâmina, pedra do cajado ou madeira do arco
-  }).refine(g => !g.damage || g.like === 'sword' || g.like === 'bow', { message: 'dano próprio só vale para espada e arco (cajados usam os números de magic)', path: ['damage'] }).optional()
+    color: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'cor como #a1b2c3').optional(),   // lâmina, pedra do cajado ou madeira do arco
+    // sorteio (comum, incomum e raro): atributos que um exemplar pode trazer a mais, cada um entre [mínimo, máximo]
+    rolls: z.partialRecord(z.enum(STAT_KEYS), z.tuple([z.number(), z.number()]).refine(([a, b]) => a <= b, 'o mínimo não pode passar do máximo')).optional(),
+    // épico e lendário: um efeito (roubo de vida, veneno, flecha que atravessa, onda ao girar, explode ao derrubar)
+    effect: z.strictObject({ kind: z.enum(EFFECTS), value: z.number().int().min(1).max(999) }).optional()
+  }).refine(g => !g.damage || g.like === 'sword' || g.like === 'bow', { message: 'dano próprio só vale para espada e arco (cajados usam os números de magic)', path: ['damage'] }).optional(),
+  // vestir (armadura e acessório): sai da mochila e fica no espaço dele; dá atributos e, em épico e lendário, um efeito
+  wear: z.strictObject({
+    slot: z.enum(WEAR_SLOTS),   // head (cabeça), body (corpo), feet (pés), neck (colar), ring (anel)
+    stats: statBonus.optional(),
+    rolls: z.partialRecord(z.enum(STAT_KEYS), z.tuple([z.number(), z.number()]).refine(([a, b]) => a <= b, 'o mínimo não pode passar do máximo')).optional(),
+    effect: z.strictObject({ kind: z.enum(WEAR_EFFECTS, { error: 'em armadura e acessório: lifesteal, poison ou explode (os outros dependem da arma)' }), value: z.number().int().min(1).max(999) }).optional()
+  }).optional(),
+  rarity: z.enum(RARITIES).optional()   // comum (padrão), incomum, raro, épico, lendário
+}).superRefine((d, ctx) => {
+  const r = d.rarity ?? 'common', fixed = r === 'epic' || r === 'legendary';
+  if (d.gear && d.wear) ctx.addIssue({ code: 'custom', path: ['wear'], message: 'um item é arma (gear) ou se veste (wear), não os dois' });
+  if (d.wear?.rolls && Object.keys(d.wear.rolls).length && fixed) ctx.addIssue({ code: 'custom', path: ['wear', 'rolls'], message: 'épico e lendário são fixos: sorteio só em comum, incomum e raro' });
+  if (d.wear?.effect && !fixed) ctx.addIssue({ code: 'custom', path: ['wear', 'effect'], message: 'efeito só em épico e lendário' });
+  if (d.gear?.rolls && Object.keys(d.gear.rolls).length && fixed) ctx.addIssue({ code: 'custom', path: ['gear', 'rolls'], message: 'épico e lendário são fixos: sorteio só em comum, incomum e raro' });
+  if (d.gear?.effect && !fixed) ctx.addIssue({ code: 'custom', path: ['gear', 'effect'], message: 'efeito só em épico e lendário' });
+  if (d.gear?.effect?.kind === 'pierce' && d.gear.like !== 'bow') ctx.addIssue({ code: 'custom', path: ['gear', 'effect'], message: 'flecha que atravessa só vale para arco' });
+  if (d.gear?.effect?.kind === 'wave' && d.gear.like !== 'sword') ctx.addIssue({ code: 'custom', path: ['gear', 'effect'], message: 'onda ao girar só vale para espada (é o giro carregado)' });
 });
 export const ID = /^[a-z0-9-]+$/;
 // Catálogo que vai para o cliente: os dados e o ícone (PNG em data URL, ~200 bytes cada).

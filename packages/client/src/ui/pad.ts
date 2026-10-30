@@ -1,4 +1,4 @@
-import { gearName, REVIVE_RANGE, gearIn, type DropView, type PlayerView } from '@vale/shared';
+import { gearName, REVIVE_RANGE, gearIn, nextGear, type DropView, type PlayerView } from '@vale/shared';
 import { pickable } from '../pickup';
 import { iconsVersion, itemIcon } from '../render/icons';
 import type { Inventory } from '../session/types';
@@ -6,7 +6,7 @@ import type { PadSize } from './settings';
 
 // Parte do controle de toque que muda com o jogo: quantos itens restam nos atalhos e o nome do botão B.
 const pad = document.getElementById('pad')!, bLabel = document.querySelector('#btnB span')!;
-const aLabel = document.querySelector('#btnA span')!, cLabel = document.querySelector('#btnC span')!, gearLine = document.getElementById('gearLine')!;
+const aLabel = document.querySelector('#btnA span')!, cLabel = document.querySelector('#btnC span')!, gearBtns = { a: document.querySelector<HTMLButtonElement>('#gearLine [data-gear=a]')!, c: document.querySelector<HTMLButtonElement>('#gearLine [data-gear=c]')! };
 let lastGear = '';
 const quick = (['heart', 'mana', 'bomb'] as const).map((id, i) => {
   const el = document.getElementById('q' + (i + 1))!;
@@ -31,8 +31,14 @@ export function updatePad(me: PlayerView | undefined, inv: Inventory | null, siz
     if (q.id === 'bomb') { bombCount.textContent = String(n); bomb.classList.toggle('empty', n === 0); }
   }
   if (inv) {   // o que está no A e no C: nos botões do celular e numa linha do HUD
-    const a = gearName(gearIn(inv, 'a')), c = gearName(gearIn(inv, 'c'));
-    if (a + c !== lastGear) { lastGear = a + c; aLabel.textContent = a; cLabel.textContent = c; gearLine.textContent = `A ${a} · C ${c}`; }
+    const a = gearName(gearIn(inv, 'a')), c = gearName(gearIn(inv, 'c')), more = String(!!nextGear(inv, 'a')) + !!nextGear(inv, 'c');
+    if (a + c + more !== lastGear) {
+      lastGear = a + c + more; aLabel.textContent = a; cLabel.textContent = c;
+      for (const [k, name] of [['a', a], ['c', c]] as const) {   // sem outra arma para trocar, o botão fica parado
+        gearBtns[k].querySelector('span')!.textContent = name; gearBtns[k].disabled = !nextGear(inv, k);
+        gearBtns[k].setAttribute('aria-label', `${k.toUpperCase()}: ${name}${gearBtns[k].disabled ? '' : '. Trocar'}`);
+      }
+    }
   }
   const fallen = !!me && me.state !== 'dead' && players.some(o => o.id !== me.id && o.state === 'dead' && Math.hypot(o.x - me.x, o.y - me.y) <= REVIVE_RANGE);
   const b = me?.carry ? 'Arremessar' : me?.state === 'fish' ? 'Puxar' : pickable(me, drops) ? 'Pegar' : fallen ? 'Levantar' : 'Ação';

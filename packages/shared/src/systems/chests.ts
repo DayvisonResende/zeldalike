@@ -3,8 +3,9 @@ import type { Player } from '../entities/player';
 import type { World } from '../world';
 import type { Chest } from '../world/map';
 import { burst, sfx } from './fx';
-import { lootName, rollLoot } from './loot';
-import { addItem, type LootId } from '../items';
+import { found, lootName, rollLoot } from './loot';
+import { ITEMS, addItem, type LootId } from '../items';
+import { rollFor } from '../rarity';
 
 /* ---------- Baús: cada personagem abre cada baú uma vez e espera ele "encher de novo" ----------
    O conteúdo vai direto para a mochila (ouro, para a carteira). O que não couber fica guardado no baú, só para
@@ -35,7 +36,13 @@ function give(w: World, p: Player, c: Chest, key: string, items: { item: LootId;
   for (const { item, n } of items) {
     let got = n;
     if (item === 'gold') p.gold += n;
-    else { const r = addItem(p.bag, item, n, stack); got = n - r; if (r) rest.push({ item, n: r }); if (got) p.bagVersion++; }
+    else if (ITEMS[item]?.gear || ITEMS[item]?.wear) {   // equipamento: cada exemplar com o próprio sorteio
+      got = 0;
+      for (let k = 0; k < n; k++) if (!addItem(p.bag, item, 1, stack, rollFor(w, item))) got++;
+      if (got < n) rest.push({ item, n: n - got });
+      if (got) { p.bagVersion++; found(w, p, item); }
+    }
+    else { const r = addItem(p.bag, item, n, stack); got = n - r; if (r) rest.push({ item, n: r }); if (got) { p.bagVersion++; found(w, p, item); } }
     if (got) w.emit({ t: 'gain', to: p.id, x: p.x, y: p.y - 8 - 9 * i++, text: '+' + lootName(item, got) });
   }
   if (rest.length) { p.chestLoot[key] = rest; w.emit({ t: 'notice', to: p.id, text: 'Mochila cheia: o resto ficou guardado no baú para você.' }); }

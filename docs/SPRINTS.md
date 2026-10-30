@@ -140,9 +140,30 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 
 ## Sprint 9: raridade
 
-- [ ] Cinco raridades (comum a lendário), cores, brilho no chão, som e anúncio no chat.
-- [ ] Lendários fixos criados na Oficina; sorteio leve nos comuns, incomuns e raros.
-- [ ] Todo lendário com um caminho garantido.
+- Decidido (2026-10-29): sorteio agora (cada exemplar é único) e 5 efeitos para começar.
+- [x] Cinco raridades (comum a lendário): cor no nome, borda no inventário, brilho no chão (luz subindo nos épicos e
+      lendários), som especial e anúncio no chat ao achar épico ou lendário.
+- [x] Sorteio nos comuns (às vezes 1 atributo), incomuns (1) e raros (2), entre as faixas definidas na Oficina; o
+      exemplar sorteado tem id próprio ("espada-de-ferro#defense=5"), não empilha e a loja vende primeiro o comum.
+- [x] Épicos e lendários fixos, com efeito: roubo de vida, veneno, flecha que atravessa, onda ao girar, explode ao
+      derrubar (Oficina, com regras: sorteio só até raro, efeito só em épico e lendário, cada efeito na arma certa).
+- [x] Todo lendário com um caminho garantido: a Oficina avisa em "Onde aparece" quando falta.
+- Corrigido de passagem: a previsão do celular ficava com a mochila vazia e usava a espada e o arco de base no lugar
+  de cajados, gancho e equipamentos da Oficina (discordava do servidor e refazia passos).
+- [ ] Criar os primeiros lendários de verdade na Oficina (com o caminho garantido de cada um) e testar com a galera.
+
+## Inventário por tipo (vestir)
+
+- Decidido (2026-10-29): como no Tibia, 7 espaços: A, C, cabeça, corpo, pés, colar e anel (sem escudo por enquanto).
+  Armadura ainda não aparece desenhada no personagem.
+- [x] Itens de vestir (`wear` no `.json`, tipo "Vestir" na Oficina): atributos, sorteio e efeito como o equipamento;
+      efeitos de vestir só roubo de vida, veneno e explosão (somam com os da arma).
+- [x] O que se veste sai da mochila e vai para o boneco; vestir no lugar de outro troca os dois; tirar precisa de um
+      espaço livre. O servidor confere tudo e guarda no banco (coluna `wear`, migração `011_vestir`).
+- [x] Mochila com abas (Tudo, Equipamento, Consumíveis, Materiais) e botão Organizar (armas, vestir, consumíveis,
+      materiais; raros primeiro). Escolher algo de vestir mostra o que muda no lugar do atual; dois cliques veste.
+- [x] Menu → Atributos lista o que está vestido.
+- [ ] Desenhar armadura no personagem (precisa de sprites por direção).
 
 ## Depois (sem data)
 

@@ -41,6 +41,12 @@ describe('itens em content/items/', () => {
     expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "gear": { "like": "firestaff", "damage": 30 } }', 'x.png': icon }))).toThrow(/gear\.damage: dano próprio só vale para espada e arco/);
     expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "gear": { "like": "machado" } }', 'x.png': icon }))).toThrow(/x\.json: gear\.like/);
     expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "gear": { "like": "sword", "color": "azul" } }', 'x.png': icon }))).toThrow(/cor como #a1b2c3/);
+    // raridade: sorteio só até raro; efeito só em épico e lendário, e o efeito precisa combinar com a arma
+    expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "rarity": "epic", "gear": { "like": "sword", "rolls": { "attack": [1, 3] } } }', 'x.png': icon }))).toThrow(/sorteio só em comum, incomum e raro/);
+    expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "rarity": "rare", "gear": { "like": "sword", "effect": { "kind": "poison", "value": 3 } } }', 'x.png': icon }))).toThrow(/efeito só em épico e lendário/);
+    expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "rarity": "epic", "gear": { "like": "sword", "effect": { "kind": "pierce", "value": 2 } } }', 'x.png': icon }))).toThrow(/só vale para arco/);
+    expect(() => loadItems(scratch({ 'x.json': '{ "name": "X", "rarity": "rare", "gear": { "like": "sword", "rolls": { "attack": [5, 2] } } }', 'x.png': icon }))).toThrow(/mínimo não pode passar do máximo/);
+    expect(loadItems(scratch({ 'x.json': '{ "name": "X", "rarity": "legendary", "gear": { "like": "bow", "effect": { "kind": "pierce", "value": 3 } } }', 'x.png': icon })).x.rarity).toBe('legendary');
   });
   it('o config só aceita itens que existem', () => {
     const text = fs.readFileSync(new URL('../config.yaml', import.meta.url), 'utf8').replace(/\r\n/g, '\n');

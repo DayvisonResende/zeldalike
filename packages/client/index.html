@@ -26,7 +26,7 @@
       <div class="xprow"><span class="lvl" id="lvl">Nv 1</span><div class="xpbar" id="xpbar" role="meter" aria-label="Experiência" aria-valuemin="0"><i></i></div></div>
       <span class="clock" id="clock"></span>
       <span class="raid" id="raid" role="status" hidden></span>
-      <span class="gearline" id="gearLine"></span>
+      <div class="gearline" id="gearLine"><button type="button" data-gear="a" title="Trocar a arma do A (tecla 4)"><b>A</b><span>Espada</span></button><button type="button" data-gear="c" title="Trocar a arma do C (tecla 5)"><b>C</b><span>Arco</span></button></div>
       <span class="gold" id="gold"><canvas width="10" height="9" aria-hidden="true"></canvas><b>0</b></span>
       <span class="gold keys" id="keys" title="Chaves do grupo" hidden><canvas width="10" height="10" aria-hidden="true"></canvas><b>0</b></span>
       <span class="badge" id="pvpBadge" hidden></span>
@@ -113,6 +113,22 @@
           <button type="button" class="gearbtn" id="gearC" data-slot="c"></button>
         </div>
         <div class="gearstats" id="gearStats"></div>
+        <div class="doll" id="doll" role="group" aria-label="Vestido: toque para ver e tirar">
+          <button type="button" class="slot wear" data-wear="head"></button>
+          <button type="button" class="slot wear" data-wear="neck"></button>
+          <button type="button" class="slot wear" data-wear="body"></button>
+          <button type="button" class="slot wear" data-wear="ring"></button>
+          <button type="button" class="slot wear" data-wear="feet"></button>
+        </div>
+        <div class="bagtabs">
+          <div class="tabs" role="tablist" aria-label="Mostrar">
+            <button type="button" role="tab" data-bagtab="all" aria-selected="true">Tudo</button>
+            <button type="button" role="tab" data-bagtab="gear" aria-selected="false">Equipamento</button>
+            <button type="button" role="tab" data-bagtab="use" aria-selected="false">Consumíveis</button>
+            <button type="button" role="tab" data-bagtab="material" aria-selected="false">Materiais</button>
+          </div>
+          <button type="button" class="link" id="bagSort">Organizar</button>
+        </div>
         <div class="bagrid" id="bagGrid" role="listbox" aria-label="Itens"></div>
         <div class="bagdetail" id="bagDetail">
           <p id="bagInfo" class="hint">Escolha um item.</p>

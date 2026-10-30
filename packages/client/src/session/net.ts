@@ -1,7 +1,7 @@
 import { Client, type Room } from '@colyseus/sdk';
 import {
   MSG, TS, World, along, applyOwnLife, applyOwnState, decodeInput, ownSimKey, ownState, blocksShot, hitsEnemy, swordPose, type Arrow, type EnemyView, base64ToBits, bfs, cleanLook, cleanName, encodeInput, exploredSize, reveal, tileOf, unpackDrop, type Drop, type MarkMsg,
-  type ChatMsg, type ChatRequest, type GearRules, type ItemCatalogMsg, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type FramePart, type SnapshotMsg, type TelemetryMsg, type WelcomeMsg
+  type ChatMsg, type ChatRequest, type GearRules, type ItemCatalogMsg, type PartyMsg, type PartyRequest, type GearId, type GearSlot, type WearSlot, type ItemId, type GameEvent, type JoinOptions, type PvpInfo, type Slot, type InputState, type MapData, type Player, type PlayerView, type Profile, type ProfileMsg, type ProfileRequest, type FramePart, type SnapshotMsg, type TelemetryMsg, type WelcomeMsg
 } from '@vale/shared';
 import { Interpolator, SnapshotClock, toFrame } from './interpolate';
 import { setCatalog } from '../render/icons';
@@ -39,6 +39,7 @@ export class NetSession implements Session {
   private partyNow: PartyState | null = null;
   private rulesNow: GearRules | null = null;
   private keys: number | null = null;
+  private wearNow: Record<WearSlot, Slot> = { head: null, body: null, feet: null, neck: null, ring: null };
   private mapId = '';   // id do mapa (como o servidor chama), para os fragmentos achados
   onLeave?: (code: number) => void;
   onMapChange?: () => void;
@@ -93,8 +94,8 @@ export class NetSession implements Session {
       if (changed) this.onMapChange?.();
     }
     m.tiles.forEach((row, ty) => [...row].forEach((c, tx) => { this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); }));
-    this.overlay.clear(); this.pending = []; this.queued = []; this.myArrows = []; this.interp.clear(); this.clock.reset(); this.predicted.clear(); this.felt.clear(); this.flash.clear(); this.echoes = [];
-    if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, '', m.at.x, m.at.y); }
+    this.overlay.clear(); this.pending = []; this.queued = []; this.myArrows = []; this.interp.clear(); this.clock.reset(); this.predicted.clear(); this.toReconcile = null; this.felt.clear(); this.flash.clear(); this.echoes = [];
+    if (!this.player) { for (const id of [...this.pred.players.keys()]) this.pred.removePlayer(id); this.pred.addPlayer(m.id, '', m.at.x, m.at.y); this.syncBag(); }
     else { const p = this.player; p.x = m.at.x; p.y = m.at.y; }
     this.smooth = { x: 0, y: 0 };
     this.profiles = new Map(m.profiles.map(p => [p.id, p]));
@@ -138,15 +139,17 @@ export class NetSession implements Session {
     this.pvpInfo = s.pvp; this.xpNext = s.xpNext; this.day = s.day; this.invasion = s.iv ?? null;
     this.partyNow = s.g ? { leader: s.g.leader, members: s.g.m.map(([id, name, level, hp, dead, x, y, where]) => ({ id, name, level, hp, dead: dead === 1, at: x < 0 ? null : { x, y }, where })) } : null;
     if (s.r) this.roster = s.r.map(([id, x, y]) => ({ id, x, y }));
-    if (s.bag) this.bag = s.bag;
+    if (s.bag) { this.bag = s.bag; this.syncBag(); }
+    if (s.wear) this.wearNow = s.wear;
     if (s.ch) this.openChests = new Set(s.ch);
     if (s.ev.length) this.queued.push({ t: s.t, ev: s.ev });
-    this.reconcile(s);
+    this.toReconcile = s;   // confere a previsão uma vez por passo, com o mais novo (ver step)
   }
 
   /* Volta ao estado que o servidor confirmou e reaplica os inputs que ele ainda não viu. Refazer a previsão custa um
      passo de simulação por input pendente (no celular, centenas por segundo); então, se o servidor chegou exatamente
      onde a previsão chegou naquele input, a previsão de agora já está certa: só copia vida, ouro e afins. */
+  private toReconcile: SnapshotMsg | null = null;   // snapshot mais novo ainda não conferido com a previsão
   private predicted = new Map<number, string>();   // seq → estado previsto depois desse input (só o que a previsão simula)
   private reconcile(s: SnapshotMsg) {
     const p = this.player; if (!p || !s.me) return;
@@ -188,8 +191,11 @@ export class NetSession implements Session {
       if (!this.map.inBounds(cx, cy)) { a.dead = true; continue; }
       if (blocksShot(this.map.tiles[cy][cx])) { a.stuck = 30; continue; }
       // mesmas caixas do servidor (createEnemy): o Rei é maior; atordoado, a flecha passa direto
-      const e = this.lastEnemies.find(e => e.hurtT === 0 && Math.abs(e.x - tx) < body(e).hw + 2 && Math.abs(e.y - ty) < body(e).hh + 5);
-      if (e) { a.dead = true; if (e.type !== 'chicken' && e.hp > 0) this.feel(e, out); }
+      const e = this.lastEnemies.find(e => e.hurtT === 0 && !a.hits?.includes(e.id) && Math.abs(e.x - tx) < body(e).hw + 2 && Math.abs(e.y - ty) < body(e).hh + 5);
+      if (e) {
+        if (e.type !== 'chicken' && e.hp > 0) this.feel(e, out);
+        if (a.pierce) { a.pierce--; (a.hits ??= []).push(e.id); } else a.dead = true;   // flecha que atravessa (efeito): segue
+      }
     }
     this.myArrows = this.myArrows.filter(a => !a.dead);
   }
@@ -227,6 +233,9 @@ export class NetSession implements Session {
     if (i >= 0) this.echoes.splice(i, 1);
     return i >= 0;
   }
+  // A previsão precisa da mochila: é dela que sai o que está no A e no C (cajado, gancho, uma espada da Oficina).
+  // Sem isso, a previsão usava a espada e o arco de base, discordava do servidor e refazia os passos.
+  private syncBag() { const p = this.player; if (p) p.bag = this.bag.map(s => s && { ...s, ...(s.roll ? { roll: { ...s.roll } } : {}) }); }
   private applyTile(tx: number, ty: number, c: string) {
     this.auth[ty][tx] = c; this.pred.map.set(tx, ty, c); this.overlay.delete(tx + ',' + ty);
   }
@@ -244,11 +253,14 @@ export class NetSession implements Session {
   partyRequest(req: PartyRequest) { if (this.status === 'online') this.room?.send(MSG.party, req); }
   inventory(): Inventory | null {
     const p = this.player; if (!p) return null;
-    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext, gear: p.gear, stats: p.stats, maxHp: p.maxHp, maxMp: p.maxMp };
+    return { bag: this.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: this.xpNext, gear: p.gear, stats: p.stats, maxHp: p.maxHp, maxMp: p.maxMp, wear: this.wearNow };
   }
   useItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'use', slot }); }
   dropItem(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'drop', slot }); }
   equip(gear: GearId, slot: GearSlot) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'equip', gear, slot }); }
+  wear(slot: number) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'wear', slot }); }
+  unwear(part: WearSlot) { if (this.status === 'online') this.room?.send(MSG.item, { action: 'unwear', slot: part }); }
+  sortBag() { if (this.status === 'online') this.room?.send(MSG.item, { action: 'sort' }); }
   shop(action: 'buy' | 'sell', shop: string, item: ItemId, n: number) { if (this.status === 'online') this.room?.send(MSG.shop, { action, shop, item, n }); }
   setPvp(on: boolean) { if (this.status === 'online') this.room?.send(MSG.pvp, { on }); }
   chat(req: ChatRequest) { if (this.status === 'online') this.room?.send(MSG.chat, req); }
@@ -270,6 +282,9 @@ export class NetSession implements Session {
 
   step(input: InputState): GameEvent[] {
     this.local++;
+    // Depois de um buraco na rede chegam dezenas de snapshots juntos. Conferir a previsão em cada um refazia todos os
+    // inputs pendentes de novo e de novo (o /debug mostrou 1.073 passos refeitos num segundo); o mais novo basta.
+    if (this.toReconcile) { const t = performance.now(); this.reconcile(this.toReconcile); this.toReconcile = null; this.time('rede_snapshot', t); }
     const out: GameEvent[] = [];
     this.stepArrows(out);
     this.smooth.x *= 0.85; this.smooth.y *= 0.85;

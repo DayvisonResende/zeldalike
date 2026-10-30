@@ -1,8 +1,9 @@
 import { BOW_END, CAST_END, SWING, TICK_RATE } from './constants';
-import type { GearDef } from './gear';
+import { WEAR_NAME, type GearDef, type WearDef } from './gear';
 import type { ItemDef } from './items';
 import type { EnemyType } from './rules';
-import { MAX_ATTACK_SPEED, type GearRules } from './systems/stats';
+import { MAX_ATTACK_SPEED, STAT_LABEL, statLines, type GearRules } from './systems/stats';
+import { EFFECT_NAME, EFFECT_UNIT } from './systems/effects';
 import type { PvpAttack } from './systems/pvp';
 
 /* ---------- Calculadora de equilíbrio (Oficina) ----------
@@ -25,6 +26,7 @@ export function balance(r: CalcRules, d: ItemDef): Balance {
   const lines: string[] = [], warnings: string[] = [];
   if (d.heal || d.mana) consumable(r, d, lines, warnings);
   if (d.gear) gear(r, d.gear, lines, warnings);
+  if (d.wear) wear(r, d.wear, lines, warnings);
   return { lines, warnings };
 }
 
@@ -39,6 +41,18 @@ function consumable(r: CalcRules, d: ItemDef, lines: string[], warnings: string[
   }
 }
 
+// Armadura e acessório: atributos, sorteio e efeito (sem golpes: quem bate é a arma).
+function wear(r: CalcRules, d: WearDef, lines: string[], warnings: string[]) {
+  const s = d.stats ?? {};
+  lines.push(`Veste em: ${WEAR_NAME[d.slot]}` + (Object.keys(s).length ? ' · ' + statLines(s).join(' · ') : ''));
+  if (s.defense) {
+    lines.push(`Defesa ${s.defense}: leva ${Math.round((1 - 100 / (100 + s.defense)) * 100)}% menos dano (no PvP, ${Math.round((1 - 100 / (100 + s.defense * r.pvp.factor)) * 100)}%)`);
+    if (s.defense >= 60) warnings.push('Defesa 60 ou mais numa peça só: com as outras peças, passa fácil de metade do dano.');
+  }
+  if ((s.hp ?? 0) >= 50) warnings.push(`+${s.hp} de vida numa peça só: com as outras, dobra a vida de quem começa.`);
+  if (d.effect) lines.push(`${EFFECT_NAME[d.effect.kind]}: ${EFFECT_UNIT[d.effect.kind](d.effect.value)}`);
+  if (d.rolls) lines.push('Sorteio: ' + Object.entries(d.rolls).map(([k, [lo, hi]]) => `${STAT_LABEL[k as keyof typeof STAT_LABEL]} ${lo === hi ? lo : `${lo} a ${hi}`}`).join(' · '));
+}
 function gear(r: CalcRules, g: GearDef, lines: string[], warnings: string[]) {
   const s = g.stats ?? {}, atk = s.attack ?? 0, mag = s.magic ?? 0, as = Math.min(MAX_ATTACK_SPEED, s.attackSpeed ?? 0) / 100;
   const perSec = (dmg: number, ticks: number) => dmg * TICK_RATE / (ticks / (1 + as));
@@ -74,6 +88,10 @@ function gear(r: CalcRules, g: GearDef, lines: string[], warnings: string[]) {
     lines.push(`Curas com a mana cheia de quem começa: ${Math.floor((r.player.maxMana + (s.mp ?? 0)) / h.mana)}`);
     if (h.amount + mag >= r.player.maxHp / 2) warnings.push('Cada cura devolve metade da vida ou mais: o grupo fica difícil de derrubar.');
   }
+  if (g.effect) lines.push(`${EFFECT_NAME[g.effect.kind]}: ${EFFECT_UNIT[g.effect.kind](g.effect.value)}`);
+  if (g.effect?.kind === 'lifesteal' && g.effect.value >= 50) warnings.push('Roubo de vida de 50% ou mais: quase não perde vida lutando.');
+  if ((g.effect?.kind === 'explode' || g.effect?.kind === 'wave') && g.effect.value >= r.enemies.beetle.hp) warnings.push(`${EFFECT_NAME[g.effect.kind]} derruba um besouro (${r.enemies.beetle.hp} de vida) de uma vez: limpa grupos sozinho.`);
+  if (g.rolls) lines.push('Sorteio: ' + Object.entries(g.rolls).map(([k, [lo, hi]]) => `${STAT_LABEL[k as keyof typeof STAT_LABEL]} ${lo === hi ? lo : `${lo} a ${hi}`}`).join(' · ') + ' (incomum: 1 destes; raro: 2; comum: às vezes 1)');
   if (s.defense) {
     const cut = 1 - 100 / (100 + s.defense), pvpCut = 1 - 100 / (100 + s.defense * r.pvp.factor);
     lines.push(`Defesa ${s.defense}: leva ${Math.round(cut * 100)}% menos dano (no PvP, ${Math.round(pvpCut * 100)}%)`);

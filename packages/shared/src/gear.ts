@@ -12,31 +12,69 @@ import type { World } from './world';
 export type GearKind = 'sword' | 'bow' | 'firestaff' | 'lightstaff' | 'darktome' | 'hook';
 export type GearId = string;   // 'sword', 'bow' ou o id de um item de equipamento
 export type GearSlot = 'a' | 'c';
+/* Vestir: armaduras e acessórios. Diferente das armas (que ficam na mochila, marcadas com A ou C, para trocar rápido),
+   o que se veste sai da mochila e fica no espaço dele. Dão atributos (e, em épicos e lendários, um efeito). */
+export type WearSlot = 'head' | 'body' | 'feet' | 'neck' | 'ring';
+export const WEAR_SLOTS: WearSlot[] = ['head', 'body', 'feet', 'neck', 'ring'];
+export const WEAR_NAME: Record<WearSlot, string> = { head: 'Cabeça', body: 'Corpo', feet: 'Pés', neck: 'Colar', ring: 'Anel' };
+export interface WearDef {
+  slot: WearSlot; stats?: Partial<Stats>;
+  rolls?: Partial<Record<keyof Stats, [number, number]>>;   // sorteio, como nas armas
+  effect?: { kind: EffectKind; value: number };              // épico e lendário (roubo de vida, veneno, explode ao derrubar)
+}
 export const GEAR: GearKind[] = ['sword', 'bow', 'firestaff', 'lightstaff', 'darktome', 'hook'];
 export const KIND_NAME: Record<GearKind, string> = { sword: 'Espada', bow: 'Arco', firestaff: 'Cajado de Fogo', lightstaff: 'Cajado de Luz', darktome: 'Grimório Sombrio', hook: 'Gancho' };
 const SHORT: Record<GearKind, string> = { sword: 'Espada', bow: 'Arco', firestaff: 'Fogo', lightstaff: 'Luz', darktome: 'Sombra', hook: 'Gancho' };
 // Num item: como ele se comporta e os números dele. Sem `damage`, o dano é o da arma de base (config: weapons).
-export interface GearDef { like: GearKind; damage?: number; stats?: Partial<Stats>; color?: string }
+export interface GearDef {
+  like: GearKind; damage?: number; stats?: Partial<Stats>; color?: string;
+  rolls?: Partial<Record<keyof Stats, [number, number]>>;   // sorteio: atributos que um exemplar pode trazer a mais (mín, máx)
+  effect?: { kind: EffectKind; value: number };              // épicos e lendários: um efeito (ver systems/effects)
+}
+export type EffectKind = 'lifesteal' | 'poison' | 'pierce' | 'wave' | 'explode';
+export const EFFECTS: EffectKind[] = ['lifesteal', 'poison', 'pierce', 'wave', 'explode'];
+export const WEAR_EFFECTS: EffectKind[] = ['lifesteal', 'poison', 'explode'];   // os que não dependem da arma
+
+/* ---------- Exemplar sorteado ----------
+   Um equipamento com atributo sorteado é um exemplar próprio: o id dele leva o sorteio junto, "espada-de-ferro#defense=5".
+   Assim botão, atributos, rede e banco tratam o exemplar como qualquer equipamento (um texto), sem procurar na mochila. */
+export const baseId = (g: GearId) => g.split('#')[0];
+export function encodeRoll(roll: Partial<Stats>) {
+  return Object.entries(roll).filter(([, v]) => v).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => `${k}=${v}`).join(',');
+}
+export function rollOf(g: GearId): Partial<Stats> {
+  const i = g.indexOf('#'); if (i < 0) return {};
+  return Object.fromEntries(g.slice(i + 1).split(',').map(kv => kv.split('=')).filter(([k, v]) => STAT_NAMES.has(k) && Number.isFinite(Number(v))).map(([k, v]) => [k, Number(v)]));
+}
+const STAT_NAMES = new Set(['attack', 'magic', 'attackSpeed', 'defense', 'hp', 'mp', 'hpRegen', 'mpRegen']);
+// O id do exemplar que está num espaço da mochila (sem sorteio, o id do item).
+export const gearIdOf = (s: { id: ItemId; roll?: Partial<Stats> }) => s.roll && encodeRoll(s.roll) ? `${s.id}#${encodeRoll(s.roll)}` : s.id;
 const INNATE: GearId[] = ['sword', 'bow'];
 export const DEFAULT_GEAR: Record<GearSlot, GearId> = { a: 'sword', c: 'bow' };
 export const isKind = (v: unknown): v is GearKind => typeof v === 'string' && (GEAR as string[]).includes(v);
-export const isGear = (v: unknown): v is GearId => v === 'sword' || v === 'bow' || (isItem(v) && !!ITEMS[v].gear);
-export const gearDef = (g: GearId): GearDef | undefined => isItem(g) ? ITEMS[g].gear : undefined;
+export const isGear = (v: unknown): v is GearId => v === 'sword' || v === 'bow' || (typeof v === 'string' && isItem(baseId(v)) && !!ITEMS[baseId(v)].gear);
+export const gearDef = (g: GearId): GearDef | undefined => isItem(baseId(g)) ? ITEMS[baseId(g)].gear : undefined;
 export const kindOf = (g: GearId): GearKind => gearDef(g)?.like ?? (isKind(g) ? g : 'sword');
 export const isStaff = (g: GearId) => { const k = kindOf(g); return k === 'firestaff' || k === 'lightstaff' || k === 'darktome'; };
 // Nome curto para os botões (Espada, Arco, Fogo…); itens novos pelo nome.
-export const gearName = (g: GearId) => isKind(g) ? SHORT[g] : ITEMS[g]?.name ?? SHORT[kindOf(g)];
+export const gearName = (g: GearId) => isKind(g) ? SHORT[g] : ITEMS[baseId(g)]?.name ?? SHORT[kindOf(g)];
 export const gearColor = (g: GearId) => gearDef(g)?.color;
 
-export const owns = (p: Pick<Player, 'bag'>, g: GearId) => INNATE.includes(g) || (isGear(g) && p.bag.some(s => s?.id === (g as ItemId)));
+export const owns = (p: Pick<Player, 'bag'>, g: GearId) => INNATE.includes(g) || (isGear(g) && p.bag.some(s => !!s && gearIdOf(s) === g));
 // Tudo que dá para pôr num botão: espada, arco e os equipamentos da mochila (sem repetir).
-export const ownedGear = (p: Pick<Player, 'bag'>): GearId[] => [...new Set([...INNATE, ...p.bag.flatMap(s => s && isGear(s.id) ? [s.id] : [])])];
+export const ownedGear = (p: Pick<Player, 'bag'>): GearId[] => [...new Set([...INNATE, ...p.bag.flatMap(s => s && isGear(s.id) ? [gearIdOf(s)] : [])])];
 // O que está de fato no botão: o equipado, se ainda o tiver; senão a espada ou o arco (o que não estiver no outro botão).
 export function gearIn(p: Pick<Player, 'bag' | 'gear'>, slot: GearSlot): GearId {
   const g = p.gear[slot];
   if (owns(p, g)) return g;
   const other = p.gear[slot === 'a' ? 'c' : 'a'];
   return DEFAULT_GEAR[slot] !== other ? DEFAULT_GEAR[slot] : INNATE.find(i => i !== other)!;
+}
+// A próxima arma para o botão (troca rápida): passa pelas que você tem, pulando a do outro botão. null: não há outra.
+export function nextGear(p: Pick<Player, 'bag' | 'gear'>, slot: GearSlot): GearId | null {
+  const other = gearIn(p, slot === 'a' ? 'c' : 'a'), mine = ownedGear(p).filter(g => g !== other), cur = gearIn(p, slot);
+  const next = mine[(mine.indexOf(cur) + 1) % mine.length];
+  return next && next !== cur ? next : null;
 }
 // Põe no botão; se já estava no outro, os dois trocam de lugar.
 export function equipGear(p: Player, g: GearId, slot: GearSlot): { ok: true } | { ok: false; reason: string } {

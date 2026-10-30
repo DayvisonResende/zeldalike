@@ -9,6 +9,7 @@ import { breakTile } from './regrowth';
 import { nearCave } from '../world/tiles';
 import { harmPlayer } from './pvp';
 import { gearScale, swordOf, weaponDamage } from '../gear';
+import { onHitEffects } from './effects';
 
 export interface SwordPose { ox: number; oy: number; ang: number; len: number }
 
@@ -73,7 +74,7 @@ export function damage(w: World, e: Enemy, n: number, sx: number, sy: number, by
   if (e.type === 'chicken') { chickenHit(w, e, sx, sy, by); return; }
   if (e.hurtT > 0) return;
   e.hp -= n; e.hurtT = e.type === 'king' ? 10 : 16;
-  if (by) e.lastHitBy = by.id;
+  if (by) { e.lastHitBy = by.id; onHitEffects(w, e, n, by); }
   if (by && e.type === 'king') (e.hitters ??= {})[by.id] = (e.hitters[by.id] ?? 0) + n;
   const a = Math.atan2(e.y - sy, e.x - sx), kb = e.type === 'king' ? 0 : 3.2;
   e.kx = Math.cos(a) * kb; e.ky = Math.sin(a) * kb;

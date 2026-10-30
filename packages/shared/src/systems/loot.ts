@@ -6,19 +6,22 @@ import type { DropRule } from '../rules';
 import { useBomb } from './bombs';
 import type { World } from '../world';
 import { sfx } from './fx';
+import { isRare, rarityOf, rollFor } from '../rarity';
+import type { Stats } from './stats';
 
 /* ---------- Drops no chão ---------- */
 export interface Drop {
   id: number; item: LootId; n: number; x: number; y: number;
   owner: string | null; ownerUntil: number;   // só o dono pega até ownerUntil; depois, qualquer um
   expires: number; born: number;
+  roll?: Partial<Stats>;   // equipamento: o sorteio deste exemplar
 }
 export const PICK_RANGE = 14;    // pegar com o botão: o item mais perto até essa distância
 export const SWEEP_RANGE = 40;   // segurar o botão: tudo em volta até essa distância
 export const SWEEP_HOLD = 24;    // passos segurando o botão para pegar tudo
 
-function spawnDrop(w: World, item: LootId, n: number, x: number, y: number, owner: string | null) {
-  const d: Drop = { id: w.nextId++, item, n, x, y, owner, ownerUntil: owner ? w.tick + ticks(w.rules.loot.ownerTime) : 0, expires: w.tick + ticks(w.rules.loot.lifetime), born: w.tick };
+function spawnDrop(w: World, item: LootId, n: number, x: number, y: number, owner: string | null, roll?: Partial<Stats>) {
+  const d: Drop = { id: w.nextId++, item, n, x, y, owner, ownerUntil: owner ? w.tick + ticks(w.rules.loot.ownerTime) : 0, expires: w.tick + ticks(w.rules.loot.lifetime), born: w.tick, ...(roll ? { roll } : {}) };
   w.drops.push(d);
   return d;
 }
@@ -35,9 +38,11 @@ export function rollLoot(w: World, list: DropRule[], dropRate = w.rules.rates.dr
 }
 // Sorteia uma lista de drops e espalha em volta de um ponto, reservada a `owner`.
 export function spawnLoot(w: World, list: DropRule[], x: number, y: number, owner: string | null, dropRate = w.rules.rates.drop) {
-  rollLoot(w, list, dropRate).forEach(({ item, n }, k) => {
+  // equipamento: cada exemplar cai separado, com o próprio sorteio
+  const all = rollLoot(w, list, dropRate).flatMap(({ item, n }) => ITEMS[item]?.gear || ITEMS[item]?.wear ? Array.from({ length: n }, () => ({ item, n: 1, roll: rollFor(w, item) })) : [{ item, n, roll: undefined }]);
+  all.forEach(({ item, n, roll }, k) => {
     const a = k * 2.4;   // espalha um pouco em volta
-    spawnDrop(w, item, n, x + Math.cos(a) * (k ? 7 : 0), y + Math.sin(a) * (k ? 5 : 0), owner);
+    spawnDrop(w, item, n, x + Math.cos(a) * (k ? 7 : 0), y + Math.sin(a) * (k ? 5 : 0), owner, roll);
   });
 }
 // Monstro derrubado: sorteia a tabela dele; o loot fica reservado a quem deu o último golpe.
@@ -66,8 +71,9 @@ function take(w: World, p: Player, d: Drop) {
   else if (d.item === 'key') { w.keys += d.n; for (const o of w.players.values()) notice(w, o, `${p.name} pegou uma chave. Chaves: ${w.keys}`); }   // do grupo, não de quem pegou
   else {
     if (!canFit(p.bag, d.item, stack)) { notice(w, p, 'Inventário cheio.'); return 0; }
-    got = d.n - addItem(p.bag, d.item, d.n, stack);
+    got = d.n - addItem(p.bag, d.item, d.n, stack, d.roll);
     p.bagVersion++;
+    if (got) found(w, p, d.item);
   }
   d.n -= got;
   w.emit({ t: 'gain', to: p.id, x: p.x, y: p.y, text: '+' + lootName(d.item, got) });
@@ -92,6 +98,12 @@ export function pickAll(w: World, p: Player) {
 // Uma vez por passo: some o que expirou ou já foi pego.
 export function updateLoot(w: World) {
   w.drops = w.drops.filter(d => d.expires > w.tick && d.n > 0);
+}
+// Achou um épico ou lendário: som especial e anúncio no chat do servidor (o WorldRoom transforma o evento em mensagem).
+export function found(w: World, p: Player, item: LootId) {
+  if (w.predicting || !isRare(item)) return;
+  w.emit({ t: 'found', id: p.id, name: p.name, item, rarity: rarityOf(item) });
+  sfx(w, rarityOf(item) === 'legendary' ? 'legend' : 'rare', p);
 }
 const noticeAt = new WeakMap<Player, number>();
 function notice(w: World, p: Player, text: string) {
@@ -129,7 +141,7 @@ export function dropItem(w: World, p: Player, slot: number): ItemResult {
   if (!s) return { ok: false, reason: 'Esse espaço está vazio.' };
   if (p.state === 'dead') return { ok: false, reason: 'Você está caído.' };
   const n = takeItem(p.bag, slot, s.n); p.bagVersion++;
-  const d = spawnDrop(w, s.id, n, p.x, p.y + 6, null);
+  const d = spawnDrop(w, s.id, n, p.x, p.y + 6, null, s.roll);
   d.born = w.tick + 48;   // quem largou não pega de volta na hora sem querer
   return { ok: true };
 }

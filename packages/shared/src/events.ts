@@ -1,4 +1,4 @@
-import type { ItemId } from './items';
+import type { ItemId, Rarity } from './items';
 import type { ShopOffer } from './systems/shop';
 
 // Tudo que a simulação quer que o cliente mostre ou toque. A simulação não desenha nem faz som:
@@ -6,7 +6,7 @@ import type { ShopOffer } from './systems/shop';
 // `by` marca o jogador que causou o efeito: o cliente dele já o mostrou na hora (previsão),
 // então o servidor não manda de novo para ele.
 export type Sfx = 'swing' | 'cut' | 'hit' | 'lift' | 'throw' | 'break' | 'splash' | 'charge' | 'spin' | 'bump' | 'poof'
-  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use' | 'chest' | 'cast' | 'bite' | 'fuse' | 'boom' | 'cluck' | 'swarm' | 'fire' | 'heal' | 'shadow' | 'scrape';
+  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use' | 'chest' | 'cast' | 'bite' | 'fuse' | 'boom' | 'cluck' | 'swarm' | 'fire' | 'heal' | 'shadow' | 'scrape' | 'rare' | 'legend';
 export type Palette = 'leaf' | 'grass' | 'rock' | 'water' | 'dust' | 'spark' | 'splinter' | 'fire' | 'heal' | 'shadow';
 export interface BurstOpts { s?: number; z?: number; up?: number }
 
@@ -28,4 +28,5 @@ export type GameEvent =
   | { t: 'announce'; text: string }
   | { t: 'slide'; fx: number; fy: number; tx: number; ty: number; by?: string }   // bloco empurrado (o cliente anima o deslize)
   | { t: 'glow'; x: number; y: number; r: number; s: number }   // clarão do Cajado de Luz: ilumina o escuro por s segundos                    // aviso para o servidor inteiro (vira mensagem no chat)
-  | { t: 'fish'; id: string; item: ItemId; size: number };   // pescou (o servidor confere recordes)                       // caído fora do mapa principal: renasce lá (o servidor transfere)
+  | { t: 'fish'; id: string; item: ItemId; size: number }
+  | { t: 'found'; id: string; name: string; item: ItemId; rarity: Rarity };   // achou épico ou lendário (o servidor anuncia no chat)   // pescou (o servidor confere recordes)                       // caído fora do mapa principal: renasce lá (o servidor transfere)

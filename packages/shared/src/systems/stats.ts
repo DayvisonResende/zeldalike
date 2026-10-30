@@ -1,9 +1,11 @@
 import type { Player } from '../entities/player';
-import { gearDef, gearIn, kindOf, type GearId } from '../gear';
+import { baseId, gearDef, gearIn, kindOf, rollOf, type GearId } from '../gear';
 import type { World } from '../world';
 import type { Rules } from '../rules';
+import { ITEMS } from '../items';
 import { maxStats } from './progress';
 import { fragmentHp } from './dungeon';
+import { EFFECT_NAME, EFFECT_UNIT, effectsOf } from './effects';
 
 /* ---------- Atributos ---------- */
 // O que deixa o personagem forte é o item, não o nível: os atributos vêm do que está nos botões A e C
@@ -21,7 +23,12 @@ export const MAX_ATTACK_SPEED = 50;
 export const emptyStats = (): Stats => ({ attack: 0, magic: 0, attackSpeed: 0, defense: 0, hp: 0, mp: 0, hpRegen: 0, mpRegen: 0 });
 
 // Bônus de um equipamento: o do item (Oficina) ou, nas armas de base, o da seção `gear` do config.
-export const gearBonus = (bonus: Partial<Record<GearId, Partial<Stats>>>, g: GearId): Partial<Stats> => gearDef(g)?.stats ?? bonus[g] ?? {};
+export function gearBonus(bonus: Partial<Record<GearId, Partial<Stats>>>, g: GearId): Partial<Stats> {
+  const base = gearDef(g)?.stats ?? bonus[baseId(g)] ?? {}, roll = rollOf(g);   // + o sorteio do exemplar
+  const out: Partial<Stats> = { ...base };
+  for (const [k, v] of Object.entries(roll) as [keyof Stats, number][]) out[k] = (out[k] ?? 0) + v;
+  return out;
+}
 // Soma os bônus de uma lista de equipamentos.
 export function statsOf(bonus: Partial<Record<GearId, Partial<Stats>>>, gear: GearId[]): Stats {
   const s = emptyStats();
@@ -33,6 +40,14 @@ export function statsOf(bonus: Partial<Record<GearId, Partial<Stats>>>, gear: Ge
 export function refreshStats(w: World, p: Player) {
   const a = gearIn(p, 'a'), c = gearIn(p, 'c');
   p.stats = statsOf(w.rules.gear, a === c ? [a] : [a, c]);
+  p.effects = effectsOf(a === c ? [a] : [a, c]);
+  // o que está vestido soma atributos (com o sorteio) e efeitos
+  for (const s of Object.values(p.wear)) {
+    const d = s && ITEMS[s.id]?.wear; if (!d) continue;
+    for (const [k, v] of [...Object.entries(d.stats ?? {}), ...Object.entries(s!.roll ?? {})] as [keyof Stats, number][]) p.stats[k] += v;
+    if (d.effect) p.effects[d.effect.kind] = (p.effects[d.effect.kind] ?? 0) + d.effect.value;
+  }
+  p.stats.attackSpeed = Math.min(MAX_ATTACK_SPEED, p.stats.attackSpeed);
   const m = maxStats(w, p.level);
   p.maxHp = m.hp + p.stats.hp + fragmentHp(w, p); p.maxMp = m.mp + p.stats.mp;
   p.hp = Math.min(p.hp, p.maxHp); p.mp = Math.min(p.mp, p.maxMp);
@@ -69,5 +84,6 @@ export function gearLines(r: GearRules, g: GearId): string[] {
     : k === 'hook' ? ['Puxa você até pilares (8 tiles, por cima de água e buracos); atordoa monstros e traz itens']
     : k === 'lightstaff' ? [`Cura ${m.heal.amount} em volta (${m.heal.mana} de mana)`, `Segurando: cura ${m.bigHeal.amount} e empurra (${m.bigHeal.mana} de mana)`]
     : [`Sombra: dano ${m.shadow.damage}, rouba ${m.shadow.drain} de vida, deixa lento (${m.shadow.mana} de mana)`, `Segurando: maldição ${m.curse.damage}, rouba ${m.curse.drain} (${m.curse.mana} de mana)`];
-  return [...base, ...statLines(gearBonus(r.gear, g))];
+  const fx = gearDef(g)?.effect;
+  return [...base, ...statLines(gearBonus(r.gear, g)), ...(fx ? [`${EFFECT_NAME[fx.kind]}: ${EFFECT_UNIT[fx.kind](fx.value)}`] : [])];
 }

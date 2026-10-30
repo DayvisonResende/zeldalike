@@ -15,6 +15,7 @@ import { pushAgainst } from './blocks';
 import { SWEEP_HOLD, pickAll } from './loot';
 import { attackStep } from './stats';
 import { startHook, updateHook } from './hook';
+import { spinWave } from './effects';
 
 export function faceAim(p: Player) { p.aim = p.input.aim ?? FACE[p.dir]; p.dir = angDir(p.aim); }
 function startSwing(w: World, p: Player) { faceAim(p); p.state = 'swing'; p.t = 0; p.hit.clear(); sfx(w, 'swing', p, p.id); }
@@ -121,7 +122,7 @@ export function updatePlayer(w: World, p: Player) {
     case 'bow': t0 = p.t; p.t += attackStep(p); if (p.t <= BOW_SHOT && inp.aim !== null) faceAim(p); if (t0 < BOW_SHOT && p.t >= BOW_SHOT) fireArrow(w, p); if (p.t >= BOW_END) p.state = 'walk'; return;
     case 'charge':
       if (!inp[p.useBtn]) {
-        if (p.charged && p.using && kindOf(p.using) === 'sword') { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); }
+        if (p.charged && p.using && kindOf(p.using) === 'sword') { p.state = 'spin'; p.t = 0; p.hit.clear(); sfx(w, 'spin', p, p.id); if (!w.predicting) spinWave(w, p); }
         else if (p.charged) { p.state = 'cast'; p.t = 0; p.big = true; }   // solta a magia forte
         else p.state = 'walk';
         p.charged = false; return;

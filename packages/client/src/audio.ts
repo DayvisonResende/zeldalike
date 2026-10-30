@@ -48,6 +48,12 @@ const SFX: Record<Sfx, () => void> = {
   pickup: () => { tone('square', 880, 880, 0.05, 0.06); setTimeout(() => tone('square', 1320, 1320, 0.07, 0.06), 55); },
   use: () => { tone('sine', 300, 600, 0.12, 0.12); setTimeout(() => tone('sine', 450, 900, 0.12, 0.1), 90); },
   levelup: () => { [523, 659, 784, 1047].forEach((f, i) => setTimeout(() => tone('square', f, f, 0.12, 0.07), i * 90)); },
+  // achou épico: arpejo brilhante; lendário: arpejo mais longo e um acorde final que fica soando
+  rare: () => { [784, 988, 1175, 1568].forEach((f, i) => setTimeout(() => tone('triangle', f, f * 1.01, 0.16, 0.09), i * 70)); },
+  legend: () => {
+    [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => setTimeout(() => tone('triangle', f, f, 0.14, 0.09), i * 75));
+    setTimeout(() => [1047, 1319, 1568].forEach(f => tone('sine', f, f, 0.9, 0.06)), 460);
+  },
   cluck: () => { tone('square', 700, 520, 0.05, 0.07); setTimeout(() => tone('square', 760, 560, 0.05, 0.07), 70); },
   swarm: () => { for (let i = 0; i < 6; i++) setTimeout(() => tone('square', 600 + i * 60, 450, 0.06, 0.06), i * 55); },
   fuse: () => noise(0.5, 0.06, 5000, 'highpass'),

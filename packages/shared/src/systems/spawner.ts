@@ -8,6 +8,7 @@ import { dropLoot } from './loot';
 import { shareXp } from './progress';
 import { onInvaderDead } from './invasion';
 import { onKingDead } from './boss';
+import { deathBlast } from './effects';
 
 export interface Spawn { type: EnemyType; tx: number; ty: number; alive: number | null; at: number; when?: 'day' | 'night'; mini?: boolean }
 
@@ -21,6 +22,7 @@ export function onEnemyDead(w: World, e: Enemy) {
   const killer = e.lastHitBy ? w.players.get(e.lastHitBy) : undefined;
   if (e.type === 'king') onKingDead(w, e);
   else { if (killer) shareXp(w, killer, w.rules.enemies[e.type].xp * (e.mini ? 5 : 1)); dropLoot(w, e, killer); }
+  deathBlast(w, e, killer);
   if (e.invader) onInvaderDead(w, killer?.id);
   const s = w.spawns[e.spawn];
   if (s) { s.alive = null; s.at = w.tick + ticks(w.rules.enemies[e.type].respawn); }

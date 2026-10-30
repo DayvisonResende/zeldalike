@@ -6,7 +6,8 @@ import type { Fishing } from '../systems/fishing';
 import type { Body } from '../world/collision';
 import type { Stats } from '../systems/stats';
 import type { Hook } from '../systems/hook';
-import { DEFAULT_GEAR, type GearId, type GearSlot } from '../gear';
+import type { Effects } from '../systems/effects';
+import { DEFAULT_GEAR, type GearId, type GearSlot, type WearSlot } from '../gear';
 
 export type Carryable = 'b' | 'r' | 'bomb' | 'player';
 export type PlayerState = 'walk' | 'hurt' | 'lift' | 'carry' | 'throw' | 'swing' | 'spin' | 'charge' | 'dashprep' | 'dash' | 'bonk' | 'hop' | 'bow' | 'dead' | 'fish' | 'held' | 'flying' | 'cast' | 'hook';
@@ -48,6 +49,8 @@ export interface Player extends Body {
   input: InputState;
   region: string | null;
   stats: Stats;              // atributos (do equipamento); o servidor calcula e manda
+  wear: Record<WearSlot, Slot>;   // o que está vestido (fora da mochila)
+  effects: Effects;          // efeitos de épicos e lendários nos botões (o servidor calcula e manda)
   hook: Hook | null;         // gancho lançado (a ponta, indo, voltando ou puxando você)
   fragments: string[];       // fragmentos de vida já achados ("mapa:x,y"): cada um dá vida máxima a mais, para sempre
   party: string | null;      // grupo em que está (o servidor cuida; aqui só para dividir XP e não se ferir)
@@ -59,5 +62,5 @@ export function createPlayer(id: string, name: string, x: number, y: number, loo
     hp: maxHp, maxHp, mp: maxMp, maxMp, hurtAt: -Infinity, killer: null, pvp: false, pvpOnAt: -Infinity, combatAt: -Infinity, pvpActive: false, safe: false,
     level: 1, xp: 0, gold: 0, bag: emptyInventory(20), bagVersion: 0, useAt: -Infinity, inPortal: true, portalWait: 0, chests: {}, chestsVersion: 0, chestLoot: {}, steps: 0, fish: null,
     input: emptyInput(), region: null, party: null,
-    hook: null, fragments: [], stats: { attack: 0, magic: 0, attackSpeed: 0, defense: 0, hp: 0, mp: 0, hpRegen: 0, mpRegen: 0 } };
+    wear: { head: null, body: null, feet: null, neck: null, ring: null }, effects: {}, hook: null, fragments: [], stats: { attack: 0, magic: 0, attackSpeed: 0, defense: 0, hp: 0, mp: 0, hpRegen: 0, mpRegen: 0 } };
 }

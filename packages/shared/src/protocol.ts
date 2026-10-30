@@ -8,7 +8,7 @@ import type { EnemyType } from './rules';
 import type { Arrow, Thrown } from './systems/projectiles';
 import type { PvpMode } from './systems/pvp';
 import type { Spell, SpellKind } from './systems/magic';
-import { DEFAULT_GEAR } from './gear';
+import { DEFAULT_GEAR, type WearSlot } from './gear';
 import type { MapData } from './world/map';
 
 /* Mensagens entre cliente e servidor. Tudo em arrays curtos: com 100 jogadores, cada byte conta.
@@ -93,29 +93,29 @@ export const packBomb = (b: BombView): BombTuple => [b.id, q(b.x), q(b.y), b.fus
 export const unpackBomb = (t: BombTuple): BombView => ({ id: t[0], x: uq(t[1]), y: uq(t[2]), fuse: t[3] });
 
 /* ---------- Estado completo do próprio jogador (para a previsão no cliente) ---------- */
-type OwnKeys = 'x' | 'y' | 'z' | 'push' | 'dvx' | 'dvy' | 'hop' | 'dir' | 'aim' | 'state' | 't' | 'step' | 'walkT' | 'inv' | 'kx' | 'ky' | 'carry' | 'liftFrom' | 'charge' | 'charged' | 'hp' | 'maxHp' | 'mp' | 'maxMp' | 'killer' | 'pvp' | 'pvpActive' | 'safe' | 'level' | 'xp' | 'gold' | 'inPortal' | 'portalWait' | 'steps' | 'fish' | 'carryFuse' | 'holding' | 'heldBy' | 'struggle' | 'prevDirs' | 'gear' | 'using' | 'useBtn' | 'big' | 'slowUntil' | 'shove' | 'holdB' | 'revive' | 'reviveBy' | 'stats' | 'fragments' | 'hook';
+type OwnKeys = 'x' | 'y' | 'z' | 'push' | 'dvx' | 'dvy' | 'hop' | 'dir' | 'aim' | 'state' | 't' | 'step' | 'walkT' | 'inv' | 'kx' | 'ky' | 'carry' | 'liftFrom' | 'charge' | 'charged' | 'hp' | 'maxHp' | 'mp' | 'maxMp' | 'killer' | 'pvp' | 'pvpActive' | 'safe' | 'level' | 'xp' | 'gold' | 'inPortal' | 'portalWait' | 'steps' | 'fish' | 'carryFuse' | 'holding' | 'heldBy' | 'struggle' | 'prevDirs' | 'gear' | 'using' | 'useBtn' | 'big' | 'slowUntil' | 'shove' | 'holdB' | 'revive' | 'reviveBy' | 'stats' | 'fragments' | 'hook' | 'effects';
 export type OwnState = Pick<Player, OwnKeys> & { hit: (number | string)[] };
 export function ownState(p: Player): OwnState {
   return { x: p.x, y: p.y, z: p.z, push: p.push, dvx: p.dvx, dvy: p.dvy, hop: p.hop && { ...p.hop }, dir: p.dir, aim: p.aim, state: p.state, t: p.t, step: p.step, walkT: p.walkT,
     inv: p.inv, kx: p.kx, ky: p.ky, carry: p.carry, liftFrom: p.liftFrom && { ...p.liftFrom }, charge: p.charge, charged: p.charged, hit: [...p.hit],
     hp: Math.round(p.hp * 10) / 10, maxHp: p.maxHp, mp: Math.round(p.mp * 10) / 10, maxMp: p.maxMp,
     killer: p.killer, pvp: p.pvp, pvpActive: p.pvpActive, safe: p.safe, level: p.level, xp: p.xp, gold: p.gold, inPortal: p.inPortal, portalWait: p.portalWait, steps: p.steps, fish: p.fish && { ...p.fish }, carryFuse: p.carryFuse, holding: p.holding, heldBy: p.heldBy, struggle: p.struggle, prevDirs: p.prevDirs,
-    gear: { ...p.gear }, using: p.using, useBtn: p.useBtn, big: p.big, slowUntil: p.slowUntil, shove: p.shove, holdB: p.holdB, revive: p.revive, reviveBy: p.reviveBy, stats: { ...p.stats }, fragments: [...p.fragments], hook: p.hook && { ...p.hook } };
+    gear: { ...p.gear }, using: p.using, useBtn: p.useBtn, big: p.big, slowUntil: p.slowUntil, shove: p.shove, holdB: p.holdB, revive: p.revive, reviveBy: p.reviveBy, stats: { ...p.stats }, fragments: [...p.fragments], hook: p.hook && { ...p.hook }, effects: { ...p.effects } };
 }
 export function applyOwnState(p: Player, s: OwnState) {
-  const { hit, hop, liftFrom, fish, gear, stats, fragments, hook, ...rest } = s;
+  const { hit, hop, liftFrom, fish, gear, stats, fragments, hook, effects, ...rest } = s;
   Object.assign(p, rest);
-  p.gear = { ...gear }; p.stats = { ...stats }; p.fragments = [...fragments]; p.hook = hook && { ...hook };
+  p.gear = { ...gear }; p.stats = { ...stats }; p.fragments = [...fragments]; p.hook = hook && { ...hook }; p.effects = { ...effects };
   p.fish = fish && { ...fish };
   p.hop = hop && { ...hop }; p.liftFrom = liftFrom && { ...liftFrom }; p.hit = new Set(hit);
 }
 // O que a previsão do cliente simula do seu estado. Vida, mana, ouro, nível e afins vêm só do servidor (a previsão
 // roda sem "life"): ficam de fora da comparação e são copiados à parte (applyOwnLife).
-const OWN_LIFE = ['hp', 'maxHp', 'mp', 'maxMp', 'killer', 'pvp', 'pvpActive', 'safe', 'level', 'xp', 'gold', 'stats', 'fragments'] as const;
+const OWN_LIFE = ['hp', 'maxHp', 'mp', 'maxMp', 'killer', 'pvp', 'pvpActive', 'safe', 'level', 'xp', 'gold', 'stats', 'fragments', 'effects'] as const;
 export function ownSimKey(s: OwnState) { const o: Partial<OwnState> = { ...s }; for (const k of OWN_LIFE) delete o[k]; return JSON.stringify(o); }
 export function applyOwnLife(p: Player, s: OwnState) {
   p.hp = s.hp; p.maxHp = s.maxHp; p.mp = s.mp; p.maxMp = s.maxMp; p.killer = s.killer; p.pvp = s.pvp; p.pvpActive = s.pvpActive; p.safe = s.safe;
-  p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.stats = { ...s.stats }; p.fragments = [...s.fragments];
+  p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.stats = { ...s.stats }; p.fragments = [...s.fragments]; p.effects = { ...s.effects };
 }
 
 /* ---------- Mensagens do servidor ---------- */
@@ -159,6 +159,7 @@ export interface SnapshotMsg {
   bag?: Slot[];           // inventário: só vem quando mudou
   ch?: string[];          // baús deste mapa vazios para você ("x,y"): só vem quando muda
   g?: PartyInfo;          // seu grupo (só vem se você estiver em um)
+  wear?: Record<WearSlot, Slot>;   // o que você está vestindo: vem junto com o inventário (quando muda)
   kc?: number;            // masmorra: quantas chaves o grupo tem
 }
 /* ---------- Itens ---------- */

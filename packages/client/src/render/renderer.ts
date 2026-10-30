@@ -1,4 +1,4 @@
-import { gearColor, isStaff, kindOf } from '@vale/shared';
+import { RARITY_COLOR, gearColor, isStaff, kindOf, rarityOf } from '@vale/shared';
 import { DEFAULT_LOOK, TS, VIEW_H, VIEW_W, bobberOf, hash, sunlight, angDir, distAt, nextLower, swordPose, type EnemyView, type Look, type PlayerView, type SpellView, type SwordPose, type WorldMap } from '@vale/shared';
 import type { Camera } from '../camera';
 import type { Scene } from '../session/types';
@@ -290,6 +290,24 @@ function edgeArrow(ctx: Ctx, x: number, y: number, color: string) {
   tri(1.5, '#1b1226'); tri(0, color);
   return true;
 }
+// Raridade no chão: um brilho na cor dela embaixo do item; épico e lendário ganham uma luz subindo, pulsando.
+function drawRarity(ctx: Ctx, item: string, x: number, y: number, tick: number) {
+  const r = rarityOf(item); if (r === 'common') return;
+  const c = RARITY_COLOR[r], pulse = 0.5 + 0.5 * Math.sin(tick / 12), a0 = ctx.globalAlpha;
+  ctx.fillStyle = c; ctx.globalAlpha = a0 * (0.45 + 0.3 * pulse);
+  ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y - 1), 8, 3, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.strokeStyle = c; ctx.lineWidth = 1; ctx.globalAlpha = a0 * 0.9;   // contorno firme: lê bem em qualquer chão
+  ctx.beginPath(); ctx.ellipse(Math.round(x), Math.round(y - 1), 9, 3.5, 0, 0, Math.PI * 2); ctx.stroke();
+  if (r === 'epic' || r === 'legendary') {
+    const h = r === 'legendary' ? 44 : 30, g = ctx.createLinearGradient(0, y - h, 0, y);
+    g.addColorStop(0, 'rgba(255,255,255,0)'); g.addColorStop(1, c);
+    ctx.fillStyle = g; ctx.globalAlpha = a0 * (0.3 + 0.25 * pulse);
+    ctx.fillRect(Math.round(x - 3), Math.round(y - h), 6, h);
+    ctx.globalAlpha = a0 * 0.9; ctx.fillStyle = '#ffffff';
+    ctx.fillRect(Math.round(x + Math.sin(tick / 9) * 5), Math.round(y - 8 - ((tick >> 2) % 18)), 1, 1);   // faísca subindo
+  }
+  ctx.globalAlpha = a0;
+}
 // Setinha amarela (com contorno) apontando para o item que o botão de Ação pega.
 function drawPickArrow(ctx: Ctx, x: number, y: number) {
   const cx = Math.round(x), cy = Math.round(y);
@@ -360,6 +378,7 @@ export function render(ctx: Ctx, w: Scene, v: View) {
     list.push({ y: d.y - 1, d: () => {
       ctx.globalAlpha = d.reserved ? 0.45 : 1;
       ctx.drawImage(SHADOW, Math.round(d.x - 7), Math.round(d.y - 2), 14, 4);
+      drawRarity(ctx, d.item, d.x, d.y, v.tick);
       const ic = itemIcon(d.item);   // centrado, com a base um pouco acima do chão
       ctx.drawImage(ic, Math.round(d.x - (ic.width >> 1)), Math.round(d.y - 3 - ic.height + bob));
       ctx.globalAlpha = 1;

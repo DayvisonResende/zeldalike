@@ -89,7 +89,17 @@ snapshots, eventos como ataque e acerto) e o do servidor (tempo dos passos, envi
       Reproduzido em Linux (pior espera ~32,6 ms quase todo segundo). Trocado por um laço próprio que mira o horário de
       cada passo (`startLoop` no `WorldRoom`): pior espera ~17,8 ms, 60 passos por segundo.
       No celular: 43 fps de mediana com a opção em 60 (até 59); código por quadro 6,5 ms.
-- [ ] Gravar de novo com o servidor atualizado e a janela minimizada.
+- [x] Gravação com o laço novo (2026-10-29 19:41): **servidor resolvido**. Pior espera entre passos 18,8 ms (antes 32),
+      pior intervalo de envio 51,5 ms (antes 65–80).
+- [x] Previsão refeita demais depois de um buraco na rede: 675 ms sem nada, 79 inputs pendentes, e os 30 snapshots que
+      chegaram juntos conferiam a previsão um por um (1.073 passos refeitos num segundo, fps caindo a 15). Agora a
+      previsão é conferida uma vez por passo, com o snapshot mais novo (`toReconcile` no `net.ts`).
+- [ ] **Rede ainda em rajadas no celular**, com o servidor enviando no ritmo: pior intervalo entre chegadas de 118 ms de
+      mediana, 272 ms em 1 de cada 10 segundos, até 675 ms. É o caminho até o celular (Wi-Fi, internet, TCP
+      retransmitindo pacote perdido). Para separar: gravar pelo navegador do celular no Wi-Fi de casa com o IP local do
+      servidor (`http://192.168.x.x:2567`) e comparar com o endereço público; e gravar no 4G. Se o Wi-Fi local já tiver
+      rajadas, é o Wi-Fi ou o celular; se só o endereço público tiver, é a internet ou o roteador. A saída de verdade é
+      o canal por UDP (WebTransport, abaixo).
 
 ### Rede por UDP (WebTransport)
 

@@ -115,3 +115,8 @@ body.reading main>:not(#guide){display:none!important}
 @media (max-width:620px){.toc ul{columns:1}}
 #guideBody{display:flex;flex-direction:column;gap:.75rem}
 .back{align-self:flex-start}
+/* raridade, sorteio e efeito */
+.rollpair{display:flex;gap:.3rem}
+.rollpair input{min-width:0}
+p.warn{margin:0;color:#ffd35a}
+p.warn::before{content:"⚠ "}

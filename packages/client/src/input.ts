@@ -6,9 +6,9 @@ const MAP: Record<string, Key> = {
   ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right',
   KeyJ: 'a', KeyZ: 'a', Space: 'a', KeyE: 'b', KeyK: 'b', KeyX: 'b', KeyF: 'b', KeyL: 'c', KeyC: 'c', ShiftLeft: 'd', ShiftRight: 'd', KeyQ: 'd'
 };
-export interface InputHooks { started(): boolean; start(): void; toggleMap(): void; openParty(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void }
+export interface InputHooks { started(): boolean; start(): void; toggleMap(): void; openParty(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void; swapGear(slot: 'a' | 'c'): void }
 // Cliques e teclas dentro do menu são do menu, não do jogo.
-export const UI_SELECTOR = '.menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap, .invite';
+export const UI_SELECTOR = '.gearline, .menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap, .invite';
 const inMenu = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(UI_SELECTOR);
 const typing = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('input, textarea, select');
 
@@ -34,6 +34,7 @@ export class Input {
       if (e.code === 'KeyP') { if (!e.repeat) hooks.togglePaths(); return; }
       if (e.code === 'KeyV') { if (!e.repeat && hooks.started()) hooks.togglePvp(); return; }
       if (e.code === 'KeyI') { if (!e.repeat && hooks.started()) hooks.toggleBag(); return; }
+      if (e.code === 'Digit4' || e.code === 'Digit5') { if (!e.repeat && hooks.started()) hooks.swapGear(e.code === 'Digit4' ? 'a' : 'c'); return; }
       if (e.code === 'Digit1' || e.code === 'Digit2' || e.code === 'Digit3') { if (!e.repeat && hooks.started()) hooks.quickUse(Number(e.code.slice(5)) as 1 | 2 | 3); return; }
       const k = MAP[e.code]; if (!k) return;
       e.preventDefault();
@@ -132,6 +133,8 @@ export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolea
   }
   // Atalhos de item: coração, poção e bomba (as teclas 1, 2 e 3)
   document.getElementById('btnBomb')!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(3); buzz(); } });
+  // troca rápida de arma (os botões A e C no canto do HUD)
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#gearLine [data-gear]')) b.addEventListener('click', e => { e.preventDefault(); b.blur(); if (hooks.started()) { hooks.swapGear(b.dataset.gear as 'a' | 'c'); buzz(); } });
   for (const n of [1, 2, 3] as const) document.getElementById('q' + n)!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(n); buzz(); } });
   const fs = document.getElementById('fsBtn')!;
   fs.hidden = !document.fullscreenEnabled;

@@ -92,6 +92,50 @@ Vai no botão A ou no C. Aparecem mais campos:
 
 > Entre jogadores (PvP) os atributos valem a metade. Assim um item bom ajuda, mas não decide a briga sozinho.
 
+### Vestir
+
+Cabeça, corpo, pés, colar ou anel. No jogo, o item sai da mochila e vai para o boneco do inventário (um de cada por
+vez; vestir outro no mesmo lugar troca os dois). Os campos:
+
+- **Onde se veste:** cabeça, corpo, pés, colar ou anel.
+- **Atributos:** os mesmos do equipamento, valendo enquanto estiver vestido. Defesa é o natural para cabeça, corpo e
+  pés; colar e anel combinam com poder mágico, velocidade de ataque e regeneração.
+- **Sorteio e efeito:** iguais aos do equipamento (veja abaixo). Efeito de vestir só pode ser roubo de vida, veneno ou
+  explode ao derrubar, e soma com o da arma.
+
+Por enquanto o que se veste não aparece desenhado no personagem: só o ícone (16×16) no inventário.
+
+### Raridade, sorteio e efeitos
+
+Todo item tem uma **raridade** (campo "Raridade", logo abaixo do tipo). Ela muda a cor do nome, a borda no inventário e
+o brilho do item no chão, e decide se ele tem sorteio ou efeito:
+
+| Raridade | Cor | O que tem |
+| --- | --- | --- |
+| Comum | branco | o básico; equipamento comum às vezes vem com 1 atributo sorteado |
+| Incomum | verde | equipamento vem com 1 atributo sorteado |
+| Raro | azul | equipamento vem com 2 atributos sorteados |
+| Épico | roxo | fixo (sem sorteio), com um efeito; achar é anunciado no chat |
+| Lendário | dourado | fixo e único, com um efeito; achar é anunciado no chat |
+
+- **Sorteio** (comum, incomum e raro): em "Sorteio", preencha o mínimo e o máximo de cada atributo que pode sair
+  (por exemplo, Ataque de 2 a 4 e Defesa de 5 a 10). Cada exemplar que cai de um monstro ou sai de um baú sorteia
+  entre eles, então duas "Espada de Ferro" podem ser diferentes. Na loja, o item sai sem sorteio. No inventário, um
+  "+" verde marca o exemplar sorteado. Equipamento não empilha: cada exemplar fica no seu espaço.
+- **Efeito** (épico e lendário): muda o jeito de lutar, não só o número. Vale enquanto o item está no A ou no C, contra
+  monstros.
+
+| Efeito | O número quer dizer | Só para |
+| --- | --- | --- |
+| Roubo de vida | % do dano que você dá que volta como vida | qualquer arma |
+| Veneno | dano por segundo no monstro atingido, por 3 s | qualquer arma |
+| Flecha que atravessa | quantos monstros a flecha atravessa antes de parar | arco |
+| Onda ao girar | dano da onda que o giro carregado solta em volta | espada |
+| Explode ao derrubar | dano da explosão do monstro que você derruba | qualquer arma |
+
+> **Regra do lendário:** todo lendário precisa de um caminho garantido, além da sorte: numa loja, num monstro com
+> 100% (um chefe, por exemplo) ou num baú com 100%. Se faltar, "Onde aparece" avisa em amarelo.
+
 ## 6. O ícone
 
 - **Tamanho: 16 × 16 pixels**, em **PNG com fundo transparente**. Outro tamanho é recusado (a Oficina diz o tamanho

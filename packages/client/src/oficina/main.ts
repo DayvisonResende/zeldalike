@@ -1,4 +1,4 @@
-import { MAX_ATTACK_SPEED, STAT_KEYS, STAT_LABEL, balance, gearLines, type CalcRules, isKind, setItems, type GearDef, type GearKind, type GearRules, type ItemCatalogMsg, type ItemDef, type Stats } from '@vale/shared';
+import { MAX_ATTACK_SPEED, RARITY_COLOR, RARITY_NAME, STAT_KEYS, STAT_LABEL, balance, gearLines, type CalcRules, type EffectKind, type Rarity, isKind, WEAR_EFFECTS, WEAR_NAME, statLines, type WearDef, type WearSlot, setItems, type GearDef, type GearKind, type GearRules, type ItemCatalogMsg, type ItemDef, type Stats } from '@vale/shared';
 import { Api, ApiError, loadSession, saveSession } from '../net/api';
 import './oficina.css';
 import { renderGuide } from './guide';
@@ -9,14 +9,14 @@ const SERVER = import.meta.env.DEV ? `${location.protocol}//${location.hostname}
 const api = new Api(SERVER + '/api');
 api.token = loadSession()?.token ?? null;
 
-type Kind = 'use' | 'material' | 'gear';
+type Kind = 'use' | 'material' | 'gear' | 'wear';
 let items: ItemCatalogMsg = {};
 let editing: string | null = null;    // id do item aberto (null = novo)
 let icon: string | null = null;       // PNG escolhido agora (data URL), ainda não gravado
 let idTouched = false;                // mexeram no id à mão: para de seguir o nome
 let rules: CalcRules | null = null;   // números do config: armas de base, magias, monstros, PvP (prévia e calculadora)
 
-const kindOf = (d: ItemDef): Kind => d.gear ? 'gear' : d.heal || d.mana ? 'use' : 'material';
+const kindOf = (d: ItemDef): Kind => d.gear ? 'gear' : d.wear ? 'wear' : d.heal || d.mana ? 'use' : 'material';
 // "Espada de Gelo" → "espada-de-gelo"
 const slug = (s: string) => s.toLowerCase().normalize('NFD').replace(/\p{M}/gu, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
 const loadImage = (src: string) => new Promise<HTMLImageElement>((ok, fail) => { const i = new Image(); i.onload = () => ok(i); i.onerror = fail; i.src = src; });
@@ -61,7 +61,7 @@ function renderList() {
   $('items').replaceChildren(...ids.filter(id => !q || id.includes(q) || slug(items[id].name).includes(q)).map(id => {
     const li = document.createElement('li'), b = document.createElement('button'), img = new Image();
     img.src = items[id].icon; img.alt = ''; img.width = 32; img.height = 32;
-    b.type = 'button'; b.append(img, Object.assign(document.createElement('span'), { textContent: items[id].name }), Object.assign(document.createElement('code'), { textContent: id }));
+    b.type = 'button'; b.append(img, Object.assign(document.createElement('span'), { textContent: items[id].name, style: `color:${RARITY_COLOR[items[id].rarity ?? 'common']}` }), Object.assign(document.createElement('code'), { textContent: id }));
     b.setAttribute('aria-current', String(id === editing));
     b.addEventListener('click', () => openItem(id));
     li.append(b);
@@ -74,6 +74,17 @@ $('newItem').addEventListener('click', () => openItem(null));
 /* ---------- Editor ---------- */
 const field = (id: string) => $<HTMLInputElement>(id);
 // Um campo por atributo (ataque, poder mágico…).
+// Sorteio: mínimo e máximo de cada atributo que um exemplar pode trazer.
+$('rollInputs').replaceChildren(...STAT_KEYS.map(k => {
+  const l = document.createElement('label'), pair = document.createElement('span');
+  pair.className = 'rollpair';
+  for (const end of ['min', 'max']) {
+    const i = Object.assign(document.createElement('input'), { id: `rl-${k}-${end}`, type: 'number', inputMode: 'decimal', placeholder: end === 'min' ? 'mín' : 'máx' });
+    i.addEventListener('input', preview); pair.append(i);
+  }
+  l.append(STAT_LABEL[k][0].toUpperCase() + STAT_LABEL[k].slice(1), pair);
+  return l;
+}));
 $('statInputs').replaceChildren(...STAT_KEYS.map(k => {
   const l = document.createElement('label'), i = Object.assign(document.createElement('input'), { id: 'st-' + k, type: 'number', step: k.endsWith('Regen') ? '0.5' : '1', inputMode: 'decimal' });
   if (k === 'attackSpeed') { i.min = '0'; i.max = String(MAX_ATTACK_SPEED); }
@@ -91,13 +102,17 @@ function openItem(id: string | null) {
   field('id').value = id ?? ''; field('id').readOnly = !!id;
   $('idHint').textContent = id ? 'O id não muda: inventários e o banco guardam o id.' : 'Sai do nome. Depois de criado, nunca muda (o banco guarda o id).';
   field('heal').value = d.heal ? String(d.heal) : ''; field('mana').value = d.mana ? String(d.mana) : '';
-  const kind = kindOf(d), g = d.gear;
+  const kind = kindOf(d), g = d.gear ?? d.wear;   // atributos, sorteio e efeito: os mesmos campos nos dois
   document.querySelectorAll<HTMLInputElement>('input[name=kind]').forEach(r => { r.checked = r.value === kind; });
-  $<HTMLSelectElement>('like').value = g?.like ?? 'sword';
+  $<HTMLSelectElement>('like').value = d.gear?.like ?? 'sword';
+  $<HTMLSelectElement>('wearSlot').value = d.wear?.slot ?? 'head';
   $<HTMLSelectElement>('like').disabled = !!id && isKind(id);   // os cajados de base são o próprio jeito de ser
-  field('damage').value = g?.damage ? String(g.damage) : '';
+  field('damage').value = d.gear?.damage ? String(d.gear.damage) : '';
   for (const k of STAT_KEYS) field('st-' + k).value = g?.stats?.[k] ? String(g.stats[k]) : '';
-  field('useColor').checked = !!g?.color; field('color').value = g?.color ?? '#9fb8ff';
+  field('useColor').checked = !!d.gear?.color; field('color').value = d.gear?.color ?? '#9fb8ff';
+  $<HTMLSelectElement>('rarity').value = d.rarity ?? 'common';
+  for (const k of STAT_KEYS) { const r = g?.rolls?.[k]; field(`rl-${k}-min`).value = r ? String(r[0]) : ''; field(`rl-${k}-max`).value = r ? String(r[1]) : ''; }
+  $<HTMLSelectElement>('effect').value = g?.effect?.kind ?? ''; field('effectValue').value = g?.effect ? String(g.effect.value) : '';
   $('iconError').textContent = ''; $('formErrors').replaceChildren(); $('status').textContent = '';
   field('iconFile').value = '';
   syncKind(); void drawIcon(id ? d.icon : null); preview();
@@ -108,13 +123,33 @@ function openItem(id: string | null) {
 const kindNow = () => (document.querySelector<HTMLInputElement>('input[name=kind]:checked')?.value ?? 'material') as Kind;
 function syncKind() {
   const k = kindNow(), like = $<HTMLSelectElement>('like').value;
-  $('useFields').hidden = k !== 'use'; $('gearFields').hidden = k !== 'gear';
-  $('damageField').hidden = like !== 'sword' && like !== 'bow';
+  $('useFields').hidden = k !== 'use'; $('gearFields').hidden = k !== 'gear' && k !== 'wear';
+  // vestir usa a mesma caixa: no lugar de "comporta-se como", dano e cor, o espaço onde se veste
+  const wear = k === 'wear';
+  $('gearLegend').textContent = wear ? 'Vestir' : 'Equipamento';
+  $('wearField').hidden = !wear; $('likeField').hidden = wear; $('colorField').hidden = wear;
+  $('statsLabel').textContent = wear ? 'Atributos (enquanto estiver vestido)' : 'Atributos (enquanto estiver no A ou no C)';
+  $('damageField').hidden = wear || (like !== 'sword' && like !== 'bow');
   if (rules) field('damage').placeholder = String(like === 'bow' ? rules.weapons.arrow : rules.weapons.sword);
   $('damageHint').textContent = like === 'sword' ? 'Vazio: o da espada de base. Giro e dash crescem junto.' : 'Vazio: o do arco de base.';
   field('color').disabled = !field('useColor').checked;
+  // raridade: sorteio só até raro; efeito só em épico e lendário (e o efeito precisa combinar com a arma)
+  const r = rarityNow(), fixed = r === 'epic' || r === 'legendary';
+  $('rollFields').hidden = fixed; $('effectFields').hidden = !fixed;
+  for (const o of $<HTMLSelectElement>('effect').options) o.disabled = wear ? !!o.value && !WEAR_EFFECTS.includes(o.value as EffectKind) : (o.value === 'pierce' && like !== 'bow') || (o.value === 'wave' && like !== 'sword');
+  if ($<HTMLSelectElement>('effect').selectedOptions[0]?.disabled) $<HTMLSelectElement>('effect').value = '';
+  field('effectValue').disabled = !$<HTMLSelectElement>('effect').value;
+  $('effectHint').textContent = wear ? 'Vale enquanto estiver vestido, contra monstros. Soma com o da arma.' : 'Muda o jeito de lutar, não só o número. Vale enquanto o item está no A ou no C, contra monstros.';
+  $('rarityHint').textContent = r === 'common' ? 'O básico. Equipamento comum às vezes vem com 1 atributo sorteado.'
+    : r === 'uncommon' ? 'Verde. Equipamento incomum vem com 1 atributo sorteado.' : r === 'rare' ? 'Azul. Equipamento raro vem com 2 atributos sorteados.'
+    : r === 'epic' ? 'Roxo. Fixo (sem sorteio), com um efeito. Achar um é anunciado no chat.'
+    : 'Dourado. Fixo e único, com um efeito. Achar um é anunciado no chat. Precisa de um caminho garantido (ver "Onde aparece").';
+  $('rarityHint').style.color = RARITY_COLOR[r];
 }
-$('like').addEventListener('change', () => { syncKind(); preview(); });
+const rarityNow = () => $<HTMLSelectElement>('rarity').value as Rarity;
+$('rarity').addEventListener('change', () => { syncKind(); preview(); });
+['effect', 'effectValue'].forEach(id => $(id).addEventListener('input', () => { syncKind(); preview(); }));
+['like', 'wearSlot'].forEach(id => $(id).addEventListener('change', () => { syncKind(); preview(); }));
 ['damage', 'useColor', 'color'].forEach(id => field(id).addEventListener('input', () => { syncKind(); preview(); }));
 document.querySelectorAll('input[name=kind]').forEach(r => r.addEventListener('change', () => { syncKind(); preview(); }));
 field('name').addEventListener('input', () => { if (!editing && !idTouched) field('id').value = slug(field('name').value); preview(); });
@@ -123,9 +158,16 @@ field('desc').addEventListener('input', preview);
 ['heal', 'mana'].forEach(id => field(id).addEventListener('input', preview));
 function preview() {
   $('pvName').textContent = field('name').value.trim() || 'Nome';
+  $('pvName').style.color = RARITY_COLOR[rarityNow()];
   $('pvDesc').textContent = field('desc').value.trim() || 'descrição';
   // equipamento: os números como o jogo mostra no inventário
   calc();
+  if (kindNow() === 'wear') {
+    const d = wearData(), li = (t: string) => Object.assign(document.createElement('li'), { textContent: t });
+    $('pvLines').hidden = false;
+    $('pvLines').replaceChildren(li(`Veste em: ${WEAR_NAME[d.slot]}`), ...statLines(d.stats ?? {}).map(li));
+    return;
+  }
   const g = kindNow() === 'gear' && rules ? gearData() : null;
   $('pvLines').hidden = !g;
   if (!g || !rules) return;
@@ -135,7 +177,7 @@ function preview() {
 // Calculadora: o efeito prático dos números que estão no formulário, a cada tecla.
 function calc() {
   const k = kindNow(), num = (id: string) => Number(field(id).value) || 0;
-  const draft: ItemDef = { name: '', desc: '', ...(k === 'use' ? { heal: num('heal') || undefined, mana: num('mana') || undefined } : {}), ...(k === 'gear' ? { gear: gearData() } : {}) };
+  const draft: ItemDef = { name: '', desc: '', ...(k === 'use' ? { heal: num('heal') || undefined, mana: num('mana') || undefined } : {}), ...(k === 'gear' ? { gear: gearData() } : {}), ...(k === 'wear' ? { wear: wearData() } : {}) };
   const b = rules && k !== 'material' ? balance(rules, draft) : null;
   $('calc').hidden = !b || !b.lines.length;
   if (!b) return;
@@ -147,10 +189,29 @@ function gearData(): GearDef {
   const g: GearDef = { like: $<HTMLSelectElement>('like').value as GearKind };
   const dmg = Number(field('damage').value);
   if (dmg > 0 && (g.like === 'sword' || g.like === 'bow')) g.damage = Math.round(dmg);
+  if (field('useColor').checked) g.color = field('color').value;
+  return Object.assign(g, numbers());
+}
+// O que se veste como está no formulário.
+const wearData = (): WearDef => ({ slot: $<HTMLSelectElement>('wearSlot').value as WearSlot, ...numbers() });
+// Atributos, sorteio (até raro) e efeito (épico e lendário): iguais em equipamento e no que se veste.
+function numbers() {
+  const g: Pick<GearDef, 'stats' | 'rolls' | 'effect'> = {};
   const stats: Partial<Stats> = {};
   for (const k of STAT_KEYS) { const v = Number(field('st-' + k).value); if (v) stats[k] = v; }
   if (Object.keys(stats).length) g.stats = stats;
-  if (field('useColor').checked) g.color = field('color').value;
+  const r = rarityNow();
+  if (r === 'epic' || r === 'legendary') {
+    const kind = $<HTMLSelectElement>('effect').value as EffectKind | '', v = Math.round(Number(field('effectValue').value));
+    if (kind && v > 0) g.effect = { kind, value: v };
+  } else {
+    const rolls: GearDef['rolls'] = {};
+    for (const k of STAT_KEYS) {
+      const lo = field(`rl-${k}-min`).value.trim(), hi = field(`rl-${k}-max`).value.trim();
+      if (lo || hi) rolls[k] = [Number(lo || hi), Number(hi || lo)];
+    }
+    if (Object.keys(rolls).length) g.rolls = rolls;
+  }
   return g;
 }
 
@@ -185,7 +246,13 @@ $('form').addEventListener('submit', async e => {
   const id = editing ?? field('id').value.trim(), kind = kindNow(), errors: string[] = [];
   const num = (k: string) => { const v = field(k).value.trim(); return v ? Number(v) : undefined; };
   const data: Record<string, unknown> = { name: field('name').value.trim(), desc: field('desc').value.trim() };
+  if (rarityNow() !== 'common') data.rarity = rarityNow();
   if (kind === 'use') { const heal = num('heal'), mana = num('mana'); if (heal) data.heal = heal; if (mana) data.mana = mana; if (!heal && !mana) errors.push('Consumível precisa de cura ou mana (ou escolha Material).'); }
+  if (kind === 'wear') {
+    data.wear = wearData();
+    const as = (data.wear as WearDef).stats?.attackSpeed ?? 0;
+    if (as < 0 || as > MAX_ATTACK_SPEED) errors.push(`Velocidade de ataque: de 0 a ${MAX_ATTACK_SPEED}%.`);
+  }
   if (kind === 'gear') {
     data.gear = gearData();
     const as = (data.gear as GearDef).stats?.attackSpeed ?? 0;
@@ -244,6 +311,10 @@ async function loadUses(id: string | null) {
   $('chestRows').replaceChildren(...(u.chests.length ? u.chests.map(c => Object.assign(document.createElement('li'), {
     textContent: `Mapa ${c.map}, tile x ${c.x}, y ${c.y}: ${Math.round(c.chance * 100)}%${c.max > 1 ? `, ${c.min === c.max ? c.max : `${c.min} a ${c.max}`} unidades` : ''}`
   })) : [Object.assign(document.createElement('li'), { textContent: 'Nenhum baú.' })]));
+  // Regra: todo lendário tem um caminho garantido (loja, baú com 100% ou monstro com 100%); a sorte só adianta.
+  const sure = u.shops.some(s => s.buy) || u.drops.some(d => d.chance === 1) || u.chests.some(c => c.chance === 1);
+  $('legendWarn').hidden = items[id]?.rarity !== 'legendary' || sure;
+  $('legendWarn').textContent = 'Lendário sem caminho garantido: ponha numa loja, num monstro com 100% (um chefe, por exemplo) ou num baú com 100% (no Tiled). Quem joga e explora sempre consegue; a sorte só adianta.';
 }
 $('saveUses').addEventListener('click', async () => {
   const id = usesFor; if (!id) return;

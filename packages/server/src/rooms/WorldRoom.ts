@@ -1,7 +1,7 @@
 import { Room, ServerError, type Client } from 'colyseus';
 import path from 'node:path';
 import {
-  INVITE_TTL, ITEMS, LOOT_IDS, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, decodeTelemetry, dropItem, emptyInput, maxStats, ownState, refreshStats,
+  INVITE_TTL, ITEMS, LOOT_IDS, RARITY_NAME, WEAR_SLOTS, sortBag, unwearItem, wearItem, type WearSlot, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, decodeTelemetry, dropItem, emptyInput, maxStats, ownState, refreshStats,
   openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
   type ChatMsg, type GearRules, type OnlineEntry, type PartyMsg, type PartyTuple, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
@@ -126,7 +126,7 @@ export class WorldRoom extends Room {
     }
     const s = resume ?? this.loadState(c), w = this.worlds.get(s.map)!;
     const p = w.addPlayer(client.sessionId, c.name, s.x, s.y, s.look);
-    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear; p.fragments = s.fragments;
+    p.level = s.level; p.xp = s.xp; p.gold = s.gold; p.bag = s.bag; p.chests = s.chests; p.chestLoot = s.chestLoot; p.gear = s.gear; p.fragments = s.fragments; p.wear = s.wear;
     for (const [id, b64] of Object.entries(s.explored)) { const o = this.worlds.get(id); if (o) p.explored[id] = base64ToBits(b64, exploredSize(o.map.cols, o.map.rows)); }
     p.hp = s.hp; p.mp = s.mp; refreshStats(w, p);   // máximos pelo nível e pelo equipamento (corta o que passar)
     if (oldId) p.party = this.parties.rename(oldId, client.sessionId)?.id ?? null;   // entrou de novo: continua no grupo
@@ -252,13 +252,19 @@ export class WorldRoom extends Room {
     try { const f = JSON.parse(c.fragments ?? '[]'); if (Array.isArray(f)) fragments = f.filter(k => typeof k === 'string'); } catch { }
     const explored: Record<string, string> = {};
     try { for (const [k, v] of Object.entries(JSON.parse(c.explored ?? '{}'))) if (typeof v === 'string' && this.worlds.has(k)) explored[k] = v; } catch { }
-    return { map, ...at, chests, chestLoot, explored, fragments, hp, mp: c.mp === null ? m.mp : c.mp, look: { cloak: c.cloak, hair: c.hair },
+    // vestido: cada espaço só aceita o que é dele (item que mudou de tipo na Oficina volta a não existir ali)
+    const wear = { head: null, body: null, feet: null, neck: null, ring: null } as CharacterState['wear'];
+    try {
+      const raw = JSON.parse(c.wear ?? '{}');
+      for (const part of WEAR_SLOTS) { const s = parseInventory([raw[part]], 1, 1)[0]; if (s && ITEMS[s.id]?.wear?.slot === part) wear[part] = s; }
+    } catch { }
+    return { map, ...at, chests, chestLoot, explored, fragments, wear, hp, mp: c.mp === null ? m.mp : c.mp, look: { cloak: c.cloak, hair: c.hair },
       level: c.level, xp: c.xp, gold: c.gold, bag: parseInventory(bag, w.rules.inventory.slots, w.rules.inventory.stack), gear: parseGear(gear) };
   }
   // Quem sai caído volta no ponto de renascimento do mapa principal, com a vida cheia.
   private stateOf(p: Player, map: string): CharacterState {
     const w = this.worlds.get(map); if (w) pruneChests(w, p);
-    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear }, fragments: [...p.fragments],
+    const keep = { look: { ...p.look }, level: p.level, xp: p.xp, gold: p.gold, bag: p.bag.map(s => s && { ...s }), chests: { ...p.chests }, chestLoot: Object.fromEntries(Object.entries(p.chestLoot).map(([k, v]) => [k, v.map(i => ({ ...i }))])), gear: { ...p.gear }, fragments: [...p.fragments], wear: { ...p.wear },
       explored: Object.fromEntries(Object.entries(p.explored).map(([k, v]) => [k, bitsToBase64(v)])) };
     if (p.state === 'dead') {
       const at = respawnPos(this.world, this.world.rules.player.respawnPoint);
@@ -530,6 +536,10 @@ export class WorldRoom extends Room {
   // Usar ou largar um item do inventário; recusa vira aviso só para quem pediu.
   private onItem(client: Client, raw: unknown) {
     const f = this.find(client.sessionId), m = raw as { action?: unknown; slot?: unknown; gear?: unknown } | null;
+    // vestir um espaço da mochila, tirar uma parte, organizar a mochila
+    if (f && m?.action === 'wear' && Number.isInteger(m.slot)) { const r = wearItem(f.w, f.p, m.slot as number); if (!r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg); return; }
+    if (f && m?.action === 'unwear' && WEAR_SLOTS.includes(m.slot as WearSlot)) { const r = unwearItem(f.w, f.p, m.slot as WearSlot); if (!r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg); return; }
+    if (f && m?.action === 'sort') { sortBag(f.p); return; }
     if (f && m?.action === 'equip') {   // equipar no A ou no C: { gear, slot: 'a' | 'c' }
       const r = isGear(m.gear) && (m.slot === 'a' || m.slot === 'c') ? equipGear(f.p, m.gear, m.slot) : null;
       if (r && !r.ok) client.send(MSG.chat, { ch: 'system', text: r.reason } satisfies ChatMsg);
@@ -620,6 +630,7 @@ export class WorldRoom extends Room {
         else if (ev.t === 'portal') moves.push(() => this.onPortal(ev.id, ev.to, ev.arrive));
         else if (ev.t === 'gohome') moves.push(() => this.goHome(ev.id));
         else if (ev.t === 'announce') this.announce(ev.text);
+        else if (ev.t === 'found') this.sendChat({ ch: 'system', text: `✦ ${ev.name} encontrou ${ITEMS[ev.item]?.name ?? ev.item} (${RARITY_NAME[ev.rarity]})!` });
         else if (ev.t === 'fish') { this.onFish(w, ev.id, ev.item, ev.size); out.push(ev); }
         else out.push(ev);
       }
@@ -659,7 +670,7 @@ export class WorldRoom extends Room {
       if (w.tick % 40 < this.sendEvery) msg.r = [...w.players.values()].filter(o => o.id !== id && o.state !== 'dead').map(o => [o.id, Math.floor(o.x / 16), Math.floor(o.y / 16)]);
       msg.g = this.partyInfo(id, seat.map);
       if (w.keys || w.map.data.keys || w.map.data.rooms) msg.kc = w.keys;   // masmorra: chaves do grupo
-      if (seat.bagSent !== me.bagVersion) { msg.bag = me.bag; seat.bagSent = me.bagVersion; }
+      if (seat.bagSent !== me.bagVersion) { msg.bag = me.bag; msg.wear = me.wear; seat.bagSent = me.bagVersion; }
       const ch = openChests(w, me), mark = ch.join(';') || '-';   // muda ao abrir e quando um baú enche de novo ('' = nunca enviado)
       if (mark !== seat.chestsSent) { msg.ch = ch; seat.chestsSent = mark; }
       seat.client.send(MSG.snapshot, msg);

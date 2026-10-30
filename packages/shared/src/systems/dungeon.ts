@@ -3,6 +3,7 @@ import type { Player } from '../entities/player';
 import { nearCave } from '../world/tiles';
 import type { World } from '../world';
 import { burst, sfx } from './fx';
+import { rollFor } from '../rarity';
 
 /* ---------- Masmorra: chaves, portas trancadas, salas que trancam e fragmentos de vida ----------
    As chaves são do mapa (da cópia do grupo, numa masmorra), não de quem pegou: qualquer um do grupo abre a porta. */
@@ -48,7 +49,8 @@ export function updateRooms(w: World) {
     } else if (st === 'locked' && !alive) {
       w.rooms[i] = 'cleared'; grates(w, r, 'D', 'O');
       const cx = (r.x + r.w / 2) * TS, cy = (r.y + r.h / 2) * TS;
-      if (r.reward) w.drops.push({ id: w.nextId++, item: r.reward === 'chave' ? 'key' : r.reward, n: 1, x: cx, y: cy, owner: null, ownerUntil: 0, expires: Infinity, born: w.tick });
+      if (r.reward) { const item = r.reward === 'chave' ? 'key' : r.reward, roll = item === 'key' ? undefined : rollFor(w, item);
+        w.drops.push({ id: w.nextId++, item, n: 1, x: cx, y: cy, owner: null, ownerUntil: 0, expires: Infinity, born: w.tick, ...(roll ? { roll } : {}) }); }
       burst(w, cx, cy, 'spark', 16, { s: 1.4, z: 8 }); sfx(w, 'chest', { x: cx, y: cy });
       for (const p of w.players.values()) if (inside(r, p.x, p.y)) notice(w, p, r.reward ? 'Sala limpa! Algo apareceu.' : 'Sala limpa!');
     } else if (st === 'locked' && !someone) { w.rooms[i] = 'idle'; grates(w, r, 'D', 'O'); }   // todos caíram ou saíram: destranca (tranca de novo ao voltar)

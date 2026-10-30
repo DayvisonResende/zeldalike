@@ -1,4 +1,4 @@
-import { MARK_TTL, World, fragmentKey, buyItem, exploredOf, equipGear, sellItem, type GearId, type GearSlot, type ItemId, dayTime, remaining, dropItem, openChests, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
+import { MARK_TTL, World, fragmentKey, sortBag, unwearItem, wearItem, type WearSlot, buyItem, exploredOf, equipGear, sellItem, type GearId, type GearSlot, type ItemId, dayTime, remaining, dropItem, openChests, pvpLock, setPvp, useItem, xpToNext, cleanChat, type ItemResult, cleanLook, cleanName, type ChatMsg, type ChatRequest, type GameEvent, type InputState, type MapData, type Player, type Profile, type ProfileRequest } from '@vale/shared';
 import type { Inventory, MapState, Mark, Scene, Session, Status } from './types';
 
 // Sem servidor: o mundo inteiro roda no navegador. Útil para desenvolver e quando o servidor está fora.
@@ -27,12 +27,15 @@ export class LocalSession implements Session {
   chat(req: ChatRequest) { const text = cleanChat(req.text, 120); if (text) this.onChat?.({ ch: req.ch, text, from: this.player.id, name: this.player.name }); }
   inventory(): Inventory {
     const p = this.player, next = xpToNext(this.world, p.level);
-    return { bag: p.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: isFinite(next) ? next : -1, gear: p.gear, stats: p.stats, maxHp: p.maxHp, maxMp: p.maxMp };
+    return { bag: p.bag, gold: p.gold, level: p.level, xp: p.xp, xpNext: isFinite(next) ? next : -1, gear: p.gear, stats: p.stats, maxHp: p.maxHp, maxMp: p.maxMp, wear: p.wear };
   }
   private itemResult(r: ItemResult) { if (!r.ok) this.onChat?.({ ch: 'system', text: r.reason }); }
   useItem(slot: number) { this.itemResult(useItem(this.world, this.player, slot)); }
   dropItem(slot: number) { this.itemResult(dropItem(this.world, this.player, slot)); }
   equip(gear: GearId, slot: GearSlot) { this.itemResult(equipGear(this.player, gear, slot)); }
+  wear(slot: number) { this.itemResult(wearItem(this.world, this.player, slot)); }
+  unwear(part: WearSlot) { this.itemResult(unwearItem(this.world, this.player, part)); }
+  sortBag() { sortBag(this.player); }
   shop(action: 'buy' | 'sell', shop: string, item: ItemId, n: number) { this.itemResult((action === 'buy' ? buyItem : sellItem)(this.world, this.player, shop, item, n)); }
   pvp() { return { mode: this.world.rules.pvp.mode, lock: pvpLock(this.world, this.player) }; }
   setPvp(on: boolean) {

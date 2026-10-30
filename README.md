@@ -100,7 +100,15 @@ botões A e C (seção `gear` do `config.yaml`; as armas atuais estão zeradas, 
 o nível dá só vida e mana. O dano em monstros é em pontos de vida (`weapons` e `magic`). Entre jogadores, os atributos
 valem `pvp.factor` (0,5 = metade do ataque, do poder mágico e da defesa). Menu → Atributos mostra a
 ficha e o que cada botão faz; no inventário, escolher uma arma mostra os números dela e o que muda ao equipar no A ou
-no C (verde melhora, vermelho piora).
+no C (verde melhora, vermelho piora), e escolher algo de vestir mostra o que muda no lugar do que está vestido.
+
+**Raridade:** comum (branco), incomum (verde), raro (azul), épico (roxo) e lendário (dourado), definida no item
+(Oficina ou `"rarity"` no `.json`). O nome, a borda no inventário e o brilho no chão (com uma luz subindo nos épicos e
+lendários) ficam na cor dela. Equipamento comum, incomum ou raro pode trazer atributos sorteados (`gear.rolls`: comum às
+vezes 1, incomum 1, raro 2) e cada exemplar é único (não empilha; o sorteio vai junto com ele para o banco e para a
+rede). Épico e lendário são fixos e trazem um efeito (`gear.effect`): roubo de vida, veneno, flecha que atravessa,
+onda ao girar ou explosão ao derrubar. Achar um épico ou lendário toca um som especial e é anunciado no chat.
+Todo lendário deve ter um caminho garantido (loja, baú ou monstro com 100%); a Oficina avisa quando falta.
 
 **Gancho:** equipamento (no A ou no C) que atira uma corrente na mira até 8 tiles. Preso num pilar, puxa você até
 ele, por cima de água e buracos; em monstro, tira um pouco e atordoa; num item do chão, traz até você. Fica no baú do
@@ -161,7 +169,10 @@ vira recorde do servidor (anunciado no chat, e na aba Recordes do menu). A barra
 então o cliente vê exatamente o que o servidor julga: o atraso da rede não atrapalha o timing.
 
 **Progresso:** monstros dão XP e soltam loot no chão (só quem derrubou pega nos primeiros segundos).
-`I` (ou 🎒) abre o inventário; `1` usa um coração e `2` uma poção de mana. Largar um item no chão é o jeito
+`I` (ou 🎒) abre o inventário: em cima as armas do A e do C e o boneco com o que está vestido (cabeça, corpo, pés,
+colar e anel; o item sai da mochila enquanto vestido e soma os atributos), embaixo a mochila com abas por tipo e o
+botão Organizar. `1` usa um coração e `2` uma poção de mana. Troca rápida de arma sem abrir o inventário: os botões
+A e C no canto do HUD (embaixo da barra de XP) ou as teclas `4` (A) e `5` (C), passando pelas armas que você tem. Largar um item no chão é o jeito
 de passar para um amigo. XP, curva de nível, tabelas de drop e taxas ficam no `config.yaml`.
 
 `Esc` (ou o botão ☰ na tela) abre o menu: personagem (nome, capa, cabelo), opções

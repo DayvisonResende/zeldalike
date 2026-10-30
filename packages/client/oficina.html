@@ -62,9 +62,21 @@
             <label><input type="radio" name="kind" value="use"><span>Consumível</span></label>
             <label><input type="radio" name="kind" value="material"><span>Material</span></label>
             <label><input type="radio" name="kind" value="gear"><span>Equipamento</span></label>
+            <label><input type="radio" name="kind" value="wear"><span>Vestir</span></label>
           </div>
-          <small id="kindHint">Consumível: usar recupera vida ou mana. Material: só para guardar e vender. Equipamento: vai no botão A ou C.</small>
+          <small id="kindHint">Consumível: usar recupera vida ou mana. Material: só para guardar e vender. Equipamento: vai no botão A ou C. Vestir: cabeça, corpo, pés, colar ou anel.</small>
         </fieldset>
+
+        <label class="field">Raridade
+          <select id="rarity">
+            <option value="common">Comum (branco)</option>
+            <option value="uncommon">Incomum (verde)</option>
+            <option value="rare">Raro (azul)</option>
+            <option value="epic">Épico (roxo)</option>
+            <option value="legendary">Lendário (dourado)</option>
+          </select>
+          <small id="rarityHint"></small>
+        </label>
 
         <div class="cols" id="useFields">
           <label class="field">Cura (vida)<input id="heal" type="number" min="0" max="1000" inputmode="numeric"></label>
@@ -72,9 +84,19 @@
         </div>
 
         <fieldset class="field gearbox" id="gearFields">
-          <legend>Equipamento</legend>
+          <legend id="gearLegend">Equipamento</legend>
           <div class="cols">
-            <label class="field">Comporta-se como
+            <label class="field" id="wearField">Onde se veste
+              <select id="wearSlot">
+                <option value="head">Cabeça</option>
+                <option value="body">Corpo</option>
+                <option value="feet">Pés</option>
+                <option value="neck">Colar</option>
+                <option value="ring">Anel</option>
+              </select>
+              <small>Um de cada por vez. Ainda não aparece desenhado no personagem.</small>
+            </label>
+            <label class="field" id="likeField">Comporta-se como
               <select id="like">
                 <option value="sword">Espada (golpe, giro carregado, dash)</option>
                 <option value="bow">Arco (flechas)</option>
@@ -88,17 +110,37 @@
             <label class="field" id="damageField">Dano por golpe<input id="damage" type="number" min="1" max="999" inputmode="numeric"><small id="damageHint">Vazio: o da arma de base.</small></label>
           </div>
           <div class="field">
-            <span>Atributos (enquanto estiver no A ou no C)</span>
+            <span id="statsLabel">Atributos (enquanto estiver no A ou no C)</span>
             <div class="stats" id="statInputs"></div>
             <small>Vazio = 0. Velocidade de ataque em %, até 50. Entre jogadores, vale a metade (pvp.factor).</small>
           </div>
-          <div class="field">
+          <div class="field" id="colorField">
             <span>Cor</span>
             <div class="colorrow">
               <label class="check"><input type="checkbox" id="useColor"><span>Cor própria</span></label>
               <input type="color" id="color" value="#9fb8ff" aria-label="Cor da lâmina, da pedra ou da madeira">
               <small id="colorHint">Espada: a lâmina. Cajado: a pedra. Arco: a madeira. Sem cor própria, fica como a arma de base.</small>
             </div>
+          </div>
+          <div class="field" id="rollFields">
+            <span>Sorteio (atributos que um exemplar pode trazer a mais)</span>
+            <div class="stats" id="rollInputs"></div>
+            <small>Preencha mínimo e máximo dos que podem sair. Cada exemplar que cai (monstro, baú) sorteia: comum às vezes 1, incomum 1, raro 2. Na loja, sai sem sorteio.</small>
+          </div>
+          <div class="field" id="effectFields">
+            <span>Efeito</span>
+            <div class="cols">
+              <select id="effect" aria-label="Efeito">
+                <option value="">Nenhum</option>
+                <option value="lifesteal">Roubo de vida (% do dano volta como vida)</option>
+                <option value="poison">Veneno (dano por segundo, por 3 s)</option>
+                <option value="pierce">Flecha que atravessa (só arco: quantos monstros)</option>
+                <option value="wave">Onda ao girar (só espada: dano da onda)</option>
+                <option value="explode">Explode ao derrubar (dano da explosão)</option>
+              </select>
+              <input id="effectValue" type="number" min="1" max="999" inputmode="numeric" aria-label="Número do efeito">
+            </div>
+            <small id="effectHint">Muda o jeito de lutar, não só o número. Vale enquanto o item está no A ou no C, contra monstros.</small>
           </div>
         </fieldset>
 
@@ -154,6 +196,7 @@
       <div class="field">
         <span>Baús</span>
         <ul class="chestlist" id="chestRows"></ul>
+        <p class="warn" id="legendWarn" hidden></p>
         <small>Baús ficam no mapa: no Tiled, a propriedade <code>conteudo</code> do baú.</small>
       </div>
       <div class="actions">

@@ -1,5 +1,5 @@
 import './render/icons';   // primeiro: registra os itens embutidos (o mapa abaixo cita itens nos baús)
-import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, type CharacterSummary, type ChatRequest, type GameEvent, type Profile, type ProfileRequest } from '@vale/shared';
+import { BUTTON, VIEW_H, VIEW_W, emptyInput, fromTiled, gearName, nextGear, type GearSlot, type CharacterSummary, type ChatRequest, type GameEvent, type Profile, type ProfileRequest } from '@vale/shared';
 import valeTmj from '../../../content/maps/vale.tmj?raw';
 import valeTsj from '../../../content/maps/vale.tsj?raw';
 import maintenanceHtml from '../../../manutencao.html?raw';
@@ -234,7 +234,7 @@ function togglePvp() {
 }
 /* ---------- Inventário (I), atalhos 1 e 2 ---------- */
 const floaters = new Floaters(document.getElementById('floaters')!);
-const bag = new BagPanel({ inventory: () => session.inventory(), rules: () => session.gearRules(), use: s => session.useItem(s), drop: s => session.dropItem(s), equip: (g, s) => session.equip(g, s), closed: refocus });
+const bag = new BagPanel({ inventory: () => session.inventory(), rules: () => session.gearRules(), use: s => session.useItem(s), drop: s => session.dropItem(s), equip: (g, s) => session.equip(g, s), wear: s => session.wear(s), unwear: part => session.unwear(part), sort: () => session.sortBag(), closed: refocus });
 const shop = new ShopPanel({ inventory: () => session.inventory(), deal: (a, s, item, n) => session.shop(a, s, item, n), closed: refocus });
 // Mapa do mundo (M) e minimapa: o que a sessão sabe do mapa atual.
 let profilesNow: ReadonlyMap<string, Profile> = new Map();   // nomes de quem está online (da cena do quadro)
@@ -260,7 +260,15 @@ function quickUse(n: 1 | 2 | 3) {
   if (slot < 0) { const me = session.me(); if (me) floaters.add(me.x, me.y, n === 1 ? 'Sem corações' : n === 2 ? 'Sem poções' : 'Sem bombas', 'notice'); return; }
   session.useItem(slot);
 }
-const hooks = { started: () => started, start: begin, toggleMap, openParty, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse };
+// Troca rápida (4 e 5, ou os botões A e C no canto): a próxima arma que você tem, sem abrir o inventário.
+function swapGear(slot: GearSlot) {
+  const inv = session.inventory(), me = session.me(); if (!inv || !me) return;
+  const g = nextGear(inv, slot);
+  if (!g) { floaters.add(me.x, me.y, 'Sem outra arma', 'notice'); return; }
+  session.equip(g, slot);
+  floaters.add(me.x, me.y, `${slot.toUpperCase()}: ${gearName(g)}`, 'notice');
+}
+const hooks = { started: () => started, start: begin, toggleMap, openParty, togglePaths, toggleMenu, openChat, togglePvp, toggleBag, quickUse, swapGear };
 const input = new Input(stage, cv, hooks);
 bindTouch(input, hooks, () => settings.vibrate);
 const fsCorner = document.getElementById('fsCorner')!;
