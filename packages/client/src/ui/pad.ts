@@ -7,6 +7,7 @@ import type { PadSize } from './settings';
 // Parte do controle de toque que muda com o jogo: quantos itens restam nos atalhos e o nome do botão B.
 const pad = document.getElementById('pad')!, bLabel = document.querySelector('#btnB span')!;
 const aLabel = document.querySelector('#btnA span')!, cLabel = document.querySelector('#btnC span')!, gearBtns = { a: document.querySelector<HTMLButtonElement>('#gearLine [data-gear=a]')!, c: document.querySelector<HTMLButtonElement>('#gearLine [data-gear=c]')! };
+const gearQuick = { a: document.querySelector<HTMLButtonElement>('#gearQuick [data-gear=a]')!, c: document.querySelector<HTMLButtonElement>('#gearQuick [data-gear=c]')! };
 let lastGear = '';
 const quick = (['heart', 'mana', 'bomb'] as const).map((id, i) => {
   const el = document.getElementById('q' + (i + 1))!;
@@ -37,6 +38,7 @@ export function updatePad(me: PlayerView | undefined, inv: Inventory | null, siz
       for (const [k, name] of [['a', a], ['c', c]] as const) {   // sem outra arma para trocar, o botão fica parado
         gearBtns[k].querySelector('span')!.textContent = name; gearBtns[k].disabled = !nextGear(inv, k);
         gearBtns[k].setAttribute('aria-label', `${k.toUpperCase()}: ${name}${gearBtns[k].disabled ? '' : '. Trocar'}`);
+        gearQuick[k].disabled = gearBtns[k].disabled; gearQuick[k].setAttribute('aria-label', gearBtns[k].getAttribute('aria-label')!);
       }
     }
   }

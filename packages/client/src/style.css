@@ -56,6 +56,14 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .qbtn canvas{width:56%;height:auto;image-rendering:pixelated}
 .qbtn b{position:absolute;right:-4px;bottom:-5px;min-width:1.5em;padding:0 .25em;font-family:var(--f-display);font-size:calc(10px * var(--k));line-height:1.5;color:#1a1226;background:#ffe66b;border-radius:2px}
 .qbtn.empty{opacity:.4}
+/* troca rápida de arma no controle de toque (deitado): A e C no canto de cima à esquerda */
+.gearquick{display:none;gap:calc(8px * var(--k))}
+.qbtn.gq{font-family:var(--f-display);color:#1a1226;border-color:rgba(26,18,38,.5)}
+.qbtn.gq.a{background:var(--amber)}
+.qbtn.gq.c{background:var(--lilac)}
+.qbtn.gq i{position:absolute;right:3px;bottom:1px;font-style:normal;font-size:calc(10px * var(--k))}
+.qbtn.gq[disabled]{opacity:.45}
+.qbtn.gq[disabled] i{display:none}
 .qbtn.empty b{background:#9a91ad}
 .btns{display:grid;grid-template-columns:auto auto;gap:calc(10px * var(--k)) calc(14px * var(--k));align-items:center}
 .btns .a,.btns .d{translate:0 calc(18px * var(--k))}   /* em diagonal, como num controle */
@@ -325,6 +333,8 @@ body.gamepad .stage{width:min(100vw,calc(100dvh * 256 / 224))}
   .stage{width:min(100vw,calc((100dvh - 200px) * 256 / 224))}
   .menu,.account,.bag{position:fixed;z-index:10}   /* no celular a tela do jogo é pequena: o menu usa a tela toda */
   .titlebg{z-index:9}                             /* por cima do controle de toque, abaixo das telas de conta */
+  .gearline{font-size:clamp(9px,2.6cqw,13px);gap:.6em}
+  .gearline button{min-height:36px;padding:.3em .8em}   /* troca rápida: do tamanho do dedo */
 }
 /* Deitado: a tela do jogo usa a altura toda e o controle vai para as faixas dos lados */
 @media (hover:none) and (pointer:coarse) and (orientation:landscape){
@@ -350,5 +360,7 @@ body.gamepad .stage{width:min(100vw,calc(100dvh * 256 / 224))}
   /* coração, poção e tela cheia: pequenos no canto de cima (a bomba já está no arco) */
   .quick{position:fixed;top:max(10px,env(safe-area-inset-top));right:max(14px,env(safe-area-inset-right))}
   #q3{display:none}
+  .gearquick{display:flex;position:fixed;top:max(10px,env(safe-area-inset-top));left:max(14px,env(safe-area-inset-left));pointer-events:auto}
+  .hud .gearline{display:none}   /* deitado, a troca rápida fica nos botões do canto */
 }
 @media (prefers-reduced-motion:reduce){.fishbar[data-phase=bite] span{animation:none}.stage.fade::after{animation:none;opacity:0}.more{animation:none}.roomname{transition:none}.bar::before{transition:none}.bar.hp.low{animation:none}}

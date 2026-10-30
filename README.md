@@ -172,7 +172,8 @@ então o cliente vê exatamente o que o servidor julga: o atraso da rede não at
 `I` (ou 🎒) abre o inventário: em cima as armas do A e do C e o boneco com o que está vestido (cabeça, corpo, pés,
 colar e anel; o item sai da mochila enquanto vestido e soma os atributos), embaixo a mochila com abas por tipo e o
 botão Organizar. `1` usa um coração e `2` uma poção de mana. Troca rápida de arma sem abrir o inventário: os botões
-A e C no canto do HUD (embaixo da barra de XP) ou as teclas `4` (A) e `5` (C), passando pelas armas que você tem. Largar um item no chão é o jeito
+A e C no canto do HUD (embaixo da barra de XP; no celular deitado, no canto de cima à esquerda, fora da tela do jogo)
+ou as teclas `4` (A) e `5` (C), passando pelas armas que você tem. Largar um item no chão é o jeito
 de passar para um amigo. XP, curva de nível, tabelas de drop e taxas ficam no `config.yaml`.
 
 `Esc` (ou o botão ☰ na tela) abre o menu: personagem (nome, capa, cabelo), opções

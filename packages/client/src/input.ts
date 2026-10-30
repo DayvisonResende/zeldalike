@@ -135,6 +135,7 @@ export function bindTouch(input: Input, hooks: InputHooks, vibrate: () => boolea
   document.getElementById('btnBomb')!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(3); buzz(); } });
   // troca rápida de arma (os botões A e C no canto do HUD)
   for (const b of document.querySelectorAll<HTMLButtonElement>('#gearLine [data-gear]')) b.addEventListener('click', e => { e.preventDefault(); b.blur(); if (hooks.started()) { hooks.swapGear(b.dataset.gear as 'a' | 'c'); buzz(); } });
+  for (const b of document.querySelectorAll<HTMLButtonElement>('#gearQuick [data-gear]')) b.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started() && !b.disabled) { hooks.swapGear(b.dataset.gear as 'a' | 'c'); buzz(); } });
   for (const n of [1, 2, 3] as const) document.getElementById('q' + n)!.addEventListener('pointerdown', e => { e.preventDefault(); if (hooks.started()) { hooks.quickUse(n); buzz(); } });
   const fs = document.getElementById('fsBtn')!;
   fs.hidden = !document.fullscreenEnabled;
