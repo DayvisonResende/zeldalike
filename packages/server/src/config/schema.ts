@@ -47,7 +47,8 @@ export const configSchema = z.strictObject({
   server: z.strictObject({
     port: z.number().int().min(1).max(65535),
     maxPlayers: z.number().int().positive(),
-    motd: z.string().default('')
+    motd: z.string().default(''),
+    publicUrl: z.union([z.literal(''), z.url().startsWith('https://', 'server.publicUrl precisa começar com https://')]).default('')   // endereço com HTTPS (Caddy); vazio = sem
   }),
   network: z.strictObject({ sendRate: z.number().int().min(1).max(60) }),
   database: z.strictObject({

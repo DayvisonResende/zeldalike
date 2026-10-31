@@ -1,14 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Por enquanto o jogo roda em http:// (e a conexão em tempo real em ws://), sem criptografia.
-     Este arquivo libera isso. Quando o servidor tiver HTTPS, troque cleartextTrafficPermitted para "false"
-     (ou apague este arquivo e a linha networkSecurityConfig do AndroidManifest.xml). -->
+<!-- O jogo roda em https:// (e a conexão em tempo real em wss://), com o Caddy na frente (docs/HTTPS.md).
+     Nada sem criptografia: http:// e ws:// ficam bloqueados. Para testar com um servidor local por http (no PC da
+     rede de casa), libere o IP dele num domain-config com cleartextTrafficPermitted="true" só no build de teste. -->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="true">pifatec.useconectai.com.br</domain>
-    </domain-config>
 </network-security-config>

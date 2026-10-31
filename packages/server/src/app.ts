@@ -5,6 +5,8 @@ import { defineRoom, defineServer, matchMaker } from 'colyseus';
 import { authRoutes } from './auth/routes';
 import { oficinaEnabled, oficinaRoutes } from './oficina/routes';
 import { WorldRoom } from './rooms/WorldRoom';
+import { httpsRedirect } from './https';
+import { getConfig } from './config/store';
 
 // Página do jogo já compilada (npm run build). Servida pela mesma porta: um endereço só para os amigos.
 export const CLIENT_DIST = fileURLToPath(new URL('../../client/dist', import.meta.url));
@@ -16,6 +18,7 @@ export async function startServer(port: number) {
     rooms: { world: defineRoom(WorldRoom) },
     express: app => {
       app.set('trust proxy', 'loopback');   // atrás de um proxy local (túnel, nginx), o IP real vem no cabeçalho
+      app.use(httpsRedirect(() => getConfig().server.publicUrl));   // endereço antigo (http) → o novo (https)
       app.get('/api/health', (_req, res) => { res.json({ ok: true }); });   // o jogo pergunta antes de decidir entre login e manutenção
       if (oficinaEnabled()) app.use('/api/oficina', oficinaRoutes());   // antes de /api: as rotas de conta respondem 404 ao resto
       app.use('/api', authRoutes());

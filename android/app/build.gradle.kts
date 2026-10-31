@@ -3,7 +3,7 @@ plugins {
 }
 
 // O endereço do jogo vem de GAME_URL em gradle.properties.
-val gameUrl = (project.findProperty("GAME_URL") as String?) ?: "http://pifatec.useconectai.com.br:2567/"
+val gameUrl = (project.findProperty("GAME_URL") as String?) ?: "https://play.useconectai.com.br/"
 
 // A tela de manutenção é a da raiz do projeto (manutencao.html); o build copia para os assets do app.
 val copyMaintenance by tasks.registering(Copy::class) {

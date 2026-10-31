@@ -17,6 +17,7 @@ server:
   port: 2567
   maxPlayers: 100
   motd: "Bem-vindos ao Vale!"
+  publicUrl: ""             # endereço com HTTPS (ver docs/HTTPS.md), ex.: https://play.useconectai.com.br — quem abrir o antigo vai para ele
 
 network:
   sendRate: 20              # atualizações enviadas a cada jogador por segundo

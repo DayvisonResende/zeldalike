@@ -13,9 +13,9 @@ sem gerar outro APK.
 
 ## Trocar o endereço do jogo
 
-Em `gradle.properties`, mude `GAME_URL` e gere o APK de novo. Enquanto o site for `http://`, o app libera conexões
-sem criptografia em `res/xml/network_security_config.xml`; quando o site tiver HTTPS, mude `cleartextTrafficPermitted`
-para `false` lá (o arquivo explica).
+Em `gradle.properties`, mude `GAME_URL` e gere o APK de novo. O endereço é `https://play.useconectai.com.br/` (HTTPS
+com o Caddy, ver `docs/HTTPS.md`); o app bloqueia conexões sem criptografia em `res/xml/network_security_config.xml`.
+O app antigo (que abria `http://pifatec...:2567`) continua funcionando: o servidor manda a página para o endereço novo.
 
 ## O que o app faz
 

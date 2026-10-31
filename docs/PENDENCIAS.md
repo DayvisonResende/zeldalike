@@ -141,8 +141,9 @@ a logo do Mossblade, no estilo da tela de manutenção) atrás das telas de cont
 
 ### Infraestrutura (já conhecidas)
 
-- **HTTPS** (fica para o fim): hoje as senhas trafegam sem criptografia. Caddy na frente do servidor (`reverse_proxy localhost:2567`).
-  Com HTTPS, o app Android pode tirar a liberação de `http://` (`res/xml/network_security_config.xml`).
+- **HTTPS** (preparado em 2026-10-30): Caddy na frente do servidor, em `https://play.useconectai.com.br`. Passo a passo
+  no Windows em `docs/HTTPS.md` (DNS, roteador, firewall, Caddy como serviço, `server.publicUrl`). O app Android já
+  aponta para o HTTPS e bloqueia `http://`. Falta fazer no servidor de casa.
 - ~~**Backup automático do banco.**~~ Feito no sprint 2.
 - ~~**Ferramentas de administrador:**~~ comandos no chat feitos no sprint 2; o "painel do servidor" visual continua em `docs/OFICINA.md`.
 - **Teste de carga:** simular uns 100 jogadores antes de chamar todo mundo.

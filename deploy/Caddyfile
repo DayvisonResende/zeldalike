@@ -1,0 +1,8 @@
+# HTTPS do Mossblade (ver docs/HTTPS.md).
+# O Caddy recebe nas portas 443 (https) e 80 (só para pegar o certificado e mandar o http para o https),
+# tira e renova sozinho o certificado do Let's Encrypt e repassa tudo, inclusive a conexão do jogo (WebSocket),
+# para o servidor do jogo na mesma máquina.
+
+play.useconectai.com.br {
+	reverse_proxy localhost:2567
+}

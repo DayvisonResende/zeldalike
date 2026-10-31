@@ -22,6 +22,9 @@ mas na última versão compilada (`npm run build`); mudanças no cliente só apa
 - `PORT=xxxx` muda a porta do servidor (é o que as hospedagens usam).
 - `CONFIG=arquivo.yaml` usa outra configuração (por exemplo, uma de produção ou de teste).
 - `COLYSEUS_LATENCY=100 npm run server` simula 100 ms de latência, bom para testar a sensação online.
+- **HTTPS** (o endereço para os amigos: https://play.useconectai.com.br): o Caddy fica na frente do servidor
+  (`deploy/Caddyfile`). Passo a passo no Windows: `docs/HTTPS.md`. Com `server.publicUrl` no config, quem abre o
+  endereço antigo (`http://...:2567`) vai para o novo.
 
 ## Estrutura
 
