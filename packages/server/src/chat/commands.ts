@@ -15,11 +15,12 @@ export interface CommandContext {
   unmute(id: string): boolean;
   party(action: 'invite' | 'accept' | 'decline' | 'leave' | 'show', arg: string): void;
   startInvasion(): boolean;
+  clock(hour?: number): number;   // hora do mundo (0 a 24); com hora, muda para ela
   backup(): Promise<string>;
 }
 
 const PUBLIC = ['/ajuda — esta lista', '/quem — quem está online e onde', '/ignorar nome — esconde as mensagens de alguém, só para você (/designorar, /ignorados)',
-  '/grupo — quem está no seu grupo', '/convidar nome — chama para o grupo', '/aceitar e /recusar — respondem a um convite', '/sairdogrupo', '/p texto — fala só com o grupo'];
+  '/grupo — quem está no seu grupo', '/convidar nome — chama para o grupo', '/aceitar e /recusar — respondem a um convite', '/sairdogrupo', '/p texto — fala só com o grupo', '/hora — que horas são no mundo'];
 const PARTY = { grupo: 'show', convidar: 'invite', aceitar: 'accept', recusar: 'decline', sairdogrupo: 'leave' } as const;
 const ADMIN = [
   '/anunciar texto — aviso para todo o servidor',
@@ -28,7 +29,8 @@ const ADMIN = [
   '/dessilenciar nome',
   '/invasao — começa uma invasão de gelecas agora',
   '/dar [nome] item [quantidade] — sem nome, para você; item pelo nome ou id (coracao, cajado-de-fogo, ouro…)',
-  '/backup — cópia do banco agora'
+  '/backup — cópia do banco agora',
+  '/hora 18 (ou 18:30) — muda a hora do mundo'
 ];
 
 // "a b \"c d\"" → ['a', 'b', 'c d']
@@ -41,6 +43,8 @@ export function findItem(word: string): ItemId | 'gold' | null {
   if (isItem(n)) return n;
   return (Object.keys(ITEMS) as ItemId[]).find(id => norm(ITEMS[id].name) === n) ?? null;
 }
+// 18.5 → "18:30"
+export const clockText = (h: number) => { const m = Math.floor(h * 60) % 1440; return `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`; };
 const where = (f: Found) => f.w.map.regionAt(f.p.x, f.p.y)?.name ?? f.w.map.data.name;
 
 export async function runCommand(ctx: CommandContext, text: string) {
@@ -60,7 +64,8 @@ export async function runCommand(ctx: CommandContext, text: string) {
     ctx.party(action, a.join(' '));
     return;
   }
-  const known = ['anunciar', 'expulsar', 'silenciar', 'dessilenciar', 'invasao', 'dar', 'backup'];
+  if (cmd === 'hora' && (!a[0] || !ctx.admin)) { ctx.reply(`No mundo são ${clockText(ctx.clock())}.`); return; }
+  const known = ['hora', 'anunciar', 'expulsar', 'silenciar', 'dessilenciar', 'invasao', 'dar', 'backup'];
   if (!known.includes(cmd)) { ctx.reply(`Comando desconhecido: /${raw}. /ajuda mostra os comandos.`); return; }
   if (!ctx.admin) { ctx.reply(`Só administradores podem usar /${cmd}.`); return; }
 
@@ -107,6 +112,12 @@ export async function runCommand(ctx: CommandContext, text: string) {
         if (left) { ctx.reply(`Inventário de ${p.name} cheio: entraram ${n - left} de ${n}.`); return; }
       }
       ctx.reply(`${p.name} recebeu ${label}.`); return;
+    }
+    case 'hora': {
+      const m = /^(\d{1,2})(?:[:h](\d{2}))?h?$/.exec(a[0]);
+      const h = m ? Number(m[1]) + Number(m[2] ?? 0) / 60 : NaN;
+      if (!m || h >= 24 || Number(m[2] ?? 0) >= 60) { ctx.reply('Use: /hora 18 ou /hora 18:30 (de 0 a 23:59).'); return; }
+      ctx.reply(`Agora são ${clockText(ctx.clock(h))} no mundo.`); return;
     }
     case 'backup': {
       try { ctx.reply(`Backup feito: ${await ctx.backup()}`); } catch (e) { ctx.reply(`Backup falhou: ${e instanceof Error ? e.message : e}`); }

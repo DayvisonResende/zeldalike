@@ -18,6 +18,7 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 | 7 | Oficina: base e construtor de itens | G |
 | 8 | Instâncias e a primeira masmorra | G |
 | 9 | Raridade | M |
+| 10 | Correções rápidas (pedidos de 2026-10-29) | P |
 
 ## Sprint 0: ponto seguro
 
@@ -151,6 +152,20 @@ Tamanho: **P** cabe numa sessão de trabalho, **M** uma sessão inteira, **G** v
 - Corrigido de passagem: a previsão do celular ficava com a mochila vazia e usava a espada e o arco de base no lugar
   de cajados, gancho e equipamentos da Oficina (discordava do servidor e refazia passos).
 - [ ] Criar os primeiros lendários de verdade na Oficina (com o caminho garantido de cada um) e testar com a galera.
+
+## Sprint 10: correções rápidas
+
+Os pequenos de `PEDIDOS.md` (itens 2, 11, 15, 1 e 7).
+
+- [x] A hora do mundo fica no banco (a cada gravação e ao desligar) e continua ao reiniciar; mudar o config não faz a hora
+      pular. `/hora` mostra; `/hora 18` (admin) muda. Testado reiniciando o servidor: parou às 8h06, voltou às 8h08.
+- [x] O ícone 💬 também fecha o chat.
+- [x] Placas e conversas: ✕ na caixa, `Esc` ou andar fecham (sem abrir a loja); A e B continuam passando. Direção que já
+      estava apertada quando a fala abriu não fecha (só soltar e apertar de novo). Testado no PC e no celular (toque no ✕).
+- [x] Portas e entradas (portais) como um arco lilás no mapa do mundo e no minimapa, pulsando; no minimapa, as já vistas
+      fora do pedaço ficam presas na borda, apontando o caminho.
+- [x] Convite de grupo: grande no meio da tela, nome em destaque, som de campainha, vibração e barra do tempo (60 s).
+- [ ] Testar com a galera: convite de verdade (som e vibração no celular) e achar a porta da masmorra pelo minimapa.
 
 ## Inventário por tipo (vestir)
 

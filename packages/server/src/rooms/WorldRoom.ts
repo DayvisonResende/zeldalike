@@ -2,7 +2,7 @@ import { Room, ServerError, type Client } from 'colyseus';
 import path from 'node:path';
 import {
   INVITE_TTL, ITEMS, LOOT_IDS, RARITY_NAME, WEAR_SLOTS, sortBag, unwearItem, wearItem, type WearSlot, MARK_TTL, MSG, base64ToBits, bitsToBase64, buyItem, exploredOf, exploredSize, type MarkMsg, startInvasion, type LootId, equipGear, isGear, isItem, packSpell, parseGear, sellItem, TICK_RATE, World, arrive, dayTime, sunlight, blockedAt, decodeChatRequest, decodeInput, decodeProfileRequest, decodeTelemetry, dropItem, emptyInput, maxStats, ownState, refreshStats,
-  openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, useItem, viewRect, xpToNext,
+  openChests, packArrow, packBomb, packDrop, packEnemy, packPlayer, packThrown, parseInventory, pruneChests, pvpLock, remaining, respawn, respawnPos, setPvp, ticks, useItem, viewRect, xpToNext,
   type ChatMsg, type GearRules, type OnlineEntry, type PartyMsg, type PartyTuple, type GameEvent, type InputState, type ItemId, type JoinOptions, type Player, type Profile, type ProfileMsg, type SnapshotMsg, type WelcomeMsg
 } from '@vale/shared';
 import { toRules } from '../config/load';
@@ -10,6 +10,7 @@ import { configPath, getConfig, onConfig } from '../config/store';
 import { runCommand, type CommandContext, type Found } from '../chat/commands';
 import { filterChat } from '../chat/filter';
 import { backupNow } from '../persistence/backup';
+import { bootDay, saveDay } from '../persistence/state';
 import type { Config } from '../config/schema';
 import { getMaps, startMap } from '../map';
 import { eventFor, inView } from './interest';
@@ -55,6 +56,7 @@ export class WorldRoom extends Room {
   private partyAt = new Map<string, number>();   // último pedido de grupo de cada um (contra spam)
   private events = new Map<string, GameEvent[]>();   // eventos de cada mundo desde o último snapshot
   private ticks = 0;
+  private dayStart = 0;   // começo do relógio do mundo (0 a 1 do dia), como rules.daynight.start
   private night: boolean | null = null;   // para anunciar quando anoitece e quando amanhece
   private sendEvery = 3;
   private saveTimer?: NodeJS.Timeout;
@@ -66,9 +68,10 @@ export class WorldRoom extends Room {
 
   onCreate() {
     const seed = Date.now() | 0;
+    this.dayStart = bootDay() ?? getConfig().daynight.start / 24;   // a hora em que o servidor parou, ou a do config
     for (const [id, map] of Object.entries(getMaps())) {
       if (instanced(id)) continue;   // masmorras: uma cópia por grupo, criada quando alguém entra (ver instanceWorld)
-      const w = new World(map, toRules(getConfig()), seed + this.worlds.size);
+      const w = new World(map, this.rules(getConfig()), seed + this.worlds.size);
       w.home = id === startMap(); w.id = id;
       this.worlds.set(id, w); this.events.set(id, []);
     }
@@ -89,11 +92,21 @@ export class WorldRoom extends Room {
     this.scheduleSave();
   }
   private apply(c: Config) {
-    for (const w of this.worlds.values()) w.rules = toRules(c);
+    const day = dayTime(this.world);
+    for (const w of this.worlds.values()) w.rules = this.rules(c);
+    this.setDay(day);   // mudar o config (até o tamanho do dia) não faz a hora pular
     if (this.saveTimer) this.scheduleSave();
     this.maxClients = c.server.maxPlayers;
     this.sendEvery = Math.max(1, Math.round(TICK_RATE / c.network.sendRate));
     for (const s of this.seats.values()) s.client.send(MSG.rules, this.gearRules());   // números das armas mudaram
+  }
+  // Regras do config, com o relógio do mundo no lugar da hora inicial do config.
+  private rules(c: Config) { const r = toRules(c); r.daynight = { ...r.daynight, start: this.dayStart }; return r; }
+  // Faz a hora do dia ser t (0 a 1) agora, em todos os mapas (andam juntos, no mesmo tick).
+  private setDay(t: number) {
+    const cyc = ticks(this.world.rules.daynight.cycle), at = Math.round(t * cyc) - this.world.tick;
+    this.dayStart = (((at % cyc) + cyc) % cyc) / cyc;
+    for (const w of this.worlds.values()) w.rules.daynight = { ...w.rules.daynight, start: this.dayStart };
   }
   // Números das armas para o cliente mostrar (dano, mana, atributos de cada uma).
   private gearRules(): GearRules { const r = this.world.rules; return { weapons: r.weapons, magic: r.magic, gear: r.gear }; }
@@ -195,7 +208,7 @@ export class WorldRoom extends Room {
     let w = this.worlds.get(key);
     if (w) { this.emptySince.delete(key); return w; }
     const data = getMaps()[map]; if (!data) return null;
-    w = new World(data, toRules(getConfig()), (Date.now() + this.worlds.size) | 0);
+    w = new World(data, this.rules(getConfig()), (Date.now() + this.worlds.size) | 0);
     w.home = false; w.id = map;   // baús e mapa explorado contam pelo mapa, não pela cópia
     w.tick = this.world.tick;     // mesma hora do dia do mapa principal
     w.instance = true;            // monstros derrubados não voltam
@@ -283,6 +296,7 @@ export class WorldRoom extends Room {
   // /debug: anota em todas as gravações em andamento.
   private note(text: string) { for (const s of this.seats.values()) s.rec?.note(text); }
   private saveAll() {
+    saveDay(getDb(), dayTime(this.world)).catch(e => console.error('[banco] falha ao salvar a hora do dia:', e));
     return this.save([...this.seats.keys()].flatMap(id => { const f = this.find(id); return f ? [[f.seat, f.p] as [Seat, Player]] : []; }));
   }
   private scheduleSave() {
@@ -415,6 +429,7 @@ export class WorldRoom extends Room {
       unmute: sid => { const s = this.seats.get(sid); return !!s && this.muted.delete(s.charId); },
       party: (action, arg) => this.partyAction(id, action, arg, reply),
       startInvasion: () => startInvasion(this.world),
+      clock: hour => { if (hour !== undefined) this.setDay(hour / 24); return dayTime(this.world) * 24; },
       backup: () => { const b = getConfig().database.backup; return backupNow(getDb(), configPath(b.dir), b.keep); }
     };
   }

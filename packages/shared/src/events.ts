@@ -6,7 +6,7 @@ import type { ShopOffer } from './systems/shop';
 // `by` marca o jogador que causou o efeito: o cliente dele já o mostrou na hora (previsão),
 // então o servidor não manda de novo para ele.
 export type Sfx = 'swing' | 'cut' | 'hit' | 'lift' | 'throw' | 'break' | 'splash' | 'charge' | 'spin' | 'bump' | 'poof'
-  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use' | 'chest' | 'cast' | 'bite' | 'fuse' | 'boom' | 'cluck' | 'swarm' | 'fire' | 'heal' | 'shadow' | 'scrape' | 'rare' | 'legend';
+  | 'sign' | 'bow' | 'step' | 'dash' | 'bonk' | 'hop' | 'land' | 'thunk' | 'down' | 'pickup' | 'levelup' | 'use' | 'chest' | 'cast' | 'bite' | 'fuse' | 'boom' | 'cluck' | 'swarm' | 'fire' | 'heal' | 'shadow' | 'scrape' | 'rare' | 'legend' | 'invite';
 export type Palette = 'leaf' | 'grass' | 'rock' | 'water' | 'dust' | 'spark' | 'splinter' | 'fire' | 'heal' | 'shadow';
 export interface BurstOpts { s?: number; z?: number; up?: number }
 

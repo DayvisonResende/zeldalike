@@ -54,6 +54,8 @@ const SFX: Record<Sfx, () => void> = {
     [523, 659, 784, 1047, 1319, 1568].forEach((f, i) => setTimeout(() => tone('triangle', f, f, 0.14, 0.09), i * 75));
     setTimeout(() => [1047, 1319, 1568].forEach(f => tone('sine', f, f, 0.9, 0.06)), 460);
   },
+  // convite para grupo: dois toques de campainha, para não passar despercebido
+  invite: () => { [988, 1319].forEach((f, i) => setTimeout(() => tone('sine', f, f, 0.22, 0.12), i * 160)); setTimeout(() => [988, 1319].forEach((f, i) => setTimeout(() => tone('sine', f, f, 0.22, 0.09), i * 160)), 900); },
   cluck: () => { tone('square', 700, 520, 0.05, 0.07); setTimeout(() => tone('square', 760, 560, 0.05, 0.07), 70); },
   swarm: () => { for (let i = 0; i < 6; i++) setTimeout(() => tone('square', 600 + i * 60, 450, 0.06, 0.06), i * 55); },
   fuse: () => noise(0.5, 0.06, 5000, 'highpass'),

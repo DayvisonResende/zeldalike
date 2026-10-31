@@ -34,6 +34,8 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .roomname.show{opacity:1}
 .dialog{position:absolute;left:5%;right:5%;bottom:4.5%;min-height:25%;background:var(--box);border:3px solid #ece6f5;box-shadow:inset 0 0 0 2px #4d4380;border-radius:4px;padding:2.4cqw 3.2cqw 3.2cqw;font-family:var(--f-pixel);font-size:clamp(12px,3.5cqw,25px);line-height:1.4;color:#f6f2fc}
 .dialog p{margin:0;max-width:60ch}
+.dialog .x{position:absolute;top:.25em;right:.35em;width:1.9em;height:1.9em;display:grid;place-items:center;padding:0;font:inherit;font-size:.8em;line-height:1;color:#f6f2fc;background:none;border:0;cursor:pointer;opacity:.7;pointer-events:auto}
+.dialog .x:hover,.dialog .x:focus-visible{opacity:1}
 .dialog .who{display:block;color:#9fe0b0;font-weight:600;margin-bottom:.2em}
 .more{position:absolute;right:2.6cqw;bottom:1.6cqw;color:var(--amber);font-size:.8em;animation:blink .8s steps(2) infinite}
 .start{position:absolute;inset:0;display:grid;place-items:center;background:rgba(10,8,18,.5);cursor:pointer}
@@ -102,8 +104,16 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .pm[data-dead=true]{color:#ff8a7a}
 .pm[data-dead=true] .bar{--fill:#5a5266;--hi:#6d6479}
 /* convite para grupo, no alto da tela */
-.invite{position:absolute;top:3.5%;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:.7em;padding:.5em .8em;font-size:clamp(10px,2.4cqw,15px);background:var(--box);border:3px solid #ece6f5;box-shadow:inset 0 0 0 2px #4d4380;z-index:5;max-width:92%}
-.invite .primary{padding:.25em .7em}
+.invite{position:absolute;top:26%;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;align-items:center;gap:.55em;padding:.8em 1.4em 1em;font-family:var(--f-pixel);font-size:clamp(12px,3.2cqw,20px);text-align:center;background:var(--box);border:3px solid var(--amber);box-shadow:inset 0 0 0 2px #4d4380,0 0 0 4px rgba(27,18,38,.6);z-index:5;width:max-content;max-width:92%;animation:invpop .5s steps(4) both,invglow 1.2s steps(2) .5s 3}
+.invite .invtitle{font-size:.7em;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+.invite span b{color:#7be08a;font-size:1.15em}
+.invite .invacts{display:flex;gap:1em;align-items:center}
+.invite .primary{padding:.4em 1.2em;min-height:36px}
+.invite .link{min-height:36px}
+.invite .invtime{display:block;width:100%;height:4px;background:rgba(236,230,245,.2)}
+.invite .invtime i{display:block;height:100%;background:var(--amber);transform-origin:left;transform:scaleX(var(--left,1))}
+@keyframes invpop{from{transform:translateX(-50%) scale(.6);opacity:0}to{transform:translateX(-50%) scale(1);opacity:1}}
+@keyframes invglow{50%{border-color:#ece6f5}}
 .invitebox{display:flex;flex-wrap:wrap;align-items:center;gap:.7em;padding:.5em .7em;border:2px solid var(--amber)}
 .plist{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:.35em}
 .plist li{display:flex;flex-wrap:wrap;align-items:baseline;gap:.2em .5em}
@@ -125,7 +135,7 @@ canvas{display:block;width:100%;height:100%;image-rendering:crisp-edges;image-re
 .raid{font-family:var(--f-display);font-size:clamp(8px,2.2cqw,13px);color:#ff9a8a;text-shadow:1px 1px 0 #000;white-space:nowrap}
 .raid[data-warn=true]{animation:raid-blink 1s steps(2) infinite}
 @keyframes raid-blink{50%{opacity:.35}}
-@media (prefers-reduced-motion:reduce){.raid[data-warn=true]{animation:none}}
+@media (prefers-reduced-motion:reduce){.raid[data-warn=true]{animation:none}.invite{animation:none}}
 .gold canvas{width:clamp(10px,2.6cqw,16px);height:auto;image-rendering:pixelated}
 
 /* Textos que sobem da cabeça: +5 XP, +1 Coração, Nível 3! */
@@ -335,6 +345,7 @@ body.gamepad .stage{width:min(100vw,calc(100dvh * 256 / 224))}
   .titlebg{z-index:9}                             /* por cima do controle de toque, abaixo das telas de conta */
   .gearline{font-size:clamp(9px,2.6cqw,13px);gap:.6em}
   .gearline button{min-height:36px;padding:.3em .8em}   /* troca rápida: do tamanho do dedo */
+  .dialog .x{width:40px;height:40px;top:0;right:0;font-size:16px}   /* fechar a placa: do tamanho do dedo */
 }
 /* Deitado: a tela do jogo usa a altura toda e o controle vai para as faixas dos lados */
 @media (hover:none) and (pointer:coarse) and (orientation:landscape){

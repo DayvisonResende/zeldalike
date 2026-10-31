@@ -35,7 +35,7 @@
     <div class="boss" id="boss" hidden><b>Rei Geleca</b><div class="bar" role="meter" aria-label="Vida do Rei Geleca" aria-valuemin="0"></div></div>
     <div class="death" id="death" role="alert" hidden><strong>Você caiu</strong><span id="deathTimer"></span></div>
     <div class="status" id="status" role="status" hidden></div>
-    <div class="dialog" id="dialog" aria-live="polite" hidden><b class="who" id="dlgWho" hidden></b><p id="dlgText"></p><span class="more" id="dlgMore">▼</span></div>
+    <div class="dialog" id="dialog" aria-live="polite" hidden><b class="who" id="dlgWho" hidden></b><p id="dlgText"></p><span class="more" id="dlgMore">▼</span><button class="x" id="dlgClose" type="button" aria-label="Fechar (Esc, ou ande)">✕</button></div>
     <div class="names" id="names" aria-hidden="true"></div>
     <div class="floaters" id="floaters" aria-hidden="true"></div>
     <div class="fishbar" id="fishbar" role="status" hidden><span></span><div class="fishtrack"><i class="zone"></i><i class="cursor"></i></div></div>
@@ -155,7 +155,10 @@
     <button class="fsbtn" id="fsCorner" type="button" aria-label="Tela cheia" hidden>⛶</button>
     <button class="mapbtn" id="mapBtn" type="button" aria-label="Mapa (M)">🗺</button>
     <div class="invite" id="inviteToast" role="alertdialog" aria-label="Convite para grupo" hidden>
-      <span></span><button type="button" class="primary" data-act="accept">Aceitar</button><button type="button" class="link" data-act="decline">Recusar</button>
+      <b class="invtitle">Convite para grupo</b>
+      <span></span>
+      <div class="invacts"><button type="button" class="primary" data-act="accept">Aceitar</button><button type="button" class="link" data-act="decline">Recusar</button></div>
+      <i class="invtime" aria-hidden="true"><i></i></i>
     </div>
     <canvas class="minimap" id="minimap" aria-label="Minimapa: toque para abrir o mapa" hidden></canvas>
     <div class="worldmap" id="worldmap" role="dialog" aria-label="Mapa" hidden>

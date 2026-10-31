@@ -67,6 +67,13 @@ export function pin(x: Ctx, cx: number, cy: number, s = 1) {
   x.beginPath(); x.arc(cx, cy - 7 * s, 4 * s, 0, Math.PI * 2); x.fill();
   x.fillStyle = '#fff4ee'; x.fillRect(Math.round(cx - 1 * s), Math.round(cy - 8 * s), Math.max(1, Math.round(2 * s)), Math.max(1, Math.round(2 * s)));
 }
+// Porta, entrada de caverna ou de masmorra (portal): um arco escuro com moldura lilás.
+export function door(x: Ctx, cx: number, cy: number, s = 1) {
+  const arch = (w: number, h: number) => { x.beginPath(); x.moveTo(cx - w, cy + h); x.lineTo(cx - w, cy - h + w); x.arc(cx, cy - h + w, w, Math.PI, 0); x.lineTo(cx + w, cy + h); x.closePath(); x.fill(); };
+  x.fillStyle = '#1b1226'; arch(5 * s + 1, 6 * s + 1);
+  x.fillStyle = '#c79bf0'; arch(5 * s, 6 * s);
+  x.fillStyle = '#1b1226'; arch(2.6 * s, 3.8 * s);
+}
 // Você: uma seta amarela apontando para onde olha.
 export function meArrow(x: Ctx, cx: number, cy: number, dir: number, s = 1) {
   const a = [Math.PI / 2, -Math.PI / 2, Math.PI, 0][dir] ?? 0, ca = Math.cos(a), sa = Math.sin(a);

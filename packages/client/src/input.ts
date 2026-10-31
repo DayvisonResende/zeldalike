@@ -8,7 +8,7 @@ const MAP: Record<string, Key> = {
 };
 export interface InputHooks { started(): boolean; start(): void; toggleMap(): void; openParty(): void; togglePaths(): void; toggleMenu(): void; openChat(): void; togglePvp(): void; toggleBag(): void; quickUse(n: 1 | 2 | 3): void; swapGear(slot: 'a' | 'c'): void }
 // Cliques e teclas dentro do menu são do menu, não do jogo.
-export const UI_SELECTOR = '.gearline, .menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap, .invite';
+export const UI_SELECTOR = '.gearline, .dialog .x, .menu, .menubtn, .chatbar, .chatbtn, .chatlog, .account, .bag, .bagbtn, .fsbtn, .mapbtn, .minimap, .worldmap, .invite';
 const inMenu = (t: EventTarget | null) => !!(t as Element | null)?.closest?.(UI_SELECTOR);
 const typing = (t: EventTarget | null) => !!(t as Element | null)?.closest?.('input, textarea, select');
 

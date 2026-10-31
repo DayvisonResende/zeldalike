@@ -4,6 +4,7 @@ import type { Generated } from 'kysely';
 export interface DB {
   accounts: { id: Generated<number>; username: string; pass_hash: string; created_at: number; last_login: number | null };
   sessions: { token_hash: string; account_id: number; created_at: number; expires_at: number };
+  server_state: { key: string; value: string };
   fish_records: { item: string; size: number; character: string; at: number };
   characters: {
     id: Generated<number>; account_id: number; name: string; name_key: string;

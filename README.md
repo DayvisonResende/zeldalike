@@ -57,7 +57,10 @@ Regras para manter o projeto saudável:
 
 ## No jogo
 
-`Enter` (ou 💬) abre o chat: **Perto** chega a quem está na tela e vira balão sobre a cabeça; **Todos**
+**Placas e conversas:** o botão de Ação lê; A ou B mostra a página inteira e depois passa. Para sair no meio: o ✕ da
+caixa, `Esc` ou simplesmente andar (não abre a loja do lojista).
+
+`Enter` (ou 💬, que também fecha) abre o chat: **Perto** chega a quem está na tela e vira balão sobre a cabeça; **Todos**
 (`Tab` troca, ou comece com `/t`) chega ao servidor inteiro. Limites e anti-spam ficam no `config.yaml`.
 
 **PvP:** o modo do servidor fica no `config.yaml`. No `optional`, cada um liga o seu com `V` (ou no menu);
@@ -65,7 +68,8 @@ depois de ligar só desliga após o cooldown, e não desliga logo depois de uma 
 Zonas seguras (a Clareira, por padrão) não têm PvP nem monstros.
 
 **Dia e noite:** um dia inteiro dura `daynight.cycle` (24 min por padrão); o relógio aparece no HUD e o chat avisa
-quando anoitece e amanhece. À noite o mundo escurece, cada jogador carrega uma luz pequena e as tochas iluminam.
+quando anoitece e amanhece. A hora fica salva no banco: reiniciar o servidor não volta para a manhã (`daynight.start`
+só vale na primeira vez; depois, `/hora 18` muda). À noite o mundo escurece, cada jogador carrega uma luz pequena e as tochas iluminam.
 
 **Levantar amigos:** `E` de frente para outro jogador levanta; `E` de novo arremessa (passa por cima de rio e barranco;
 cair em monstro machuca o monstro). No colo de alguém, aperte as teclas rápido para se soltar. Desliga em `fun.liftPlayers`.
@@ -91,7 +95,7 @@ sozinhos depois de `regrow.block` sem ninguém perto. Nas Ruínas de Aurel há u
 
 **Mapa do mundo:** `M` (ou o botão 🗺, ou tocar no minimapa do canto) abre o mapa do mapa atual, desenhado a partir dos
 tiles. Ele começa escuro e se revela conforme você anda (o explorado fica salvo no personagem). Mostra regiões, zonas
-seguras, lojas, portais, baús, quem está no mapa e os marcadores: tocar ou clicar põe o seu "venham aqui!", que vale por
+seguras, lojas, portais (um arco lilás que pulsa; no minimapa também, preso na borda quando está fora), baús, quem está no mapa e os marcadores: tocar ou clicar põe o seu "venham aqui!", que vale por
 1 minuto (no mundo, um alfinete; fora da tela, uma seta na borda). Em grupo, só o grupo vê; sem grupo, todos no mapa. O minimapa liga e desliga em Opções.
 O som agora fica só em Opções (o `M` é do mapa).
 
@@ -114,8 +118,8 @@ Todo lendário deve ter um caminho garantido (loja, baú ou monstro com 100%); a
 ele, por cima de água e buracos; em monstro, tira um pouco e atordoa; num item do chão, traz até você. Fica no baú do
 Covil do Besouro, na Masmorra do Musgo. Qualquer item da Oficina pode se comportar como gancho (`"like": "hook"`).
 
-**Grupo:** `G` (ou Menu → Grupo) mostra quem está online, em que região, com "Convidar". O convite aparece no alto da
-tela (Aceitar/Recusar) e na aba Grupo; também dá pelo chat: `/convidar nome`, `/aceitar`, `/recusar`, `/sairdogrupo`,
+**Grupo:** `G` (ou Menu → Grupo) mostra quem está online, em que região, com "Convidar". O convite aparece grande no meio
+da tela, com som, vibração e uma barra do tempo que falta (Aceitar/Recusar), e na aba Grupo; também dá pelo chat: `/convidar nome`, `/aceitar`, `/recusar`, `/sairdogrupo`,
 `/grupo`. Até `party.maxSize` (4) por grupo; quem convidou lidera (pode convidar e tirar; saindo, o mais antigo lidera).
 No grupo: a vida de cada um aparece embaixo da sua (e onde está, se estiver em outro mapa), uma seta verde na borda da
 tela aponta para quem está longe, o nome fica verde, o XP de monstro é dividido igualmente com quem estiver até
@@ -292,6 +296,7 @@ Administradores são os usuários (o login da conta) da lista `admins` no `confi
 | --- | --- | --- |
 | `/ajuda` | todos | lista os comandos |
 | `/quem` | todos | quem está online e onde |
+| `/hora` | todos | que horas são no mundo (admin: `/hora 18` ou `/hora 18:30` muda a hora) |
 | `/ignorar nome` (`/designorar`, `/ignorados`) | todos | esconde as mensagens de alguém, só para você (fica no navegador) |
 | `/anunciar texto` | admin | aviso para todo o servidor (chat e tela) |
 | `/expulsar nome [motivo]` | admin | tira do servidor (pode voltar) |

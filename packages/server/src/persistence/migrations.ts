@@ -66,6 +66,15 @@ export const migrations: Record<string, Migration> = {
       await db.schema.alterTable('characters').addColumn('chests', 'text', c => c.notNull().defaultTo('{}')).execute();   // {"mapa:x,y": quando abriu (ms)}
     }
   },
+  '012_hora_do_mundo': {
+    async up(db: Kysely<unknown>) {
+      // valores soltos do servidor: {"key": "day", "value": "0.42"} (hora do dia, para continuar depois de reiniciar)
+      await db.schema.createTable('server_state')
+        .addColumn('key', 'text', c => c.primaryKey())
+        .addColumn('value', 'text', c => c.notNull())
+        .execute();
+    }
+  },
   '011_vestir': {
     async up(db: Kysely<unknown>) {
       // o que está vestido: {"head": {"id": "elmo", "n": 1, "roll": {"hp": 5}}, ...}

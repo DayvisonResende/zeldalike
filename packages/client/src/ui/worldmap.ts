@@ -1,5 +1,5 @@
 import type { PlayerView, Profile, WorldMap } from '@vale/shared';
-import { PX, dot, label, mapImage, meArrow, pin, seenAt } from '../render/mapimage';
+import { PX, door, dot, label, mapImage, meArrow, pin, seenAt } from '../render/mapimage';
 import type { MapState } from '../session/types';
 
 export interface WorldMapHooks {
@@ -19,9 +19,7 @@ function drawOverlay(x: Ctx, v: NonNullable<ReturnType<WorldMapHooks['view']>>, 
     if (seen && map.data.regions.length > 1) label(x, r.name, cx, cy, 11, state.safe.includes(r.id) ? '#bff5c8' : '#f6f2fc');
   }
   for (const p of map.data.portals ?? []) if (seenAt(map, state, p.x + p.w / 2, p.y + p.h / 2)) {
-    const cx = (p.x + p.w / 2) * s, cy = (p.y + p.h / 2) * s;
-    x.strokeStyle = '#1b1226'; x.lineWidth = 4; x.beginPath(); x.arc(cx, cy, 4, 0, Math.PI * 2); x.stroke();
-    x.strokeStyle = '#c79bf0'; x.lineWidth = 2; x.beginPath(); x.arc(cx, cy, 4, 0, Math.PI * 2); x.stroke();
+    door(x, (p.x + p.w / 2) * s, (p.y + p.h / 2) * s, (tick >> 5) & 1 ? 1.25 : 1.1);   // pulsa devagar: as entradas são o que mais se procura
   }
   for (const c of map.data.chests ?? []) if (seenAt(map, state, c.x * 16 + 8, c.y * 16 + 8)) {
     x.fillStyle = '#1b1226'; x.fillRect(c.x * PX + 1, c.y * PX + 2, PX - 2, PX - 3); x.fillStyle = '#e9b44c'; x.fillRect(c.x * PX + 2, c.y * PX + 3, PX - 4, PX - 5);
@@ -71,7 +69,7 @@ export class WorldMapPanel {
   }
 }
 
-/* Minimapa no canto: um pedaço do mapa em volta de você, com quem está perto e os marcadores. Tocar abre o mapa. */
+/* Minimapa no canto: um pedaço do mapa em volta de você, com as entradas (portas, cavernas), quem está perto e os marcadores. Tocar abre o mapa. */
 const VIEW_W = 24, VIEW_H = 18;   // tiles
 export class Minimap {
   private cv = document.getElementById('minimap') as HTMLCanvasElement;
@@ -90,6 +88,12 @@ export class Minimap {
     x.drawImage(img, sx, sy, VIEW_W * PX, VIEW_H * PX, 0, 0, this.cv.width, this.cv.height);
     const at = (px: number, py: number): [number, number] => [(px / 16 * PX - sx) * k, (py / 16 * PX - sy) * k];
     for (const o of state.roster) { const [ox, oy] = at(o.x * 16 + 8, o.y * 16 + 8); if (ox >= 0 && oy >= 0 && ox < this.cv.width && oy < this.cv.height) dot(x, ox, oy, 1.5, v.party.has(o.id) ? '#7be08a' : '#7ac8ff'); }
+    for (const p of map.data.portals ?? []) {   // entradas já vistas; as de fora ficam presas na borda, apontando o caminho
+      const px = p.x + p.w / 2, py = p.y + p.h / 2; if (!seenAt(map, state, px, py)) continue;
+      const [dx, dy] = at(px, py), W = this.cv.width, H = this.cv.height;
+      const inside = dx >= 0 && dy >= 0 && dx < W && dy < H, pulse = (tick >> 4) & 1;
+      door(x, Math.max(5, Math.min(W - 5, dx)), Math.max(6, Math.min(H - 5, dy)), inside ? (pulse ? 0.9 : 0.8) : 0.6);
+    }
     for (const m of state.marks) {
       const [mx, my] = at(m.x, m.y);
       pin(x, Math.max(4, Math.min(this.cv.width - 4, mx)), Math.max(9, Math.min(this.cv.height - 1, my)), 0.6);

@@ -6,11 +6,13 @@ import { startServer } from './app';
 import { openDatabase, setDb } from './persistence/db';
 import { purgeSessions } from './persistence/accounts';
 import { scheduleBackups } from './persistence/backup';
+import { loadDay, setBootDay } from './persistence/state';
 import { MapError, type MapData } from '@vale/shared';
 import { checkPortals, loadMap, setMaps } from './map';
 import { ITEMS_DIR, ItemsError, getCatalog, loadItems, setCatalog, watchItems } from './content/items';
 import { oficinaEnabled } from './oficina/routes';
 import { preciseTimers } from './timer';
+import { clockText } from './chat/commands';
 
 // CONFIG=arquivo.yaml troca a configuração (por exemplo, uma de produção ou de teste).
 const CONFIG_FILE = process.env.CONFIG ? path.resolve(process.env.CONFIG) : fileURLToPath(new URL('../config.yaml', import.meta.url));
@@ -52,6 +54,9 @@ const dbFile = path.resolve(path.dirname(CONFIG_FILE), getConfig().database.file
 const db = await openDatabase(dbFile);
 setDb(db);
 console.log(`[banco] ${dbFile}`);
+const day = await loadDay(db);   // o relógio do mundo continua de onde parou
+setBootDay(day);
+if (day !== null) console.log(`[relógio] mundo continua às ${clockText(day * 24)}`);
 setInterval(() => { purgeSessions(db).catch(e => console.error('[banco]', e)); }, 3_600_000).unref();
 // Backups automáticos (pasta relativa ao arquivo de config, como o banco).
 scheduleBackups(db, () => ({ ...getConfig().database.backup, dir: configPath(getConfig().database.backup.dir) }));

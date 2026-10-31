@@ -37,9 +37,10 @@ mundo para os lados até preencher a tela.
   transparentes, mas vão cobrir parte da cena.
 - No PvP, quem tem tela mais larga vê mais. Entre amigos, isso é aceitável. Se incomodar, limito a largura máxima.
 - Para o problema de achar a porta da masmorra, há uma solução mais barata que já ajuda sozinha: **marcar portas e
-  entradas no minimapa e no mapa (M)** com um ícone. Recomendo fazer as duas coisas, começando pelo marcador (P).
+  entradas no minimapa e no mapa (M)** com um ícone. Recomendo fazer as duas coisas, começando pelo marcador (P). O
+  marcador foi feito em 2026-10-30.
 
-### 2. A hora volta para a manhã quando o servidor reinicia (P), um defeito
+### 2. A hora volta para a manhã quando o servidor reinicia (P), um defeito: corrigido em 2026-10-30
 
 **Hoje:** não é de propósito. O relógio do jogo é "hora inicial do `config.yaml` (8h) + tempo desde que o servidor
 ligou", e nada é guardado.
@@ -105,7 +106,7 @@ Precisa de regras contra bagunça:
 - Um conflito futuro: quando a armadura for desenhada no personagem, ela cobre a camisa. Proposta: a cor escolhida
   aparece quando não há nada vestido ali, ou a armadura "tinge" com a sua cor.
 
-### 7. Convite de grupo com confirmação (já existe; talvez pouco visível)
+### 7. Convite de grupo com confirmação (já existe; talvez pouco visível): mais chamativo em 2026-10-30
 
 **Hoje:** quem é convidado recebe um aviso no topo da tela com **Aceitar** e **Recusar**. Ninguém entra no grupo sem
 aceitar.
@@ -169,7 +170,7 @@ ele faz, e uma tela para trocar as teclas e os botões do controle.
 
 ### 11. Chat no celular: o teclado cobre o jogo, e o ícone não fecha o chat
 
-**O ícone não fecha (P), um defeito:** tocar no ícone com o chat aberto deveria fechar. Correção simples.
+**O ícone não fecha (P), um defeito:** corrigido em 2026-10-30.
 
 **O teclado (M):** o teclado é do Android; não dá para diminuí-lo. O que dá para fazer:
 
@@ -216,7 +217,7 @@ mais difícil para quem está começando. Recomendo baixar junto com a pescaria 
   "prata", por exemplo) para as quatro moedas aparecerem.
 - Recomendo fazer quando a economia crescer (horta, pesca, receitas). Até lá, ouro e prata bastam.
 
-### 15. Placas: dá para pular o texto (P)
+### 15. Placas: dá para pular o texto (P): feito em 2026-10-30
 
 **Hoje:** é preciso passar todas as páginas.
 
@@ -363,6 +364,21 @@ O que fica de fora:
 
 Para isso, o Piskel ou o Aseprite continuam melhores, e a Oficina continua aceitando PNG de fora.
 
+**Atalho: o Piskel embutido (pergunta de 2026-10-30).** O Piskel é de código aberto (licença Apache 2.0, que permite
+embutir, mantendo o aviso de licença) e roda no navegador. Dá para servir uma cópia dele junto com a Oficina e abrir
+numa janela dentro dela, já com o tamanho e os quadros do molde, e com um botão "Salvar no jogo" que traz os quadros
+de volta.
+
+- **A favor:** tudo pronto (camadas, onion skin, prévia, espelho), em dias em vez de semanas.
+- **Contra:**
+  - o Piskel não tem uma interface oficial para outro site conversar com ele; a ponte usa o código interno dele, que
+    pode mudar numa versão nova (por isso fixamos uma versão);
+  - a tela dele é em inglês;
+  - no celular é ruim;
+  - o projeto anda devagar.
+- **Recomendação:** começar pelo Piskel embutido, com uma prova rápida antes (abrir um ícone, editar e salvar de
+  volta). Se funcionar bem, o Ateliê próprio só vira necessário se o Piskel atrapalhar.
+
 **Quando:** junto com o construtor de criaturas (item 16). Primeiro o editor de um quadro só (que já serve para os
 ícones dos itens), depois os quadros e a animação.
 
@@ -370,7 +386,7 @@ Para isso, o Piskel ou o Aseprite continuam melhores, e a Oficina continua aceit
 
 Combinado em 2026-10-29: o que dá independência na criação vem antes do resto.
 
-1. **Correções rápidas (P cada, cabem num sprint pequeno):**
+1. ~~**Correções rápidas**~~ (feito em 2026-10-30, Sprint 10 em `SPRINTS.md`):
    - hora que continua depois de reiniciar (2);
    - o ícone do chat fecha o chat (11);
    - placas e conversas que se pulam (15);

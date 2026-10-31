@@ -1,5 +1,6 @@
 import { INVITE_TTL, type OnlineEntry, type PartyMsg, type PartyRequest } from '@vale/shared';
 import type { PartyState } from '../session/types';
+import { sfx } from '../audio';
 
 export interface PartyHooks {
   party(): PartyState | null;
@@ -7,6 +8,7 @@ export interface PartyHooks {
   send(req: PartyRequest): void;
   online: boolean;   // offline não tem grupo
   active(): boolean; // a aba Grupo está à vista
+  buzz?(): void;     // vibra o celular (se a vibração estiver ligada nas opções)
 }
 const WHO_EVERY = 3000;   // ms entre atualizações da lista de quem está online (só com a aba aberta)
 
@@ -20,6 +22,7 @@ export class PartyPanel {
   private onlineEl = document.getElementById('onlineList')!;
   private boxes = [document.getElementById('inviteToast')!, document.getElementById('partyInvite')!];
   private invite: { from: string; until: number } | null = null;
+  private timeBar = document.querySelector<HTMLElement>('#inviteToast .invtime')!;   // quanto tempo falta para o convite valer
   private who: OnlineEntry[] | null = null;
   private whoAt = 0; private partyKey = '?'; private whoKey = '?'; private inviteKey = '?';
 
@@ -32,7 +35,11 @@ export class PartyPanel {
   }
   // Mensagem do servidor: convite (ou o fim dele) e a lista de quem está online.
   receive(m: PartyMsg) {
-    if ('invite' in m) this.invite = m.invite && { from: m.invite.from, until: Date.now() + Math.min(m.invite.ttl, INVITE_TTL) };
+    if ('invite' in m) {
+      const fresh = !!m.invite && m.invite.from !== this.invite?.from;
+      this.invite = m.invite && { from: m.invite.from, until: Date.now() + Math.min(m.invite.ttl, INVITE_TTL) };
+      if (fresh) { sfx('invite'); this.hooks.buzz?.(); }   // som e vibração: o convite não pode passar despercebido
+    }
     else this.who = m.who;
   }
   answer(yes: boolean) {
@@ -49,11 +56,15 @@ export class PartyPanel {
     this.renderOnline();
   }
   private renderInvite(menuOpen: boolean) {
+    if (this.invite) this.timeBar.style.setProperty('--left', String(Math.max(0, (this.invite.until - Date.now()) / INVITE_TTL)));
     const key = this.invite ? `${this.invite.from}|${menuOpen}` : '';
     if (key === this.inviteKey) return;
     this.inviteKey = key;
     const [toast, inTab] = this.boxes;
-    for (const b of this.boxes) { b.hidden = !this.invite; if (this.invite) b.querySelector('span')!.textContent = `${this.invite.from} te convidou para o grupo.`; }
+    for (const b of this.boxes) {
+      b.hidden = !this.invite;
+      if (this.invite) b.querySelector('span')!.replaceChildren(el('b', { textContent: this.invite.from }), ' te convidou para o grupo.');
+    }
     toast.hidden = !this.invite || menuOpen;   // com o menu aberto, o convite aparece dentro da aba Grupo
     inTab.hidden = !this.invite;
   }

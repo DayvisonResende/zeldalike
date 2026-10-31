@@ -191,7 +191,7 @@ events:
 # ── Dia e noite ───────────────────────────────────────
 daynight:
   cycle: 24m                # duração de um dia inteiro (24m = 1 minuto real por hora do jogo)
-  start: 8                  # hora em que o servidor começa (0 a 24)
+  start: 8                  # hora do primeiro dia (0 a 24). Depois a hora fica salva no banco e continua ao reiniciar; /hora 18 muda
 
 # ── Jogadores ─────────────────────────────────────────
 player:

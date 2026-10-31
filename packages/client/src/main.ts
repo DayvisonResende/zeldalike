@@ -224,7 +224,7 @@ const bindChat = (s: Session) => { s.onChat = m => {
 }; };
 bindChat(session);
 // Esc fecha o chat se ele estiver aberto; senão abre/fecha o menu. Enter numa placa avança o texto.
-function toggleMenu() { if (!started) return; if (chat.open) chat.hide(); else if (worldMap.open) worldMap.close(); else if (shop.open) shop.close(); else if (bag.open) bag.close(); else menu.toggle(); }
+function toggleMenu() { if (!started) return; if (dialog.open) dialog.close(); else if (chat.open) chat.hide(); else if (worldMap.open) worldMap.close(); else if (shop.open) shop.close(); else if (bag.open) bag.close(); else menu.toggle(); }
 function openChat() { if (!started || menu.open) return; if (dialog.open) { dialog.update(BUTTON.b); return; } chat.show(); }
 function togglePvp() {
   const info = session.pvp(), me = session.me();
@@ -250,7 +250,8 @@ document.getElementById('mapBtn')!.addEventListener('click', () => toggleMap());
 // Grupo (G): abre o menu direto na aba Grupo.
 const partyPanel = new PartyPanel({
   party: () => session.party(), meId: () => session.me()?.id ?? '', send: r => session.partyRequest(r),
-  online: !OFFLINE, active: () => menu.open && menu.tabNow === 'party'
+  online: !OFFLINE, active: () => menu.open && menu.tabNow === 'party',
+  buzz: () => { if (settings.vibrate) try { navigator.vibrate?.([60, 80, 60]); } catch { } }
 });
 function openParty() { if (!started || chat.open || bag.open || shop.open || worldMap.open) return; if (menu.open) menu.close(); else menu.show('party'); }
 function toggleBag() { if (!started || menu.open || chat.open) return; bag.toggle(); }
@@ -286,7 +287,7 @@ const pads = new Gamepads(input, {
 });
 startEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); begin(); });
 stage.addEventListener('pointerdown', e => { ensureAudio(); if (!(e.target as Element).closest(UI_SELECTOR)) refocus(); });
-document.getElementById('chatBtn')!.addEventListener('click', () => { begin(); openChat(); });
+document.getElementById('chatBtn')!.addEventListener('click', () => { begin(); if (chat.open) chat.hide(); else openChat(); });   // o ícone abre e fecha
 document.getElementById('bagBtn')!.addEventListener('click', () => { begin(); toggleBag(); });
 document.getElementById('menuBtn')!.addEventListener('click', () => { if (!account.open) menu.toggle(); });
 
@@ -339,7 +340,7 @@ function update() {
   let inp = emptyInput();
   pads.poll();
   if (!started || menu.open || chat.open || bag.open || shop.open || worldMap.open) input.clearTaps();   // com o menu aberto o personagem fica parado, mas o mundo continua
-  else if (dialog.open) dialog.update(input.sample(null).tap);   // lendo: o personagem fica parado, mas o mundo continua
+  else if (dialog.open) { const s = input.sample(null); dialog.update(s.tap, s.up || s.down || s.left || s.right); }   // lendo: o personagem fica parado (andar fecha), mas o mundo continua
   else inp = input.sample(aim());
   const gear = session.inventory()?.gear;   // /debug: com o quê (espada, arco, cajado…)
   if (inp.tap & BUTTON.a) debug.event('ataque ' + (gear?.a ?? 'A'));
